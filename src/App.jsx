@@ -43,14 +43,18 @@ export default function App() {
   // Load user + profile
   const loadProfile = async (authUser) => {
     if (!authUser) { setProfile(null); return; }
-    const { data } = await getUserProfile(authUser.id);
+    const { data, error } = await getUserProfile(authUser.id);
     if (data) {
       setProfile(data);
-    } else {
-      // Auto-create profile for new users (default: personel)
+    } else if (!error) {
+      // No profile exists yet → auto-create with default role 'personel'
       const newProfile = { user_id: authUser.id, role: 'personel', full_name: authUser.email };
-      await upsertUserProfile(newProfile);
-      setProfile({ ...newProfile });
+      const { data: created } = await upsertUserProfile(newProfile);
+      setProfile(created?.[0] || { ...newProfile });
+    } else {
+      // Error reading profile (e.g. RLS issue) → do NOT overwrite, use minimal fallback
+      console.error('loadProfile error:', error);
+      setProfile({ user_id: authUser.id, role: 'personel', full_name: authUser.email, _fallback: true });
     }
   };
 
