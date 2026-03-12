@@ -62,13 +62,16 @@ export default function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
-      await loadProfile(u);
+      try { await loadProfile(u); } catch(e) { console.error('Session loadProfile error:', e); }
+      setLoading(false);
+    }).catch((e) => {
+      console.error('getSession error:', e);
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      await loadProfile(u);
+      try { await loadProfile(u); } catch(e) { console.error('Auth change loadProfile error:', e); }
     });
     return () => subscription.unsubscribe();
   }, []);
