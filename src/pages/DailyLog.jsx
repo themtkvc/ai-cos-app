@@ -20,7 +20,6 @@ const CATEGORIES = [
 ];
 
 const NON_WORK_STATUSES = ['saglik_izni', 'egitim_izni', 'yillik_izin', 'calismiyor'];
-
 const DAYS_TR   = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
@@ -46,7 +45,6 @@ function getWeekDates(referenceDate) {
   });
 }
 
-// Başlangıç ve bitiş saatinden dakika hesapla
 function calcItemMinutes(item) {
   if (item.all_day) return 480;
   if (!item.start_time || !item.end_time) return 0;
@@ -65,6 +63,11 @@ function fmtMins(mins) {
 
 function newItem() {
   return { id: Date.now() + Math.random(), category: '', description: '', start_time: '', end_time: '', all_day: false };
+}
+
+function migrateItem(raw) {
+  if (raw.start_time !== undefined || raw.all_day !== undefined) return raw;
+  return { ...raw, start_time: '', end_time: '', all_day: false };
 }
 
 const AUTO_SAVE_DELAY = 2000;
@@ -89,11 +92,9 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
   const mins = calcItemMinutes(item);
   return (
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: '155px 1fr auto 32px',
+      display: 'grid', gridTemplateColumns: '155px 1fr auto 32px',
       gap: 8, marginBottom: 10, alignItems: 'center',
     }}>
-      {/* Kategori */}
       <select
         className="form-select"
         value={item.category}
@@ -105,7 +106,6 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
 
-      {/* Açıklama */}
       <input
         className="form-input"
         placeholder="Ne yaptınız?"
@@ -115,7 +115,6 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
         style={{ fontSize: 12.5, padding: '7px 10px' }}
       />
 
-      {/* Saat grubu */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {item.all_day ? (
           <span style={{
@@ -163,11 +162,10 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
           </div>
         )}
 
-        {/* Tüm Gün checkbox */}
         {!disabled && (
           <label style={{
             display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer',
-            fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap',
+            fontSize: 11.5, whiteSpace: 'nowrap',
             padding: '5px 10px', borderRadius: 8,
             border: `1px solid ${item.all_day ? 'var(--navy)' : 'var(--border)'}`,
             background: item.all_day ? 'var(--navy)10' : 'transparent',
@@ -185,7 +183,6 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
         )}
       </div>
 
-      {/* Sil */}
       {!disabled ? (
         <button onClick={onRemove} style={{
           background: 'none', border: 'none', cursor: 'pointer',
@@ -209,10 +206,19 @@ export default function DailyLog({ user, profile }) {
   const [notes, setNotes]               = useState('');
   const [submitted, setSubmitted]       = useState(false);
   const [submitting, setSubmitting]     = useState(false);
-  const [editing, setEditing]           = useState(false); // "Düzenle" modunda mı?
+  const [editing, setEditing]           = useState(false);
   const [autoSaveState, setAutoSaveState] = useState('idle');
   const [draft, setDraft]               = useState(false);
-  const autoSaveTimer                   = useRef(null);
+
+  const autoSaveTimer = useRef(null);
+
+  // ── KRITIK: Her render sonrası güncel state değerlerini tut
+  // Bu sayede closure'lar eski state'i yakalamaz (stale closure bug fix)
+  const stateRef = useRef({});
+  useEffect(() => {
+    stateRef.current = { submitted, editing, status, items, overtime, notes, selectedDate };
+  });
+
   const isNonWork = NON_WORK_STATUSES.includes(status);
   const isReadOnly = submitted && !editing;
 
@@ -220,13 +226,6 @@ export default function DailyLog({ user, profile }) {
   const refDate = new Date();
   refDate.setDate(refDate.getDate() + weekOffset * 7);
   const weekDates = getWeekDates(refDate);
-
-  // Mevcut verideki eski duration_minutes formatını yeni formata çevir
-  function migrateItem(raw) {
-    if (raw.start_time !== undefined || raw.all_day !== undefined) return raw;
-    // Eski format: duration_minutes
-    return { ...raw, start_time: '', end_time: '', all_day: false };
-  }
 
   // ── Log yükle
   const loadLog = useCallback(async (dateStr) => {
@@ -238,6 +237,7 @@ export default function DailyLog({ user, profile }) {
       setNotes(data.notes || '');
       setSubmitted(data.submitted || false);
       setEditing(false);
+      // Sadece gönderilmemiş ve içerik varsa taslak göster
       setDraft(!data.submitted && !!data.work_items?.length);
     } else {
       setStatus('ofis');
@@ -262,24 +262,39 @@ export default function DailyLog({ user, profile }) {
   useEffect(() => { loadLog(selectedDate); }, [selectedDate]);
   useEffect(() => { loadWeekLogs(); }, [weekOffset, user.id]);
 
-  // ── Otomatik kaydet
+  // ── Otomatik kaydet — stateRef kullanarak stale closure'ı önler
   const triggerAutoSave = useCallback(() => {
-    if (isReadOnly) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    setAutoSaveState('saving');
+
     autoSaveTimer.current = setTimeout(async () => {
-      const totalMin = [...items, ...overtime].reduce((s, x) => s + calcItemMinutes(x), 0);
+      // Closure'dan değil, ref'ten oku — her zaman güncel değer
+      const { submitted: sub, editing: ed, status: st, items: it, overtime: ot, notes: n, selectedDate: sd } = stateRef.current;
+
+      // Gönderilmiş & düzenleme modunda değilse kaydetme
+      if (sub && !ed) {
+        setAutoSaveState('idle');
+        return;
+      }
+
+      setAutoSaveState('saving');
+      const totalMin = [...it, ...ot].reduce((s, x) => s + calcItemMinutes(x), 0);
       const { error } = await upsertDailyLog({
-        user_id: user.id, log_date: selectedDate,
-        work_status: status, work_items: items, overtime_items: overtime,
-        total_minutes: totalMin, notes, submitted: false,
+        user_id: user.id, log_date: sd,
+        work_status: st, work_items: it, overtime_items: ot,
+        total_minutes: totalMin, notes: n, submitted: false,
       });
       setAutoSaveState(error ? 'error' : 'saved');
-      setDraft(true);
+      if (!error) setDraft(true);
     }, AUTO_SAVE_DELAY);
-  }, [isReadOnly, user.id, selectedDate, status, items, overtime, notes]);
+  }, [user.id]); // user.id dışındaki her şey stateRef'ten geliyor
 
-  useEffect(() => { triggerAutoSave(); }, [status, items, overtime, notes]);
+  // Kullanıcı değişikliklerinde auto-save tetikle
+  useEffect(() => {
+    // isReadOnly ise tetikleme (anlık kontrol için stateRef değil, render-time değeri)
+    if (isReadOnly) return;
+    triggerAutoSave();
+    setAutoSaveState('saving');
+  }, [status, items, overtime, notes]);
 
   // ── Gönder / Güncelle
   const handleSubmit = async () => {
@@ -296,16 +311,17 @@ export default function DailyLog({ user, profile }) {
       setEditing(false);
       setDraft(false);
       setAutoSaveState('idle');
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       loadWeekLogs();
     }
   };
 
   // ── Item helpers
-  const setItem    = (id, f, v) => setItems(p => p.map(i => i.id === id ? {...i, [f]: v} : i));
-  const addItem    = () => setItems(p => [...p, newItem()]);
-  const removeItem = (id) => setItems(p => p.length > 1 ? p.filter(i => i.id !== id) : p);
-  const setOtItem  = (id, f, v) => setOvertime(p => p.map(i => i.id === id ? {...i, [f]: v} : i));
-  const addOtItem  = () => setOvertime(p => [...p, newItem()]);
+  const setItem      = (id, f, v) => setItems(p => p.map(i => i.id === id ? {...i, [f]: v} : i));
+  const addItem      = () => setItems(p => [...p, newItem()]);
+  const removeItem   = (id) => setItems(p => p.length > 1 ? p.filter(i => i.id !== id) : p);
+  const setOtItem    = (id, f, v) => setOvertime(p => p.map(i => i.id === id ? {...i, [f]: v} : i));
+  const addOtItem    = () => setOvertime(p => [...p, newItem()]);
   const removeOtItem = (id) => setOvertime(p => p.filter(i => i.id !== id));
 
   const totalMin = items.reduce((s, x) => s + calcItemMinutes(x), 0);
@@ -333,13 +349,13 @@ export default function DailyLog({ user, profile }) {
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {!isReadOnly && autoSaveState === 'saving' && <><span style={{ color: 'var(--orange)' }}>●</span> Kaydediliyor…</>}
-            {!isReadOnly && autoSaveState === 'saved'  && <><span style={{ color: 'var(--green)' }}>●</span> Otomatik kaydedildi</>}
+            {!isReadOnly && autoSaveState === 'saved'  && <><span style={{ color: '#16a34a' }}>●</span> Otomatik kaydedildi</>}
             {!isReadOnly && autoSaveState === 'error'  && <><span style={{ color: 'var(--red)' }}>●</span> Kayıt hatası</>}
           </div>
         </div>
       </div>
 
-      {/* TASLAK BANNER */}
+      {/* TASLAK BANNER — sadece gönderilmemiş günler için */}
       {draft && !submitted && !editing && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -354,6 +370,65 @@ export default function DailyLog({ user, profile }) {
               Sil
             </button>
           </div>
+        </div>
+      )}
+
+      {/* GONDERİLMİŞ BANNER — sayfanın üstünde belirgin şekilde */}
+      {submitted && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px', borderRadius: 12, marginBottom: 16,
+          background: editing
+            ? 'linear-gradient(135deg, #fff8ee 0%, #fffdf5 100%)'
+            : 'linear-gradient(135deg, #edfaf4 0%, #f0fdf8 100%)',
+          border: `1.5px solid ${editing ? '#f59e0b' : '#16a34a'}44`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 26 }}>{editing ? '✏️' : '✅'}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: editing ? '#b45309' : '#15803d' }}>
+                {editing
+                  ? `${dayName} logu düzenleniyor…`
+                  : `${dayName} çalışma kaydı gönderildi ve kaydedildi`}
+              </div>
+              {!editing && totalMin > 0 && (
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  Toplam çalışma: <strong>{fmtMins(totalMin)}</strong>
+                  {otMin > 0 && <> · Mesai: <strong>{fmtMins(otMin)}</strong></>}
+                  {' · '}<StatusBadge status={status} />
+                </div>
+              )}
+              {editing && (
+                <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>
+                  Değişikliklerinizi kaydetmek için "Güncelle" butonuna basın
+                </div>
+              )}
+            </div>
+          </div>
+          {!editing ? (
+            <button
+              onClick={() => setEditing(true)}
+              style={{
+                padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                border: '1.5px solid #1a3a5c44', background: 'white',
+                cursor: 'pointer', color: 'var(--navy)', fontFamily: 'var(--font-body)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              ✏️ Düzenle
+            </button>
+          ) : (
+            <button
+              onClick={() => { setEditing(false); loadLog(selectedDate); }}
+              style={{
+                padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                border: '1.5px solid #f59e0b44', background: 'white',
+                cursor: 'pointer', color: '#b45309', fontFamily: 'var(--font-body)',
+              }}
+            >
+              İptal
+            </button>
+          )}
         </div>
       )}
 
@@ -372,12 +447,16 @@ export default function DailyLog({ user, profile }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
           {weekDates.map(d => {
-            const ds    = toLocalDateStr(d);
+            const ds     = toLocalDateStr(d);
             const isToday = ds === today;
             const isSel   = ds === selectedDate;
             const log     = weekLogs[ds];
             const isWknd  = d.getDay() === 0 || d.getDay() === 6;
-            const ws      = WORK_STATUS.find(s => s.value === log?.work_status);
+
+            // Renk: gönderilmiş=yeşil, taslak=turuncu, boş=gri
+            const dotColor = log
+              ? (log.submitted ? '#16a34a' : 'var(--orange)')
+              : null;
 
             return (
               <button key={ds} onClick={() => setSelectedDate(ds)} style={{
@@ -394,11 +473,12 @@ export default function DailyLog({ user, profile }) {
                 <div style={{ fontSize: 13, fontWeight: 700, color: isSel ? 'white' : 'var(--text)', marginBottom: 4 }}>
                   {String(d.getDate()).padStart(2, '0')}/{String(d.getMonth() + 1).padStart(2, '0')}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  {log ? (
-                    <span title={ws?.label || ''} style={{
-                      display: 'block', width: 6, height: 6, borderRadius: '50%',
-                      background: log.submitted ? (ws?.color || 'var(--green)') : 'var(--orange)',
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 8 }}>
+                  {dotColor ? (
+                    <span title={log.submitted ? 'Gönderildi' : 'Taslak'} style={{
+                      display: 'block', width: log.submitted ? 8 : 6, height: log.submitted ? 8 : 6,
+                      borderRadius: '50%', background: dotColor,
+                      boxShadow: log.submitted ? `0 0 0 2px ${dotColor}33` : undefined,
                     }} />
                   ) : (
                     <span style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', background: isSel ? 'rgba(255,255,255,0.3)' : 'var(--border)' }} />
@@ -408,55 +488,33 @@ export default function DailyLog({ user, profile }) {
             );
           })}
         </div>
+        {/* Takvim açıklaması */}
+        <div style={{ display: 'flex', gap: 16, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', justifyContent: 'flex-end' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block', boxShadow: '0 0 0 2px #16a34a33' }} />
+            Gönderildi
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--orange)', display: 'inline-block' }} />
+            Taslak
+          </span>
+        </div>
       </div>
 
-      {/* GÜN BAŞLIĞI */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16, padding: '14px 20px', borderRadius: 12,
-        background: submitted ? (editing ? 'var(--orange-pale,#fff8ee)' : 'var(--green-pale,#edfaf4)') : 'var(--surface)',
-        border: `1px solid ${submitted ? (editing ? 'var(--orange)33' : 'var(--green)33') : 'var(--border)'}`,
-      }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--navy)' }}>{dayName}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{formattedDate}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* GÜN BAŞLIĞI (submitted olmayan günler için) */}
+      {!submitted && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 16, padding: '14px 20px', borderRadius: 12,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--navy)' }}>{dayName}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{formattedDate}</div>
+          </div>
           <StatusBadge status={status} />
-          {submitted && !editing && (
-            <>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                fontSize: 12, fontWeight: 700, color: 'var(--green)',
-                background: 'var(--green)15', borderRadius: 20, padding: '4px 12px',
-                border: '1px solid var(--green)33',
-              }}>
-                ✓ Gönderildi & Kaydedildi
-              </span>
-              <button
-                onClick={() => setEditing(true)}
-                style={{
-                  padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  border: '1px solid var(--navy)44', background: 'transparent',
-                  cursor: 'pointer', color: 'var(--navy)', fontFamily: 'var(--font-body)',
-                }}
-              >
-                ✏️ Düzenle
-              </button>
-            </>
-          )}
-          {submitted && editing && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 12, fontWeight: 700, color: 'var(--orange)',
-              background: 'var(--orange)15', borderRadius: 20, padding: '4px 12px',
-              border: '1px solid var(--orange)33',
-            }}>
-              ✏️ Düzenleniyor
-            </span>
-          )}
         </div>
-      </div>
+      )}
 
       {/* ÇALIŞMA DURUMU */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -474,7 +532,8 @@ export default function DailyLog({ user, profile }) {
                 background: status === s.value ? s.color + '14' : 'var(--surface)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 fontFamily: 'var(--font-body)', transition: 'all 0.15s',
-                opacity: isReadOnly ? 0.7 : 1,
+                opacity: isReadOnly ? 0.65 : 1,
+                pointerEvents: isReadOnly ? 'none' : 'auto',
               }}>
               <span style={{ fontSize: 20 }}>{s.icon}</span>
               <span style={{ fontSize: 10.5, fontWeight: 600, color: status === s.value ? s.color : 'var(--text-muted)', textAlign: 'center', lineHeight: 1.3 }}>
@@ -488,14 +547,21 @@ export default function DailyLog({ user, profile }) {
       {/* İŞ KALEMLERİ */}
       {!isNonWork && (
         <>
-          <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card" style={{
+            marginBottom: 16,
+            opacity: isReadOnly ? 0.85 : 1,
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 12.5, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
                 İŞ KALEMLERİ &nbsp;·&nbsp; {formattedDate}
               </div>
+              {isReadOnly && (
+                <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, background: '#dcfce7', borderRadius: 6, padding: '3px 8px' }}>
+                  🔒 Gönderildi
+                </span>
+              )}
             </div>
 
-            {/* Kolon başlıkları */}
             <div style={{
               display: 'grid', gridTemplateColumns: '155px 1fr auto 32px',
               gap: 8, marginBottom: 8,
@@ -517,7 +583,8 @@ export default function DailyLog({ user, profile }) {
               />
             ))}
 
-            {!isReadOnly && (
+            {/* İş kalemi ekle — sadece düzenleme modunda */}
+            {!isReadOnly ? (
               <button onClick={addItem} style={{
                 display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                 padding: '10px 16px', borderRadius: 10, border: '2px dashed var(--border)',
@@ -528,6 +595,15 @@ export default function DailyLog({ user, profile }) {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; }}>
                 <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> İş kalemi ekle
               </button>
+            ) : (
+              <div style={{
+                padding: '10px 16px', borderRadius: 10, border: '2px dashed var(--border)',
+                background: 'var(--surface)', color: 'var(--text-muted)',
+                fontSize: 12, textAlign: 'center', marginTop: 4,
+                opacity: 0.5,
+              }}>
+                İş kalemi eklemek için "Düzenle" butonuna basın
+              </div>
             )}
 
             {/* Toplam */}
@@ -538,7 +614,7 @@ export default function DailyLog({ user, profile }) {
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Toplam:</span>
               <span style={{
                 fontSize: 17, fontWeight: 700,
-                color: totalMin >= 480 ? 'var(--green)' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
+                color: totalMin >= 480 ? '#16a34a' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
                 fontFamily: 'var(--font-display)',
               }}>
                 {totalMin > 0 ? fmtMins(totalMin) : '—'}
@@ -551,9 +627,14 @@ export default function DailyLog({ user, profile }) {
 
           {/* MESAİ */}
           {(overtime.length > 0 || !isReadOnly) && (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 700, fontSize: 12.5, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>
-                ⏰ MESAİ (İSTEĞE BAĞLI)
+            <div className="card" style={{ marginBottom: 16, opacity: isReadOnly ? 0.85 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12.5, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                  ⏰ MESAİ (İSTEĞE BAĞLI)
+                </div>
+                {isReadOnly && overtime.length === 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Mesai girilmemiş</span>
+                )}
               </div>
               {overtime.map(item => (
                 <WorkItemRow
@@ -564,7 +645,7 @@ export default function DailyLog({ user, profile }) {
                   onRemove={() => removeOtItem(item.id)}
                 />
               ))}
-              {!isReadOnly && (
+              {!isReadOnly ? (
                 <button onClick={addOtItem} style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 16px',
                   borderRadius: 10, border: '2px dashed var(--orange)44', background: 'transparent',
@@ -572,7 +653,7 @@ export default function DailyLog({ user, profile }) {
                 }}>
                   <span style={{ fontSize: 18 }}>+</span> Mesai ekle
                 </button>
-              )}
+              ) : overtime.length === 0 ? null : null}
               {otMin > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Mesai: </span>
@@ -623,41 +704,8 @@ export default function DailyLog({ user, profile }) {
         </div>
       ) : null}
 
-      {/* ALT AKSYON */}
-      {isReadOnly ? (
-        /* Gönderilmiş & salt okunur durum */
-        <div style={{
-          padding: '16px 20px', borderRadius: 12, marginBottom: 20,
-          background: 'var(--green-pale,#edfaf4)',
-          border: '1px solid var(--green)33',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22 }}>✅</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--green)' }}>
-                {dayName} logu gönderildi ve kaydedildi
-              </div>
-              {totalMin > 0 && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Toplam çalışma: {fmtMins(totalMin)}{otMin > 0 ? ` + ${fmtMins(otMin)} mesai` : ''}
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => setEditing(true)}
-            style={{
-              padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              border: '1.5px solid var(--navy)44', background: 'white',
-              cursor: 'pointer', color: 'var(--navy)', fontFamily: 'var(--font-body)',
-            }}
-          >
-            ✏️ Düzenle
-          </button>
-        </div>
-      ) : (
-        /* Gönder / Güncelle butonu */
+      {/* GÖNDER / GÜNCELLE BUTONU — sadece düzenleme veya yeni kayıt */}
+      {!isReadOnly && (
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
@@ -666,6 +714,7 @@ export default function DailyLog({ user, profile }) {
             width: '100%', padding: '15px', fontSize: 15, fontWeight: 700,
             borderRadius: 12, marginBottom: 20,
             opacity: (!isNonWork && totalMin === 0) ? 0.5 : 1,
+            background: editing ? 'var(--orange,#f59e0b)' : undefined,
           }}>
           {submitting
             ? '⏳ Kaydediliyor…'
