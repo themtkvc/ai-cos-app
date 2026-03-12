@@ -177,6 +177,60 @@ export const getSystemStats = async (userId) => {
   };
 };
 
+// ── DAILY LOGS ──
+export const getDailyLog = async (userId, logDate) => {
+  const { data, error } = await supabase
+    .from('daily_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('log_date', logDate)
+    .maybeSingle();
+  return { data, error };
+};
+
+export const getWeekLogs = async (userId, fromDate, toDate) => {
+  const { data, error } = await supabase
+    .from('daily_logs')
+    .select('log_date, work_status, total_minutes, submitted')
+    .eq('user_id', userId)
+    .gte('log_date', fromDate)
+    .lte('log_date', toDate)
+    .order('log_date');
+  return { data, error };
+};
+
+export const upsertDailyLog = async (log) => {
+  const { data, error } = await supabase
+    .from('daily_logs')
+    .upsert(log, { onConflict: 'user_id,log_date' })
+    .select();
+  return { data, error };
+};
+
+export const submitDailyLog = async (log) => {
+  const { data, error } = await supabase
+    .from('daily_logs')
+    .upsert({
+      ...log,
+      submitted: true,
+      submitted_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,log_date' })
+    .select();
+  return { data, error };
+};
+
+// Direktör için: tüm personelin loglarını gör
+export const getAllDailyLogs = async (fromDate, toDate) => {
+  const { data, error } = await supabase
+    .from('daily_logs')
+    .select('*, user_profiles!inner(full_name, role, unit)')
+    .gte('log_date', fromDate)
+    .lte('log_date', toDate)
+    .order('log_date', { ascending: false })
+    .order('user_id');
+  return { data, error };
+};
+
 // ── USER PROFILES & ROLES ──
 export const getUserProfile = async (userId) => {
   const { data, error } = await supabase

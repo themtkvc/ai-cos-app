@@ -9,6 +9,7 @@ const ALL_NAV = [
   { id: 'donors',    icon: '🤝', label: 'Donör CRM' },
   { id: 'meetings',  icon: '📋', label: 'Toplantı Logu' },
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
+  { id: 'dailylog',  icon: '🗓', label: 'Günlük İş Logu' },
 ];
 
 const ADMIN_NAV = [
