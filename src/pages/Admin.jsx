@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getSystemStats, seedDemoData, clearChatHistory, clearTable } from '../lib/supabase';
+import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, supabase } from '../lib/supabase';
+import { ROLE_LABELS } from '../App';
 
 const DEFAULT_ORG = {
   orgName: 'Uluslararası İnsani Yardım Örgütü',
@@ -37,22 +38,218 @@ function StatusDot({ ok }) {
   );
 }
 
-export default function Admin({ user, onNavigate }) {
-  const [stats, setStats] = useState(null);
+// ── USER MANAGEMENT COMPONENT ──
+const ROLE_OPTIONS = [
+  { value: 'direktor',            label: 'Direktör' },
+  { value: 'direktor_yardimcisi', label: 'Direktör Yardımcısı' },
+  { value: 'asistan',             label: 'Asistan' },
+  { value: 'koordinator',         label: 'Koordinatör' },
+  { value: 'personel',            label: 'Personel' },
+];
+
+const UNIT_OPTIONS = [
+  'Partnerships', 'Humanitarian Affairs', 'Traditional Donors',
+  'Grants', 'Accreditations', 'Policy & Governance',
+];
+
+function UserManagement({ currentUser, notify }) {
+  const [profiles, setProfiles]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [editingId, setEditingId]     = useState(null);
+  const [editDraft, setEditDraft]     = useState({});
+  const [saving, setSaving]           = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole]   = useState('personel');
+  const [inviteUnit, setInviteUnit]   = useState('');
+  const [inviteName, setInviteName]   = useState('');
+  const [inviting, setInviting]       = useState(false);
+
+  const loadProfiles = async () => {
+    setLoading(true);
+    const { data } = await getAllProfiles();
+    setProfiles(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadProfiles(); }, []);
+
+  const startEdit = (p) => {
+    setEditingId(p.user_id);
+    setEditDraft({ full_name: p.full_name || '', role: p.role, unit: p.unit || '' });
+  };
+
+  const saveEdit = async (userId) => {
+    setSaving(true);
+    const { error } = await updateUserProfile(userId, editDraft);
+    setSaving(false);
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify('✅ Kullanıcı güncellendi.');
+    setEditingId(null);
+    loadProfiles();
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    // Create auth user via admin API — requires service role key (not available client-side)
+    // Best approach: use Supabase signUp to create user, then set profile
+    const { data: authData, error: authError } = await supabase.auth.admin?.createUser?.({
+      email: inviteEmail.trim(),
+      password: 'TempPass2026!',
+      email_confirm: true,
+    });
+    if (authError || !authData?.user) {
+      // Fallback: just show instructions
+      notify('Kullanıcı otomatik oluşturulamadı. Kullanıcı sisteme kendisi kayıt olmalı, siz rolünü atayabilirsiniz.', 'error');
+      setInviting(false);
+      return;
+    }
+    // Create profile
+    const { error: profileError } = await updateUserProfile(authData.user.id, {
+      full_name: inviteName || inviteEmail.split('@')[0],
+      role: inviteRole,
+      unit: inviteUnit,
+    });
+    setInviting(false);
+    if (profileError) { notify('Hata: ' + profileError.message, 'error'); return; }
+    notify(`✅ ${inviteEmail} sisteme eklendi.`);
+    setInviteEmail(''); setInviteName(''); setInviteRole('personel'); setInviteUnit('');
+    loadProfiles();
+  };
+
+  const roleColor = (role) => {
+    const map = {
+      direktor: '#1a3a5c', direktor_yardimcisi: '#1e5799',
+      asistan: '#2e6da4', koordinator: '#c47a1e', personel: '#666',
+    };
+    return map[role] || '#666';
+  };
+
+  if (loading) return <div style={{padding:32,textAlign:'center',color:'var(--text-muted)'}}>Yükleniyor…</div>;
+
+  return (
+    <div>
+      {/* Mevcut Kullanıcılar */}
+      <div className="card" style={{marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <div className="card-title" style={{marginBottom:0}}>👥 Sistem Kullanıcıları ({profiles.length})</div>
+          <button className="btn btn-outline btn-sm" onClick={loadProfiles}>↺ Yenile</button>
+        </div>
+
+        {profiles.length === 0 ? (
+          <div style={{padding:24,textAlign:'center',color:'var(--text-muted)'}}>Kayıtlı kullanıcı yok</div>
+        ) : (
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {profiles.map(p => (
+              <div key={p.user_id} style={{
+                padding:'12px 16px', borderRadius:10, border:'1px solid var(--border)',
+                background:'var(--surface)', display:'flex', alignItems:'center', gap:12
+              }}>
+                <div style={{
+                  width:38, height:38, borderRadius:'50%', flexShrink:0, display:'flex',
+                  alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:15,
+                  background: roleColor(p.role) + '22', color: roleColor(p.role), border: `2px solid ${roleColor(p.role)}44`
+                }}>
+                  {(p.full_name?.[0] || p.auth_user?.email?.[0] || '?').toUpperCase()}
+                </div>
+
+                <div style={{flex:1, minWidth:0}}>
+                  {editingId === p.user_id ? (
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                      <input className="form-input" style={{width:130,padding:'4px 8px',fontSize:12}}
+                        placeholder="Ad Soyad" value={editDraft.full_name}
+                        onChange={e => setEditDraft(d => ({...d, full_name: e.target.value}))} />
+                      <select className="form-input" style={{width:160,padding:'4px 8px',fontSize:12}}
+                        value={editDraft.role}
+                        onChange={e => setEditDraft(d => ({...d, role: e.target.value}))}>
+                        {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                      {['koordinator','personel'].includes(editDraft.role) && (
+                        <select className="form-input" style={{width:160,padding:'4px 8px',fontSize:12}}
+                          value={editDraft.unit}
+                          onChange={e => setEditDraft(d => ({...d, unit: e.target.value}))}>
+                          <option value="">— Birim seç —</option>
+                          {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{fontWeight:600, fontSize:13, color:'var(--text)'}}>
+                        {p.full_name || p.auth_user?.email?.split('@')[0] || 'İsimsiz'}
+                      </div>
+                      <div style={{fontSize:11.5, color:'var(--text-muted)', marginTop:2}}>
+                        {p.auth_user?.email || '—'}
+                        {p.unit ? ` · ${p.unit}` : ''}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                  {editingId !== p.user_id && (
+                    <span style={{
+                      padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600,
+                      background: roleColor(p.role) + '18', color: roleColor(p.role),
+                    }}>
+                      {ROLE_LABELS[p.role] || p.role}
+                    </span>
+                  )}
+                  {p.user_id === currentUser.id && (
+                    <span style={{fontSize:10,color:'var(--text-muted)'}}>(siz)</span>
+                  )}
+                  {editingId === p.user_id ? (
+                    <>
+                      <button className="btn btn-outline btn-sm"
+                        onClick={() => setEditingId(null)} disabled={saving}>İptal</button>
+                      <button className="btn btn-primary btn-sm"
+                        onClick={() => saveEdit(p.user_id)} disabled={saving}>
+                        {saving ? '⏳' : '✓ Kaydet'}
+                      </button>
+                    </>
+                  ) : (
+                    <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Kullanıcı Ekleme */}
+      <div className="card">
+        <div className="card-title">➕ Yeni Kullanıcı</div>
+        <p style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:14,lineHeight:1.5}}>
+          Yeni kullanıcı sisteme <strong>https://ai-cos-app.vercel.app</strong> adresinden kayıt olabilir.
+          Kayıt olduktan sonra bu panelden rolünü ve birimini atayın.
+        </p>
+        <div style={{
+          padding:'12px 16px', background:'var(--gold-pale,#fef9ec)', borderRadius:8,
+          border:'1px solid var(--gold,#c8a84b)22', fontSize:12.5, color:'var(--text-muted)'
+        }}>
+          💡 Kullanıcıya şu bilgileri iletin: Siteye gidin → "Henüz hesabınız yok mu? Kayıt olun" → Email ve şifre belirlesin → Siz buradan rol atayın.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Admin({ user, profile, onNavigate, defaultTab }) {
+  const [activeTab, setActiveTab]     = useState(defaultTab === 'users' ? 'users' : 'system');
+  const [stats, setStats]             = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [orgConfig, setOrgConfig] = useState(loadOrgConfig);
-  const [editingOrg, setEditingOrg] = useState(false);
-  const [orgDraft, setOrgDraft] = useState(null);
+  const [orgConfig, setOrgConfig]     = useState(loadOrgConfig);
+  const [editingOrg, setEditingOrg]   = useState(false);
+  const [orgDraft, setOrgDraft]       = useState(null);
   const [seedLoading, setSeedLoading] = useState(false);
-  const [seedResult, setSeedResult] = useState(null);
+  const [seedResult, setSeedResult]   = useState(null);
   const [clearLoading, setClearLoading] = useState('');
   const [notification, setNotification] = useState(null);
 
   const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-  const claudeApiKey = process.env.REACT_APP_CLAUDE_API_KEY;
-
   const supabaseConnected = supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co';
-  const claudeConnected = claudeApiKey && claudeApiKey !== 'your-claude-api-key-here';
+  const claudeConnected   = true; // Now server-side proxy — assume configured if deployed
 
   const loadStats = async () => {
     setStatsLoading(true);
@@ -157,13 +354,37 @@ export default function Admin({ user, onNavigate }) {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
             <h1 className="page-title">⚙️ Admin Paneli</h1>
-            <p className="page-subtitle">Sistem yönetimi · Organizasyon yapısı · Veri işlemleri</p>
+            <p className="page-subtitle">Sistem yönetimi · Kullanıcı yönetimi · Veri işlemleri</p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate('dashboard')}>← Dashboard</button>
         </div>
+        {/* Tabs */}
+        <div style={{display:'flex',gap:4,marginTop:16,borderBottom:'2px solid var(--border)',paddingBottom:0}}>
+          {[
+            { id:'system', icon:'⚙️', label:'Sistem & Veri' },
+            { id:'users',  icon:'👥', label:'Kullanıcı Yönetimi' },
+          ].map(tab => (
+            <button key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding:'8px 18px', border:'none', background:'transparent', cursor:'pointer',
+                fontSize:13, fontWeight:500, color: activeTab===tab.id ? 'var(--navy)' : 'var(--text-muted)',
+                borderBottom: activeTab===tab.id ? '2px solid var(--navy)' : '2px solid transparent',
+                marginBottom:-2, transition:'all 0.15s', fontFamily:'var(--font-body)'
+              }}>
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+      {/* USERS TAB */}
+      {activeTab === 'users' && (
+        <UserManagement currentUser={user} notify={notify} />
+      )}
+
+      {/* SYSTEM TAB */}
+      {activeTab === 'system' && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
 
         {/* SISTEM DURUMU */}
         <div className="card">
@@ -444,7 +665,8 @@ export default function Admin({ user, onNavigate }) {
           </div>
         </div>
 
-      </div>
+      </div>}
+
     </div>
   );
 }

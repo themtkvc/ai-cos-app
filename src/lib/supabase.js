@@ -177,6 +177,59 @@ export const getSystemStats = async (userId) => {
   };
 };
 
+// ── USER PROFILES & ROLES ──
+export const getUserProfile = async (userId) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  return { data, error };
+};
+
+export const getAllProfiles = async () => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*, auth_user:user_id(email)')
+    .order('created_at', { ascending: true });
+  return { data, error };
+};
+
+export const upsertUserProfile = async (profile) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .upsert(profile, { onConflict: 'user_id' })
+    .select();
+  return { data, error };
+};
+
+export const updateUserProfile = async (userId, updates) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .select();
+  return { data, error };
+};
+
+// Admin: invite/create a new user via Supabase Auth (only admin service key can do this,
+// so we just create the profile record; actual user must sign up themselves)
+export const inviteUser = async (email, role, unit, fullName) => {
+  // Step 1: Create auth user via Supabase (requires service role — not available client-side)
+  // Instead, we store an "invitation" in user_profiles with a placeholder
+  // The user will sign up and their profile gets linked on first login
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .insert([{
+      user_id: '00000000-0000-0000-0000-000000000000', // placeholder
+      full_name: fullName,
+      role,
+      unit,
+    }])
+    .select();
+  return { data, error };
+};
+
 // ── SEED DEMO DATA ──
 export const seedDemoData = async (userId) => {
   const { data, error } = await supabase.rpc('seed_demo_data', { p_user_id: userId });

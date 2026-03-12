@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getDeadlines, getMeetingActions, signOut } from '../lib/supabase';
+import { ROLE_ACCESS, ROLE_LABELS } from '../App';
 
-const NAV_MAIN = [
+const ALL_NAV = [
   { id: 'dashboard', icon: '⚡', label: 'Dashboard' },
   { id: 'chat',      icon: '🤖', label: 'AI Asistan' },
   { id: 'deadlines', icon: '📅', label: 'Görevler & Tarihler' },
@@ -10,32 +11,45 @@ const NAV_MAIN = [
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
 ];
 
-const NAV_ADMIN = [
+const ADMIN_NAV = [
   { id: 'admin', icon: '⚙️', label: 'Admin Paneli' },
+  { id: 'users', icon: '👥', label: 'Kullanıcı Yönetimi' },
 ];
 
-export default function Sidebar({ activePage, onNavigate, user }) {
+export default function Sidebar({ activePage, onNavigate, user, profile }) {
   const [urgentCount, setUrgentCount] = useState(0);
   const [openActionsCount, setOpenActionsCount] = useState(0);
 
+  const role = profile?.role || 'personel';
+  const allowed = ROLE_ACCESS[role] || ROLE_ACCESS['personel'];
+
   useEffect(() => {
     if (!user) return;
-    getDeadlines(user.id).then(({ data }) => {
-      if (!data) return;
-      const n = data.filter(d => {
-        const days = Math.ceil((new Date(d.due_date) - new Date()) / 86400000);
-        return days <= 3 && days >= 0 && d.status !== '✅ Completed';
-      }).length;
-      setUrgentCount(n);
-    });
-    getMeetingActions(user.id).then(({ data }) => {
-      if (!data) return;
-      setOpenActionsCount(data.filter(a => a.status !== '✅ Completed').length);
-    });
-  }, [user]);
+    if (allowed.includes('deadlines')) {
+      getDeadlines(user.id).then(({ data }) => {
+        if (!data) return;
+        const n = data.filter(d => {
+          const days = Math.ceil((new Date(d.due_date) - new Date()) / 86400000);
+          return days <= 3 && days >= 0 && d.status !== '✅ Completed';
+        }).length;
+        setUrgentCount(n);
+      });
+    }
+    if (allowed.includes('meetings')) {
+      getMeetingActions(user.id).then(({ data }) => {
+        if (!data) return;
+        setOpenActionsCount(data.filter(a => a.status !== '✅ Completed').length);
+      });
+    }
+  }, [user, role]);
 
   const badges = { deadlines: urgentCount || null, meetings: openActionsCount || null };
-  const initials = user?.email?.[0]?.toUpperCase() || 'D';
+  const initials = (profile?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase();
+  const displayName = profile?.full_name || user?.email || '';
+  const roleLabel = ROLE_LABELS[role] || role;
+
+  const visibleNav = ALL_NAV.filter(item => allowed.includes(item.id));
+  const visibleAdmin = ADMIN_NAV.filter(item => allowed.includes(item.id));
 
   return (
     <nav className="sidebar">
@@ -46,7 +60,7 @@ export default function Sidebar({ activePage, onNavigate, user }) {
 
       <div className="sidebar-nav">
         <div className="nav-section-label">Ana Menü</div>
-        {NAV_MAIN.map(item => (
+        {visibleNav.map(item => (
           <button
             key={item.id}
             className={`nav-item ${activePage === item.id ? 'active' : ''}`}
@@ -58,25 +72,29 @@ export default function Sidebar({ activePage, onNavigate, user }) {
           </button>
         ))}
 
-        <div className="nav-section-label" style={{marginTop:16}}>Yönetim</div>
-        {NAV_ADMIN.map(item => (
-          <button
-            key={item.id}
-            className={`nav-item ${activePage === item.id ? 'active' : ''}`}
-            onClick={() => onNavigate(item.id)}
-          >
-            <span className="nav-icon">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
+        {visibleAdmin.length > 0 && (
+          <>
+            <div className="nav-section-label" style={{marginTop:16}}>Yönetim</div>
+            {visibleAdmin.map(item => (
+              <button
+                key={item.id}
+                className={`nav-item ${activePage === item.id ? 'active' : ''}`}
+                onClick={() => onNavigate(item.id)}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       <div className="sidebar-footer">
         <div className="sidebar-user">
           <div className="sidebar-user-avatar">{initials}</div>
           <div className="sidebar-user-info">
-            <div className="sidebar-user-name">{user?.email}</div>
-            <div className="sidebar-user-role">Direktör</div>
+            <div className="sidebar-user-name" title={user?.email}>{displayName.split('@')[0]}</div>
+            <div className="sidebar-user-role">{roleLabel}</div>
           </div>
           <button className="sign-out-btn" onClick={() => signOut()} title="Çıkış">⎋</button>
         </div>

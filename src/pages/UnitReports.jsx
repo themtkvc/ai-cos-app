@@ -37,7 +37,10 @@ const EMPTY_FORM = {
   next_week_priorities: '',
 };
 
-export default function UnitReports({ user, onNavigate }) {
+export default function UnitReports({ user, profile, onNavigate }) {
+  // Koordinatör/personel: kendi birimine kilitli
+  const isRestricted = ['koordinator','personel'].includes(profile?.role);
+  const userUnit = profile?.unit || '';
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
@@ -48,10 +51,20 @@ export default function UnitReports({ user, onNavigate }) {
 
   const load = async () => {
     const { data } = await getUnitReports(user.id);
-    setReports(data || []);
+    // Koordinatörler sadece kendi birimini görür
+    const filtered = isRestricted && userUnit
+      ? (data || []).filter(r => r.unit === userUnit)
+      : (data || []);
+    setReports(filtered);
     setLoading(false);
   };
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => {
+    load();
+    // Koordinatör kendi birimine kilitli — modal açıldığında otomatik birim seç
+    if (isRestricted && userUnit) {
+      setActiveUnit(userUnit);
+    }
+  }, [user]);
 
   // Latest report per unit
   const latestByUnit = {};
@@ -60,6 +73,11 @@ export default function UnitReports({ user, onNavigate }) {
       latestByUnit[r.unit] = r;
     }
   });
+
+  // Koordinatöre göre filtreli birim listesi
+  const visibleUnits = isRestricted && userUnit
+    ? UNITS.filter(u => u.name === userUnit)
+    : UNITS;
 
   const openModal = (unitName) => {
     const unit = UNITS.find(u => u.name === unitName) || UNITS[0];
@@ -131,7 +149,7 @@ export default function UnitReports({ user, onNavigate }) {
       {view === 'latest' ? (
         /* LATEST STATUS VIEW */
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:16}}>
-          {UNITS.map(unit => {
+          {visibleUnits.map(unit => {
             const latest = latestByUnit[unit.name];
             const daysAgo = latest
               ? Math.floor((new Date() - new Date(latest.submitted_at)) / 86400000)
@@ -224,7 +242,7 @@ export default function UnitReports({ user, onNavigate }) {
             >
               Tümü ({reports.length})
             </button>
-            {UNITS.map(u => (
+            {visibleUnits.map(u => (
               <button key={u.name}
                 className={`btn btn-sm ${activeUnit === u.name ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setActiveUnit(activeUnit === u.name ? null : u.name)}
@@ -310,11 +328,12 @@ export default function UnitReports({ user, onNavigate }) {
               <div className="form-group">
                 <label className="form-label">Birim</label>
                 <select className="form-select" value={form.unit}
+                  disabled={isRestricted}
                   onChange={e => {
                     const unit = UNITS.find(u => u.name === e.target.value) || UNITS[0];
                     setForm(f => ({...f, unit: unit.name, coordinator: unit.coordinator}));
                   }}>
-                  {UNITS.map(u => <option key={u.name}>{u.name}</option>)}
+                  {visibleUnits.map(u => <option key={u.name}>{u.name}</option>)}
                 </select>
               </div>
               <div className="form-group">

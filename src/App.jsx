@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { supabase, getUserProfile, upsertUserProfile } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Deadlines from './pages/Deadlines';
@@ -11,25 +11,67 @@ import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
+// ── Role Context ──
+export const ProfileContext = createContext(null);
+export const useProfile = () => useContext(ProfileContext);
+
+// Role-based page access
+export const ROLE_ACCESS = {
+  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','admin','users'],
+  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports'],
+  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports'],
+  koordinator:          ['dashboard','chat','reports'],
+  personel:             ['dashboard','chat','reports'],
+};
+
+export const ROLE_LABELS = {
+  direktor:            'Direktör',
+  direktor_yardimcisi: 'Direktör Yardımcısı',
+  asistan:             'Asistan',
+  koordinator:         'Koordinatör',
+  personel:            'Personel',
+};
+
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
 
+  // Load user + profile
+  const loadProfile = async (authUser) => {
+    if (!authUser) { setProfile(null); return; }
+    const { data } = await getUserProfile(authUser.id);
+    if (data) {
+      setProfile(data);
+    } else {
+      // Auto-create profile for new users (default: personel)
+      const newProfile = { user_id: authUser.id, role: 'personel', full_name: authUser.email };
+      await upsertUserProfile(newProfile);
+      setProfile({ ...newProfile });
+    }
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      await loadProfile(u);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      await loadProfile(u);
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // Enhanced navigate: navigate(page) or navigate(page, { initialMessage: '...' })
   const navigate = (page, opts = {}) => {
+    // Check role access
+    const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
+    if (!allowed.includes(page)) return;
     setActivePage(page);
     if (opts && opts.initialMessage !== undefined) {
       setChatInitialMessage(opts.initialMessage || null);
@@ -43,36 +85,41 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <Login onLogin={setUser} />;
+  if (!user) return <Login onLogin={(u) => { setUser(u); loadProfile(u); }} />;
 
   const pages = {
     dashboard: Dashboard,
     deadlines: Deadlines,
-    donors: Donors,
-    meetings: MeetingLog,
-    reports: UnitReports,
-    admin: Admin,
+    donors:    Donors,
+    meetings:  MeetingLog,
+    reports:   UnitReports,
+    admin:     Admin,
+    users:     Admin, // Admin page handles both tabs
   };
 
   const PageComponent = pages[activePage];
 
   return (
-    <div className="app">
-      <Sidebar activePage={activePage} onNavigate={navigate} user={user} />
-      <main className="app-main">
-        {activePage === 'chat' ? (
-          <Chat
-            user={user}
-            onNavigate={navigate}
-            initialMessage={chatInitialMessage}
-            onClearInitialMessage={() => setChatInitialMessage(null)}
-          />
-        ) : PageComponent ? (
-          <PageComponent user={user} onNavigate={navigate} />
-        ) : (
-          <Dashboard user={user} onNavigate={navigate} />
-        )}
-      </main>
-    </div>
+    <ProfileContext.Provider value={{ profile, setProfile, reloadProfile: () => loadProfile(user) }}>
+      <div className="app">
+        <Sidebar activePage={activePage} onNavigate={navigate} user={user} profile={profile} />
+        <main className="app-main">
+          {activePage === 'chat' ? (
+            <Chat
+              user={user}
+              profile={profile}
+              onNavigate={navigate}
+              initialMessage={chatInitialMessage}
+              onClearInitialMessage={() => setChatInitialMessage(null)}
+            />
+          ) : PageComponent ? (
+            <PageComponent user={user} profile={profile} onNavigate={navigate}
+              defaultTab={activePage === 'users' ? 'users' : undefined} />
+          ) : (
+            <Dashboard user={user} profile={profile} onNavigate={navigate} />
+          )}
+        </main>
+      </div>
+    </ProfileContext.Provider>
   );
 }
