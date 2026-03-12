@@ -1,0 +1,231 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { sendMessage, buildContext } from '../lib/claude';
+import { getChatHistory, saveChatMessage, clearChatHistory, getDeadlines, getDonors, getMeetingActions, getUnitReports } from '../lib/supabase';
+
+const QUICK_ACTIONS = [
+  '⚡ Bu hafta ne yapmalıyım?',
+  '📋 Koordinatörler toplantısı gündemi',
+  '🏛 Board meeting brifingini hazırla',
+  '📧 WFP için follow-up email yaz',
+  '📊 Haftalık direktör brifingini oluştur',
+  '🤝 Donör durumu özeti',
+  '🚨 Kritik görevleri ve gecikmeleri listele',
+  '✍️ Good Neighbors grant email taslağı',
+];
+
+function renderMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0"/>')
+    .replace(/`(.*?)`/g, '<code>$1</code>')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\n/g, '<br/>');
+}
+
+export default function Chat({ user, onNavigate, initialMessage, onClearInitialMessage }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [context, setContext] = useState(null);
+  const [contextLoaded, setContextLoaded] = useState(false);
+  const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+  const initialMessageSentRef = useRef(false);
+  const messagesLoadedRef = useRef(false);
+
+  // Load chat history and context
+  useEffect(() => {
+    getChatHistory(user.id).then(({ data }) => {
+      if (data?.length) {
+        setMessages(data);
+      } else {
+        setMessages([{
+          id: 'welcome',
+          role: 'assistant',
+          content: `Merhaba Direktör. Ben AI Chief of Staff'ınızım.\n\nSisteminizdeki verilerle çalışıyorum — görevler, donörler, toplantı aksiyonları. Bana herhangi bir konuda sorabilirsiniz:\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — öncelikli görev listesi\n- "WFP için email yaz" — taslak email\n- "Board meeting brifingini hazırla" — hazır belge\n- "Koordinatörler toplantısı gündemi" — gündem taslağı\n\nNasıl yardımcı olabilirim?`,
+          created_at: new Date().toISOString()
+        }]);
+      }
+      messagesLoadedRef.current = true;
+    });
+
+    // Load context data
+    Promise.all([
+      getDeadlines(user.id),
+      getDonors(user.id),
+      getMeetingActions(user.id),
+      getUnitReports(user.id),
+    ]).then(([d, don, a, r]) => {
+      const ctx = buildContext(d.data, don.data, a.data, r.data);
+      setContext(ctx);
+      setContextLoaded(true);
+    });
+  }, [user]);
+
+  // Auto-send initialMessage from Dashboard/other pages
+  useEffect(() => {
+    if (
+      initialMessage &&
+      !initialMessageSentRef.current &&
+      contextLoaded &&
+      messagesLoadedRef.current
+    ) {
+      initialMessageSentRef.current = true;
+      onClearInitialMessage?.();
+      // Small delay to let messages render
+      setTimeout(() => {
+        sendMsg(initialMessage);
+      }, 400);
+    }
+  }, [initialMessage, contextLoaded]); // eslint-disable-line
+
+  // Reset the ref when initialMessage changes (new navigation)
+  useEffect(() => {
+    if (initialMessage) {
+      initialMessageSentRef.current = false;
+    }
+  }, [initialMessage]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const sendMsg = async (text) => {
+    const content = (text || input).trim();
+    if (!content || loading) return;
+    setInput('');
+
+    const userMsg = { id: Date.now(), role: 'user', content, created_at: new Date().toISOString() };
+    setMessages(prev => [...prev, userMsg]);
+    setLoading(true);
+
+    // Save to Supabase
+    saveChatMessage(user.id, 'user', content);
+
+    // Build messages array for API
+    const history = [...messages, userMsg]
+      .filter(m => m.id !== 'welcome')
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    try {
+      const reply = await sendMessage(history, context);
+      const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: reply, created_at: new Date().toISOString() };
+      setMessages(prev => [...prev, assistantMsg]);
+      saveChatMessage(user.id, 'assistant', reply);
+    } catch (err) {
+      const errMsg = {
+        id: Date.now() + 1, role: 'assistant',
+        content: `⚠️ Hata: ${err.message || 'Bir sorun oluştu. API key\'inizi kontrol edin.'}`,
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errMsg]);
+    }
+    setLoading(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+  };
+
+  const clearHistory = async () => {
+    await clearChatHistory(user.id);
+    initialMessageSentRef.current = false;
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Konuşma geçmişi temizlendi. Nasıl yardımcı olabilirim?',
+      created_at: new Date().toISOString()
+    }]);
+  };
+
+  const formatTime = (iso) => {
+    try { return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); }
+    catch { return ''; }
+  };
+
+  return (
+    <div className="chat-page">
+      {/* Header */}
+      <div className="chat-header">
+        <div className="chat-header-icon">🤖</div>
+        <div style={{flex:1}}>
+          <div className="chat-header-title">AI Chief of Staff</div>
+          <div className="chat-header-sub">
+            {contextLoaded
+              ? `✅ Sistem verileri yüklendi — canlı bağlamla çalışıyor`
+              : '⏳ Veriler yükleniyor...'}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button className="btn btn-outline btn-sm" onClick={() => onNavigate('dashboard')} title="Dashboard'a dön">
+            ← Dashboard
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={clearHistory} title="Geçmişi temizle">
+            🗑 Temizle
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="chat-messages">
+        {messages.map(msg => (
+          <div key={msg.id} className={`chat-message ${msg.role}`}>
+            <div className={`message-avatar ${msg.role}`}>
+              {msg.role === 'assistant' ? '🤖' : 'D'}
+            </div>
+            <div>
+              <div
+                className={`message-bubble ${msg.role}`}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+              />
+              <div className="message-time">{formatTime(msg.created_at)}</div>
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="chat-message assistant">
+            <div className="message-avatar assistant">🤖</div>
+            <div className="chat-thinking">
+              Düşünüyor
+              <div className="thinking-dots">
+                <span /><span /><span />
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input area */}
+      <div className="chat-input-area">
+        <div className="chat-quick-actions">
+          {QUICK_ACTIONS.map(q => (
+            <button key={q} className="quick-action" onClick={() => sendMsg(q)}>{q}</button>
+          ))}
+        </div>
+        <div className="chat-input-row">
+          <div className="chat-input-wrapper">
+            <textarea
+              ref={inputRef}
+              className="chat-input"
+              placeholder="Sorun veya isteğinizi yazın... (Enter = gönder, Shift+Enter = yeni satır)"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              rows={1}
+            />
+          </div>
+          <button className="chat-send-btn" onClick={() => sendMsg()} disabled={loading || !input.trim()}>
+            ↑
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

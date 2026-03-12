@@ -1,0 +1,190 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase credentials not found. Using demo mode.');
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder'
+);
+
+// ── AUTH HELPERS ──
+export const signIn = async (email, password) => {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  return { data, error };
+};
+
+export const signUp = async (email, password) => {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  return { data, error };
+};
+
+export const signOut = async () => {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+};
+
+export const getUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+};
+
+// ── DEADLINES ──
+export const getDeadlines = async (userId) => {
+  const { data, error } = await supabase
+    .from('deadlines')
+    .select('*')
+    .eq('user_id', userId)
+    .order('due_date', { ascending: true });
+  return { data, error };
+};
+
+export const createDeadline = async (deadline) => {
+  const { data, error } = await supabase.from('deadlines').insert([deadline]).select();
+  return { data, error };
+};
+
+export const updateDeadline = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('deadlines').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+export const deleteDeadline = async (id) => {
+  const { error } = await supabase.from('deadlines').delete().eq('id', id);
+  return { error };
+};
+
+// ── DONORS ──
+export const getDonors = async (userId) => {
+  const { data, error } = await supabase
+    .from('donors').select('*').eq('user_id', userId).order('name');
+  return { data, error };
+};
+
+export const updateDonor = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('donors').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+// ── INTERACTIONS ──
+export const getInteractions = async (userId, donorId = null) => {
+  let query = supabase.from('interactions').select('*').eq('user_id', userId);
+  if (donorId) query = query.eq('donor_id', donorId);
+  const { data, error } = await query.order('interaction_date', { ascending: false });
+  return { data, error };
+};
+
+export const createInteraction = async (interaction) => {
+  const { data, error } = await supabase.from('interactions').insert([interaction]).select();
+  return { data, error };
+};
+
+// ── MEETING ACTIONS ──
+export const getMeetingActions = async (userId) => {
+  const { data, error } = await supabase
+    .from('meeting_actions').select('*').eq('user_id', userId)
+    .order('due_date', { ascending: true });
+  return { data, error };
+};
+
+export const createMeetingAction = async (action) => {
+  const { data, error } = await supabase.from('meeting_actions').insert([action]).select();
+  return { data, error };
+};
+
+export const updateMeetingAction = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('meeting_actions').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+// ── UNIT REPORTS ──
+export const getUnitReports = async (userId) => {
+  const { data, error } = await supabase
+    .from('unit_reports').select('*').eq('user_id', userId)
+    .order('submitted_at', { ascending: false });
+  return { data, error };
+};
+
+// ── CHAT HISTORY ──
+export const getChatHistory = async (userId, limit = 50) => {
+  const { data, error } = await supabase
+    .from('chat_history').select('*').eq('user_id', userId)
+    .order('created_at', { ascending: true }).limit(limit);
+  return { data, error };
+};
+
+export const saveChatMessage = async (userId, role, content) => {
+  const { data, error } = await supabase
+    .from('chat_history').insert([{ user_id: userId, role, content }]).select();
+  return { data, error };
+};
+
+export const clearChatHistory = async (userId) => {
+  const { error } = await supabase.from('chat_history').delete().eq('user_id', userId);
+  return { error };
+};
+
+// ── DONOR CRUD (full) ──
+export const createDonor = async (donor) => {
+  const { data, error } = await supabase.from('donors').insert([donor]).select();
+  return { data, error };
+};
+
+export const deleteDonor = async (id) => {
+  const { error } = await supabase.from('donors').delete().eq('id', id);
+  return { error };
+};
+
+// ── MEETING ACTIONS (delete) ──
+export const deleteMeetingAction = async (id) => {
+  const { error } = await supabase.from('meeting_actions').delete().eq('id', id);
+  return { error };
+};
+
+// ── UNIT REPORTS (create) ──
+export const createUnitReport = async (report) => {
+  const { data, error } = await supabase.from('unit_reports').insert([report]).select();
+  return { data, error };
+};
+
+// ── SYSTEM STATS ──
+export const getSystemStats = async (userId) => {
+  const results = await Promise.all([
+    supabase.from('deadlines').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('donors').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('meeting_actions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('interactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('unit_reports').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('chat_history').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+  ]);
+  return {
+    deadlines: results[0].count || 0,
+    donors: results[1].count || 0,
+    meetingActions: results[2].count || 0,
+    interactions: results[3].count || 0,
+    unitReports: results[4].count || 0,
+    chatMessages: results[5].count || 0,
+  };
+};
+
+// ── SEED DEMO DATA ──
+export const seedDemoData = async (userId) => {
+  const { data, error } = await supabase.rpc('seed_demo_data', { p_user_id: userId });
+  return { data, error };
+};
+
+// ── CLEAR TABLE ──
+export const clearTable = async (table, userId) => {
+  const { error } = await supabase.from(table).delete().eq('user_id', userId);
+  return { error };
+};
