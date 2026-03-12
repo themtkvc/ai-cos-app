@@ -284,6 +284,42 @@ export const inviteUser = async (email, role, unit, fullName) => {
   return { data, error };
 };
 
+// ── DUYURULAR ──
+export const getPublicAnnouncements = async () => {
+  const { data, error } = await supabase
+    .from('public_announcements')
+    .select('*')
+    .eq('active', true)
+    .order('published_at', { ascending: false })
+    .limit(10);
+  return { data, error };
+};
+
+export const createAnnouncement = async (ann) => {
+  const { data, error } = await supabase
+    .from('public_announcements')
+    .insert([ann])
+    .select();
+  return { data, error };
+};
+
+export const updateAnnouncement = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('public_announcements')
+    .update(updates)
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+export const deleteAnnouncement = async (id) => {
+  const { error } = await supabase
+    .from('public_announcements')
+    .delete()
+    .eq('id', id);
+  return { error };
+};
+
 // ── DASHBOARD ANALİTİK ──
 export const getDashboardLogs = async (startDate, endDate) => {
   const { data, error } = await supabase.rpc('get_dashboard_logs', {

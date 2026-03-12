@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, supabase } from '../lib/supabase';
+import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 
 const DEFAULT_ORG = {
@@ -259,6 +259,241 @@ function UserManagement({ currentUser, notify }) {
   );
 }
 
+// ── ANNOUNCEMENT MANAGEMENT COMPONENT ──
+const PRIORITY_OPTIONS = [
+  { value: 'normal',    label: 'Normal',  color: '#2563eb' },
+  { value: 'important', label: 'Önemli',  color: '#d97706' },
+  { value: 'urgent',    label: 'Acil',    color: '#dc2626' },
+];
+
+const EMPTY_ANN = { title: '', content: '', priority: 'normal', active: true };
+
+function AnnouncementManagement({ notify }) {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [editingId, setEditingId]         = useState(null); // null = new, string = existing
+  const [draft, setDraft]                 = useState(null);
+  const [saving, setSaving]               = useState(false);
+  const [deletingId, setDeletingId]       = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    // Fetch ALL announcements (including inactive) for admin view
+    const { data: allData } = await supabase
+      .from('public_announcements')
+      .select('*')
+      .order('published_at', { ascending: false });
+    setAnnouncements(allData || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startNew = () => {
+    setEditingId('new');
+    setDraft({ ...EMPTY_ANN });
+  };
+
+  const startEdit = (ann) => {
+    setEditingId(ann.id);
+    setDraft({ title: ann.title, content: ann.content, priority: ann.priority, active: ann.active });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setDraft(null); };
+
+  const handleSave = async () => {
+    if (!draft.title.trim()) { notify('Başlık gerekli.', 'error'); return; }
+    setSaving(true);
+    let error;
+    if (editingId === 'new') {
+      ({ error } = await createAnnouncement({
+        ...draft,
+        published_at: new Date().toISOString(),
+      }));
+    } else {
+      ({ error } = await updateAnnouncement(editingId, draft));
+    }
+    setSaving(false);
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify(editingId === 'new' ? '✅ Duyuru oluşturuldu.' : '✅ Duyuru güncellendi.');
+    cancelEdit();
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bu duyuruyu silmek istediğinizden emin misiniz?')) return;
+    setDeletingId(id);
+    const { error } = await deleteAnnouncement(id);
+    setDeletingId(null);
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify('Duyuru silindi.');
+    load();
+  };
+
+  const handleToggleActive = async (ann) => {
+    const { error } = await updateAnnouncement(ann.id, { active: !ann.active });
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify(!ann.active ? '✅ Duyuru yayınlandı.' : 'ℹ️ Duyuru gizlendi.');
+    load();
+  };
+
+  const priorityInfo = (p) => PRIORITY_OPTIONS.find(x => x.value === p) || PRIORITY_OPTIONS[0];
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div className="card-title" style={{ marginBottom: 4 }}>📢 Duyuru Yönetimi</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+              Giriş sayfasında herkesin görebileceği duyuruları buradan yönetin.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-outline btn-sm" onClick={load}>↺ Yenile</button>
+            {editingId !== 'new' && (
+              <button className="btn btn-primary btn-sm" onClick={startNew}>+ Yeni Duyuru</button>
+            )}
+          </div>
+        </div>
+
+        {/* New / Edit form */}
+        {editingId !== null && (
+          <div style={{
+            padding: '16px', marginBottom: 16, borderRadius: 10,
+            background: 'var(--surface)', border: '2px solid var(--navy)',
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 14, color: 'var(--navy)' }}>
+              {editingId === 'new' ? '➕ Yeni Duyuru' : '✏️ Duyuruyu Düzenle'}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Başlık *</label>
+              <input className="form-input" placeholder="Duyuru başlığı..."
+                value={draft.title}
+                onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">İçerik</label>
+              <textarea className="form-input" rows={3}
+                placeholder="Duyuru detayı (isteğe bağlı)..."
+                style={{ resize: 'vertical', minHeight: 72 }}
+                value={draft.content}
+                onChange={e => setDraft(d => ({ ...d, content: e.target.value }))} />
+            </div>
+
+            <div className="form-row" style={{ marginBottom: 0 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Öncelik</label>
+                <select className="form-input" value={draft.priority}
+                  onChange={e => setDraft(d => ({ ...d, priority: e.target.value }))}>
+                  {PRIORITY_OPTIONS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="checkbox" checked={draft.active}
+                    onChange={e => setDraft(d => ({ ...d, active: e.target.checked }))} />
+                  Hemen yayınla (aktif)
+                </label>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline btn-sm" onClick={cancelEdit} disabled={saving}>İptal</button>
+              <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+                {saving ? '⏳ Kaydediliyor...' : '✓ Kaydet'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* List */}
+        {loading ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Yükleniyor…</div>
+        ) : announcements.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+            Henüz duyuru yok. "+ Yeni Duyuru" ile ekleyin.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {announcements.map(ann => {
+              const pi = priorityInfo(ann.priority);
+              return (
+                <div key={ann.id} style={{
+                  padding: '12px 16px', borderRadius: 10,
+                  border: `1px solid ${pi.color}33`,
+                  background: ann.active ? 'var(--surface)' : 'var(--gray-light)',
+                  opacity: ann.active ? 1 : 0.65,
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 20, fontSize: 10.5, fontWeight: 700,
+                        background: pi.color + '18', color: pi.color, textTransform: 'uppercase', letterSpacing: '0.05em',
+                      }}>
+                        {pi.label}
+                      </span>
+                      {!ann.active && (
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 20, fontSize: 10.5, fontWeight: 600,
+                          background: 'var(--text-muted)22', color: 'var(--text-muted)',
+                        }}>Gizli</span>
+                      )}
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                        {ann.published_at ? new Date(ann.published_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)', marginBottom: ann.content ? 4 : 0 }}>
+                      {ann.title}
+                    </div>
+                    {ann.content && (
+                      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.55 }}>{ann.content}</div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                    <button
+                      title={ann.active ? 'Gizle' : 'Yayınla'}
+                      onClick={() => handleToggleActive(ann)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 16, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        background: ann.active ? '#16a34a18' : 'var(--surface)',
+                        color: ann.active ? '#16a34a' : 'var(--text-muted)',
+                        border: `1px solid ${ann.active ? '#16a34a44' : 'var(--border)'}`,
+                      }}
+                    >
+                      {ann.active ? '✓ Aktif' : '○ Gizli'}
+                    </button>
+                    {editingId !== ann.id && (
+                      <button className="btn btn-outline btn-sm"
+                        onClick={() => startEdit(ann)}
+                        disabled={editingId !== null}>✏️</button>
+                    )}
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: 'var(--red-pale)', color: 'var(--red)', border: '1px solid var(--red)22' }}
+                      onClick={() => handleDelete(ann.id)}
+                      disabled={deletingId === ann.id}
+                    >
+                      {deletingId === ann.id ? '⏳' : '🗑'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin({ user, profile, onNavigate, defaultTab }) {
   const [activeTab, setActiveTab]     = useState(defaultTab === 'users' ? 'users' : 'system');
   const [stats, setStats]             = useState(null);
@@ -385,8 +620,9 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
         {/* Tabs */}
         <div style={{display:'flex',gap:4,marginTop:16,borderBottom:'2px solid var(--border)',paddingBottom:0}}>
           {[
-            { id:'system', icon:'⚙️', label:'Sistem & Veri' },
-            { id:'users',  icon:'👥', label:'Kullanıcı Yönetimi' },
+            { id:'system',         icon:'⚙️', label:'Sistem & Veri' },
+            { id:'users',          icon:'👥', label:'Kullanıcı Yönetimi' },
+            { id:'announcements',  icon:'📢', label:'Duyurular' },
           ].map(tab => (
             <button key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -405,6 +641,11 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
       {/* USERS TAB */}
       {activeTab === 'users' && (
         <UserManagement currentUser={user} notify={notify} />
+      )}
+
+      {/* ANNOUNCEMENTS TAB */}
+      {activeTab === 'announcements' && (
+        <AnnouncementManagement notify={notify} />
       )}
 
       {/* SYSTEM TAB */}
