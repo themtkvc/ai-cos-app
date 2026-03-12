@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, supabase } from '../lib/supabase';
+import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 
 const DEFAULT_ORG = {
@@ -85,6 +85,14 @@ function UserManagement({ currentUser, notify }) {
     if (error) { notify('Hata: ' + error.message, 'error'); return; }
     notify('✅ Kullanıcı güncellendi.');
     setEditingId(null);
+    loadProfiles();
+  };
+
+  const toggleDashboard = async (p) => {
+    const newVal = !p.can_view_dashboard;
+    const { error } = await updateDashboardAccess(p.user_id, newVal);
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify(newVal ? `✅ ${p.full_name || 'Kullanıcı'} dashboard erişimi verildi.` : `ℹ️ Dashboard erişimi kaldırıldı.`);
     loadProfiles();
   };
 
@@ -197,6 +205,22 @@ function UserManagement({ currentUser, notify }) {
                   )}
                   {p.user_id === currentUser.id && (
                     <span style={{fontSize:10,color:'var(--text-muted)'}}>(siz)</span>
+                  )}
+                  {/* Dashboard erişim toggle — sadece direktör yetkisiyle */}
+                  {editingId !== p.user_id && !['direktor','direktor_yardimcisi'].includes(p.role) && (
+                    <button
+                      title={p.can_view_dashboard ? 'Dashboard erişimi var — kaldırmak için tıkla' : 'Dashboard erişimi ver'}
+                      onClick={() => toggleDashboard(p)}
+                      style={{
+                        padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer',
+                        background: p.can_view_dashboard ? '#16a34a18' : 'var(--surface)',
+                        color: p.can_view_dashboard ? '#16a34a' : 'var(--text-muted)',
+                        border: `1px solid ${p.can_view_dashboard ? '#16a34a44' : 'var(--border)'}`,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      📊 {p.can_view_dashboard ? 'Dashboard ✓' : 'Dashboard'}
+                    </button>
                   )}
                   {editingId === p.user_id ? (
                     <>

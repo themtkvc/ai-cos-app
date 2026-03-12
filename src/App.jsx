@@ -7,6 +7,7 @@ import Donors from './pages/Donors';
 import MeetingLog from './pages/MeetingLog';
 import UnitReports from './pages/UnitReports';
 import DailyLog from './pages/DailyLog';
+import LogsDashboard from './pages/LogsDashboard';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -18,11 +19,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','admin','users'],
-  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports','dailylog'],
-  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports','dailylog'],
-  koordinator:          ['dashboard','chat','reports','dailylog'],
-  personel:             ['dashboard','chat','reports','dailylog'],
+  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','admin','users'],
+  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics'],
+  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics'],
+  koordinator:          ['dashboard','chat','reports','dailylog','analytics'],
+  personel:             ['dashboard','chat','reports','dailylog','analytics'],
 };
 
 export const ROLE_LABELS = {
@@ -114,6 +115,7 @@ export default function App() {
     meetings:  MeetingLog,
     reports:   UnitReports,
     dailylog:  DailyLog,
+    analytics: LogsDashboard,
     admin:     Admin,
     users:     Admin,
   };

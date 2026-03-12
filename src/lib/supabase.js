@@ -284,6 +284,24 @@ export const inviteUser = async (email, role, unit, fullName) => {
   return { data, error };
 };
 
+// ── DASHBOARD ANALİTİK ──
+export const getDashboardLogs = async (startDate, endDate) => {
+  const { data, error } = await supabase.rpc('get_dashboard_logs', {
+    p_start_date: startDate,
+    p_end_date:   endDate,
+  });
+  return { data, error };
+};
+
+export const updateDashboardAccess = async (userId, canView) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ can_view_dashboard: canView })
+    .eq('user_id', userId)
+    .select();
+  return { data, error };
+};
+
 // ── SEED DEMO DATA ──
 export const seedDemoData = async (userId) => {
   const { data, error } = await supabase.rpc('seed_demo_data', { p_user_id: userId });

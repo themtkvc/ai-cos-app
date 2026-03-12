@@ -10,6 +10,7 @@ const ALL_NAV = [
   { id: 'meetings',  icon: '📋', label: 'Toplantı Logu' },
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
   { id: 'dailylog',  icon: '🗓', label: 'Günlük İş Logu' },
+  { id: 'analytics', icon: '📈', label: 'Çalışma Analizi' },
 ];
 
 const ADMIN_NAV = [
