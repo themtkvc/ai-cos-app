@@ -3,7 +3,7 @@
 // Handles all communication with the Anthropic API
 // ═══════════════════════════════════════════════════
 
-const CLAUDE_API_KEY = process.env.REACT_APP_CLAUDE_API_KEY;
+// API key artık tarayıcıda değil — /api/claude proxy üzerinden gidiyor
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 // ── SYSTEM PROMPT ──
@@ -61,20 +61,13 @@ ${context}` : 'No live data loaded — answer based on organizational context ab
 
 // ── MAIN CHAT FUNCTION ──
 export const sendMessage = async (messages, contextData = null) => {
-  if (!CLAUDE_API_KEY || CLAUDE_API_KEY === 'your-claude-api-key-here') {
-    // Demo mode response
-    return getDemoResponse(messages[messages.length - 1]?.content || '');
-  }
-
   const systemPrompt = buildSystemPrompt(contextData);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
@@ -86,12 +79,20 @@ export const sendMessage = async (messages, contextData = null) => {
 
     if (!response.ok) {
       const err = await response.json();
-      throw new Error(err.error?.message || 'API error');
+      // If the proxy isn't configured (no API key), fall back to demo mode
+      if (response.status === 500 && err.error?.includes('not configured')) {
+        return getDemoResponse(messages[messages.length - 1]?.content || '');
+      }
+      throw new Error(err.error || 'API error');
     }
 
     const data = await response.json();
     return data.content[0]?.text || 'No response received.';
   } catch (error) {
+    // Network error — likely local dev without proxy, use demo mode
+    if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+      return getDemoResponse(messages[messages.length - 1]?.content || '');
+    }
     console.error('Claude API error:', error);
     throw error;
   }
