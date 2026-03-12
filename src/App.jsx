@@ -59,21 +59,33 @@ export default function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Timeout güvenliği: 8 saniye sonra her durumda loading bitir
+    const safetyTimer = setTimeout(() => setLoading(false), 8000);
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(safetyTimer);
       const u = session?.user ?? null;
       setUser(u);
-      try { await loadProfile(u); } catch(e) { console.error('Session loadProfile error:', e); }
-      setLoading(false);
+      setLoading(false); // Profil yüklenmesini bekleme, hemen göster
+      if (u) {
+        loadProfile(u).catch(e => console.error('loadProfile error:', e));
+      }
     }).catch((e) => {
+      clearTimeout(safetyTimer);
       console.error('getSession error:', e);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      try { await loadProfile(u); } catch(e) { console.error('Auth change loadProfile error:', e); }
+      if (u) {
+        loadProfile(u).catch(e => console.error('Auth change loadProfile error:', e));
+      } else {
+        setProfile(null);
+      }
     });
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(safetyTimer); subscription.unsubscribe(); };
   }, []);
 
   const navigate = (page, opts = {}) => {
