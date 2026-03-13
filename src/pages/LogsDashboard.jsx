@@ -251,53 +251,68 @@ function processLogs(logs, dateRange) {
 
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
 export default function LogsDashboard({ user, profile }) {
-  const [period, setPeriod]     = useState('week');   // 'week' | 'month'
-  const [offset, setOffset]     = useState(0);
-  const [viewMode, setViewMode] = useState('personal'); // 'personal' | 'unit' | 'all'
-  const [logs, setLogs]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const [period, setPeriod]           = useState('week');
+  const [offset, setOffset]           = useState(0);
+  const [filterType, setFilterType]   = useState('personal'); // 'personal' | 'person' | 'unit' | 'all'
+  const [selectedPerson, setSelectedPerson] = useState('');   // user_id
+  const [selectedUnit, setSelectedUnit]     = useState('');   // unit name
+  const [allLogs, setAllLogs]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
 
   const role = profile?.role;
   const canViewUnit = ['koordinator','direktor','direktor_yardimcisi'].includes(role) || profile?.can_view_dashboard;
   const canViewAll  = ['direktor','direktor_yardimcisi'].includes(role) || profile?.can_view_dashboard;
-
-  // İzin verilen maksimum view mode'a al
-  useEffect(() => {
-    if (viewMode === 'all' && !canViewAll) setViewMode(canViewUnit ? 'unit' : 'personal');
-    if (viewMode === 'unit' && !canViewUnit) setViewMode('personal');
-  }, [role]);
 
   const dateRange = useMemo(
     () => period === 'week' ? getWeekRange(offset) : getMonthRange(offset),
     [period, offset]
   );
 
+  // Her zaman tüm logu çek, filtreleme client-side
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     const { data, error: err } = await getDashboardLogs(dateRange.start, dateRange.end);
     if (err) { setError(err.message); setLoading(false); return; }
-
-    let filtered = data || [];
-    // Kişisel görünümde sadece kendi verisini göster
-    if (viewMode === 'personal') {
-      filtered = filtered.filter(l => l.user_id === user.id);
-    }
-    // Birim görünümünde kendi birimini göster
-    if (viewMode === 'unit' && profile?.unit) {
-      filtered = filtered.filter(l => l.unit === profile.unit);
-    }
-    setLogs(filtered);
+    setAllLogs(data || []);
     setLoading(false);
-  }, [dateRange.start, dateRange.end, viewMode, user.id, profile?.unit]);
+  }, [dateRange.start, dateRange.end]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
+  // Dropdown seçenekleri: mevcut loglardan türet
+  const allPeople = useMemo(() => {
+    const map = {};
+    allLogs.forEach(l => { if (l.user_id && l.full_name) map[l.user_id] = l.full_name; });
+    return Object.entries(map).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allLogs]);
+
+  const allUnits = useMemo(() => {
+    const s = new Set(allLogs.map(l => l.unit).filter(Boolean));
+    return [...s].sort();
+  }, [allLogs]);
+
+  // Filtrelenmiş loglar
+  const logs = useMemo(() => {
+    if (filterType === 'personal') return allLogs.filter(l => l.user_id === user.id);
+    if (filterType === 'person')   return selectedPerson ? allLogs.filter(l => l.user_id === selectedPerson) : allLogs.filter(l => l.user_id === user.id);
+    if (filterType === 'unit')     return selectedUnit   ? allLogs.filter(l => l.unit === selectedUnit) : allLogs;
+    return allLogs; // 'all'
+  }, [allLogs, filterType, selectedPerson, selectedUnit, user.id]);
+
   const stats = useMemo(() => processLogs(logs, dateRange), [logs, dateRange]);
 
-  const showPersonChart = viewMode !== 'personal' && (stats?.personData?.length > 1);
-  const showUnitChart   = viewMode === 'all' && (stats?.unitData?.length > 1);
+  const showPersonChart = filterType !== 'personal' && filterType !== 'person' && (stats?.personData?.length > 1);
+  const showUnitChart   = filterType === 'all' && (stats?.unitData?.length > 1);
+
+  // Başlık için aktif filtre etiketi
+  const filterLabel = useMemo(() => {
+    if (filterType === 'personal') return profile?.full_name || user?.email?.split('@')[0];
+    if (filterType === 'person')   return allPeople.find(p => p.id === selectedPerson)?.name || 'Personel Seç';
+    if (filterType === 'unit')     return selectedUnit || 'Birim Seç';
+    return 'Tüm Departman';
+  }, [filterType, selectedPerson, selectedUnit, allPeople, profile, user]);
 
   return (
     <div className="page" style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -308,26 +323,64 @@ export default function LogsDashboard({ user, profile }) {
           <div>
             <h1 className="page-title">📊 Çalışma Analizi</h1>
             <p className="page-subtitle">
-              {profile?.full_name || user?.email?.split('@')[0]} · {ROLE_LABELS[role] || 'Personel'}
+              {filterLabel} · {ROLE_LABELS[role] || 'Personel'}
             </p>
           </div>
 
-          {/* Görünüm seçici */}
-          {(canViewUnit || canViewAll) && (
-            <div style={{ display: 'flex', gap: 6, background: 'var(--surface)', borderRadius: 10, padding: 4, border: '1px solid var(--border)' }}>
-              <ViewBtn active={viewMode === 'personal'} onClick={() => { setViewMode('personal'); setOffset(0); }}>👤 Benim</ViewBtn>
-              {canViewUnit && (
-                <ViewBtn active={viewMode === 'unit'} onClick={() => { setViewMode('unit'); setOffset(0); }}>
-                  🏢 {profile?.unit || 'Birimim'}
-                </ViewBtn>
+          {/* Görünüm seçici — direktör için tam filtre */}
+          {(canViewUnit || canViewAll) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* Tip butonları */}
+              <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4, border: '1px solid var(--border)' }}>
+                <ViewBtn active={filterType === 'personal'} onClick={() => { setFilterType('personal'); setOffset(0); }}>👤 Ben</ViewBtn>
+                {canViewAll && (
+                  <ViewBtn active={filterType === 'person'} onClick={() => { setFilterType('person'); setOffset(0); }}>🔍 Personel</ViewBtn>
+                )}
+                {canViewUnit && (
+                  <ViewBtn active={filterType === 'unit'} onClick={() => { setFilterType('unit'); setOffset(0); }}>🏢 Birim</ViewBtn>
+                )}
+                {canViewAll && (
+                  <ViewBtn active={filterType === 'all'} onClick={() => { setFilterType('all'); setOffset(0); }}>🌐 Departman</ViewBtn>
+                )}
+              </div>
+
+              {/* Personel dropdown */}
+              {filterType === 'person' && (
+                <select
+                  value={selectedPerson}
+                  onChange={e => setSelectedPerson(e.target.value)}
+                  style={{
+                    padding: '7px 12px', borderRadius: 8, border: '1.5px solid var(--navy)',
+                    background: 'white', color: 'var(--navy)', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', outline: 'none', minWidth: 180,
+                  }}
+                >
+                  <option value="">— Personel seçin —</option>
+                  {allPeople.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               )}
-              {canViewAll && (
-                <ViewBtn active={viewMode === 'all'} onClick={() => { setViewMode('all'); setOffset(0); }}>
-                  🌐 Departman
-                </ViewBtn>
+
+              {/* Birim dropdown */}
+              {filterType === 'unit' && (
+                <select
+                  value={selectedUnit}
+                  onChange={e => setSelectedUnit(e.target.value)}
+                  style={{
+                    padding: '7px 12px', borderRadius: 8, border: '1.5px solid var(--navy)',
+                    background: 'white', color: 'var(--navy)', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', outline: 'none', minWidth: 160,
+                  }}
+                >
+                  <option value="">— Birim seçin —</option>
+                  {allUnits.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Dönem seçici + navigasyon */}
@@ -420,7 +473,7 @@ export default function LogsDashboard({ user, profile }) {
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <ReferenceLine y={8} stroke="#16a34a" strokeDasharray="4 4" label={{ value: '8s', fontSize: 10, fill: '#16a34a', position: 'right' }} />
-                  <Bar dataKey="avgHours" name={viewMode === 'personal' ? 'Çalışma (saat)' : 'Ort. Çalışma'} fill="#1a3a5c" radius={[4,4,0,0]}
+                  <Bar dataKey="avgHours" name={filterType === 'personal' || filterType === 'person' ? 'Çalışma (saat)' : 'Ort. Çalışma'} fill="#1a3a5c" radius={[4,4,0,0]}
                     cell={stats.dailyData.map((d, i) => <Cell key={i} fill={d.isWeekend ? '#9ca3af' : '#1a3a5c'} opacity={d.isWeekend ? 0.4 : 0.9} />)}
                   />
                   {stats.totalOtMins > 0 && (
