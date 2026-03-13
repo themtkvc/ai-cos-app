@@ -36,12 +36,89 @@ export const ROLE_LABELS = {
   personel:            'Personel',
 };
 
+// ── Şifre Belirleme Ekranı (invite/recovery sonrası) ──────────────────────────
+function SetPasswordScreen({ onDone }) {
+  const [pw, setPw]       = useState('');
+  const [pw2, setPw2]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handle = async (e) => {
+    e.preventDefault();
+    if (pw.length < 6)     return setError('Şifre en az 6 karakter olmalı.');
+    if (pw !== pw2)        return setError('Şifreler eşleşmiyor.');
+    setLoading(true); setError('');
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    if (error) setError(error.message);
+    else onDone();
+    setLoading(false);
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(135deg, #0f1e2e 0%, #1a3a5c 50%, #0f2640 100%)',
+      fontFamily: 'system-ui, sans-serif',
+    }}>
+      <div style={{
+        background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 18, padding: '40px 36px', width: 340, boxSizing: 'border-box',
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>🔑</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'white', marginBottom: 6 }}>Şifrenizi Belirleyin</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+            Hesabınıza ilk girişiniz. Lütfen bir şifre oluşturun.
+          </div>
+        </div>
+        <form onSubmit={handle} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {['Yeni Şifre', 'Şifreyi Tekrarla'].map((label, i) => (
+            <div key={i}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                {label.toUpperCase()}
+              </label>
+              <input
+                type="password"
+                value={i === 0 ? pw : pw2}
+                onChange={e => i === 0 ? setPw(e.target.value) : setPw2(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '11px 14px', borderRadius: 10,
+                  border: '1.5px solid rgba(255,255,255,0.15)',
+                  background: 'rgba(255,255,255,0.07)', color: 'white',
+                  fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                }}
+              />
+            </div>
+          ))}
+          {error && (
+            <div style={{
+              padding: '9px 13px', borderRadius: 8, fontSize: 12.5,
+              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5',
+            }}>⚠️ {error}</div>
+          )}
+          <button type="submit" disabled={loading} style={{
+            padding: '13px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: loading ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.92)',
+            color: '#1a3a5c', fontWeight: 800, fontSize: 14, fontFamily: 'inherit',
+          }}>
+            {loading ? '⏳ Kaydediliyor…' : 'Şifreyi Kaydet & Giriş Yap →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser]       = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState('dashboard');
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
 
   // Load user + profile
   const loadProfile = async (authUser) => {
@@ -79,13 +156,18 @@ export default function App() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
       setUser(u);
+      // Invite veya password recovery linkiyle gelindiyse şifre belirleme ekranı göster
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' && session?.user?.app_metadata?.provider === 'email' && !session?.user?.last_sign_in_at) {
+        setNeedsPassword(true);
+      }
       if (u) {
         loadProfile(u).catch(e => console.error('Auth change loadProfile error:', e));
       } else {
         setProfile(null);
+        setNeedsPassword(false);
       }
     });
     return () => { clearTimeout(safetyTimer); subscription.unsubscribe(); };
@@ -109,6 +191,9 @@ export default function App() {
   );
 
   if (!user) return <Login onLogin={(u) => { setUser(u); loadProfile(u); }} />;
+
+  // Invite veya recovery linki ile gelindi → şifre belirleme ekranı
+  if (needsPassword) return <SetPasswordScreen onDone={() => setNeedsPassword(false)} />;
 
   const pages = {
     dashboard: Dashboard,
