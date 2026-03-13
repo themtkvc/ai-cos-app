@@ -21,25 +21,19 @@ const emptySubUnit = () => ({
   id: newId(), name: '', members: [emptyMember()],
 });
 
-// ── Expanded member fields ────────────────────────────────────────────────────
+// ── Expanded member fields (expertise, phone, birthday only — email is in compact row) ──
 function MemberExpanded({ m, color, onChange }) {
   return (
     <div style={{
       padding: '10px 12px', background: 'var(--surface)',
       borderTop: '1px dashed var(--border)',
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
     }}>
       <div>
         <label className="form-label" style={{ fontSize: 10.5 }}>Uzmanlık Alanı</label>
         <input className="form-input" placeholder="Ör: Uluslararası Hukuk, AB Fonları"
           value={m.expertise || ''} style={{ padding: '4px 8px', fontSize: 12 }}
           onChange={e => onChange({ ...m, expertise: e.target.value })} />
-      </div>
-      <div>
-        <label className="form-label" style={{ fontSize: 10.5 }}>E-posta</label>
-        <input className="form-input" type="email" placeholder="ad@ornek.com"
-          value={m.email || ''} style={{ padding: '4px 8px', fontSize: 12 }}
-          onChange={e => onChange({ ...m, email: e.target.value })} />
       </div>
       <div>
         <label className="form-label" style={{ fontSize: 10.5 }}>Telefon</label>
@@ -93,17 +87,28 @@ function MemberRow({ m, color, onChange, onRemove, canRemove }) {
         <input className="form-input"
           placeholder="Pozisyon" value={m.position || ''}
           onChange={e => onChange({ ...m, position: e.target.value })}
-          style={{ width: 130, padding: '3px 7px', fontSize: 11.5 }} />
+          style={{ width: 120, padding: '3px 7px', fontSize: 11.5 }} />
+
+        {/* Email — visible directly in row */}
+        <input className="form-input" type="email"
+          placeholder="✉ e-posta"
+          value={m.email || ''}
+          onChange={e => onChange({ ...m, email: e.target.value })}
+          style={{
+            width: 160, padding: '3px 7px', fontSize: 11.5,
+            borderColor: m.email ? 'var(--border)' : '#fbbf24',
+            background: m.email ? 'white' : '#fffbeb',
+          }} />
 
         {/* Ext */}
         <input className="form-input"
           placeholder="Dahili" value={m.ext}
           onChange={e => onChange({ ...m, ext: e.target.value })}
-          style={{ width: 58, padding: '3px 7px', fontSize: 11.5, fontFamily: 'monospace' }} />
+          style={{ width: 54, padding: '3px 7px', fontSize: 11.5, fontFamily: 'monospace' }} />
 
         {/* Expand toggle */}
         <button onClick={() => setExp(e => !e)}
-          title="Kişisel bilgiler"
+          title="Uzmanlık alanı, telefon, doğum günü"
           style={{
             width: 22, height: 22, borderRadius: 6, flexShrink: 0,
             border: '1px solid var(--border)',
@@ -253,8 +258,9 @@ function UnitEditor({ unit, color, onChange, onRemove, onMoveUp, onMoveDown, isF
           }}>
             <div style={{ width: 20, textAlign: 'center' }}>●</div>
             <div style={{ flex: 1 }}>Ad Soyad</div>
-            <div style={{ width: 130 }}>Pozisyon</div>
-            <div style={{ width: 58 }}>Dahili</div>
+            <div style={{ width: 120 }}>Pozisyon</div>
+            <div style={{ width: 160 }}>E-posta ✉</div>
+            <div style={{ width: 54 }}>Dahili</div>
             <div style={{ width: 22 }}>+</div>
             <div style={{ width: 22 }}>✕</div>
           </div>
@@ -326,8 +332,9 @@ function DirectStaffEditor({ members, onChange }) {
         }}>
           <div style={{ width: 20, textAlign: 'center' }}>●</div>
           <div style={{ flex: 1 }}>Ad Soyad</div>
-          <div style={{ width: 130 }}>Pozisyon</div>
-          <div style={{ width: 58 }}>Dahili</div>
+          <div style={{ width: 120 }}>Pozisyon</div>
+          <div style={{ width: 160 }}>E-posta ✉</div>
+          <div style={{ width: 54 }}>Dahili</div>
           <div style={{ width: 22 }}>+</div>
           <div style={{ width: 22 }}>✕</div>
         </div>
@@ -438,7 +445,7 @@ export default function OrgChartAdmin({ notify }) {
           <div>
             <div className="card-title" style={{ marginBottom: 2 }}>🏗 Birimler ({chart.units.length})</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Satıra tıklayarak genişletin · Dolu = Sorumlu · ▼ = Kişisel bilgiler
+              Satıra tıklayarak genişletin · Dolu nokta = Sorumlu · ▼ = Uzmanlık, telefon, doğum günü
             </div>
           </div>
           <button className="btn btn-primary btn-sm" onClick={addUnit}>+ Yeni Birim</button>
