@@ -9,6 +9,7 @@ import UnitReports from './pages/UnitReports';
 import DailyLog from './pages/DailyLog';
 import LogsDashboard from './pages/LogsDashboard';
 import DonationTracker from './pages/DonationTracker';
+import OrgChart from './pages/OrgChart';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -20,11 +21,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','admin','users'],
-  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations'],
-  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations'],
-  koordinator:          ['dashboard','chat','reports','dailylog','analytics'],
-  personel:             ['dashboard','chat','reports','dailylog','analytics'],
+  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart','admin','users'],
+  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
+  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
+  koordinator:          ['dashboard','chat','reports','dailylog','analytics','orgchart'],
+  personel:             ['dashboard','chat','reports','dailylog','analytics','orgchart'],
 };
 
 export const ROLE_LABELS = {
@@ -118,6 +119,7 @@ export default function App() {
     dailylog:  DailyLog,
     analytics: LogsDashboard,
     donations: DonationTracker,
+    orgchart:  OrgChart,
     admin:     Admin,
     users:     Admin,
   };

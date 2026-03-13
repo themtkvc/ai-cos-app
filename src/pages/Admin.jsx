@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
+import OrgChartAdmin from '../components/OrgChartAdmin';
 
 const DEFAULT_ORG = {
   orgName: 'Uluslararası İnsani Yardım Örgütü',
@@ -623,6 +624,7 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
             { id:'system',         icon:'⚙️', label:'Sistem & Veri' },
             { id:'users',          icon:'👥', label:'Kullanıcı Yönetimi' },
             { id:'announcements',  icon:'📢', label:'Duyurular' },
+            { id:'orgchart',       icon:'🏢', label:'Org Şeması' },
           ].map(tab => (
             <button key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -646,6 +648,11 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
       {/* ANNOUNCEMENTS TAB */}
       {activeTab === 'announcements' && (
         <AnnouncementManagement notify={notify} />
+      )}
+
+      {/* ORG CHART TAB */}
+      {activeTab === 'orgchart' && (
+        <OrgChartAdmin notify={notify} />
       )}
 
       {/* SYSTEM TAB */}

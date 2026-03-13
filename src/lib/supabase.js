@@ -349,3 +349,22 @@ export const clearTable = async (table, userId) => {
   const { error } = await supabase.from(table).delete().eq('user_id', userId);
   return { error };
 };
+
+// ── ORG CHART ──
+export const getOrgChart = async () => {
+  const { data, error } = await supabase
+    .from('org_config')
+    .select('value')
+    .eq('key', 'org_chart')
+    .single();
+  return { data: data?.value || null, error };
+};
+
+export const saveOrgChart = async (chartData) => {
+  const { data, error } = await supabase
+    .from('org_config')
+    .upsert({ key: 'org_chart', value: chartData, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    .select();
+  return { data, error };
+};
+

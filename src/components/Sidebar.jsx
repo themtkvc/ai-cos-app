@@ -12,6 +12,7 @@ const ALL_NAV = [
   { id: 'dailylog',  icon: '🗓', label: 'Günlük İş Logu' },
   { id: 'analytics', icon: '📈', label: 'Çalışma Analizi' },
   { id: 'donations', icon: '💰', label: 'Bağış Takip' },
+  { id: 'orgchart',  icon: '🏢', label: 'Org Şeması' },
 ];
 
 const ADMIN_NAV = [
