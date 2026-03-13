@@ -368,3 +368,28 @@ export const saveOrgChart = async (chartData) => {
   return { data, error };
 };
 
+
+// ── INVITE STAFF (Edge Function proxy) ──
+export const inviteStaffMember = async (email, name, role = "personel") => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: { message: "Oturum bulunamadı" } };
+  try {
+    const res = await fetch(
+      `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/invite-staff`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email, name, role }),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) return { error: { message: json.error || "Hata oluştu" } };
+    return { data: json, error: null };
+  } catch (e) {
+    return { error: { message: e.message } };
+  }
+};
+
