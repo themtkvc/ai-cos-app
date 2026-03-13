@@ -151,7 +151,6 @@ function ProfileModal({ member, color, isDirector, onClose, onInviteSuccess }) {
           )}
 
           {/* Info rows */}
-          {member.ext && <InfoRow icon="☎️" label="Dahili" value={member.ext} />}
           {member.email && (
             <InfoRow icon="✉️" label="E-posta" value={member.email} href={`mailto:${member.email}`} />
           )}
@@ -159,7 +158,7 @@ function ProfileModal({ member, color, isDirector, onClose, onInviteSuccess }) {
           {member.birthday && <InfoRow icon="🎂" label="Doğum Günü" value={fmtBirthday(member.birthday)} />}
 
           {/* Empty state */}
-          {!member.expertise && !member.ext && !member.email && !member.phone && !member.birthday && (
+          {!member.expertise && !member.email && !member.phone && !member.birthday && (
             <div style={{ padding: '12px 0', color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>
               Henüz bilgi girilmedi.
             </div>
@@ -257,15 +256,6 @@ function MemberItem({ m, color, onSelect }) {
           </span>
         )}
       </div>
-      {m.ext && (
-        <span style={{
-          fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'monospace',
-          background: 'var(--surface)', padding: '1px 5px',
-          borderRadius: 4, border: '1px solid var(--border)', flexShrink: 0,
-        }}>
-          {m.ext}
-        </span>
-      )}
       {m.invited && <span style={{ fontSize: 10, color: '#16a34a', flexShrink: 0 }}>✓</span>}
     </div>
   );
@@ -396,13 +386,6 @@ function DirectStaffSection({ members, onSelect }) {
               <div style={{ fontSize: 11.5, color, fontWeight: 500, marginTop: 1 }}>{m.position}</div>
             )}
           </div>
-          {m.ext && (
-            <span style={{
-              marginLeft: 6, fontSize: 11, color: 'var(--text-muted)',
-              fontFamily: 'monospace', background: 'white',
-              padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)',
-            }}>{m.ext}</span>
-          )}
           {m.invited && <span style={{ fontSize: 10, color: '#16a34a', marginLeft: 2 }}>✓</span>}
         </div>
       ))}
@@ -557,7 +540,6 @@ export default function OrgChart({ user, profile, onNavigate }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '6px 0', marginBottom: 12, fontSize: 12, color: 'var(--text-muted)' }}>
         <span>● Dolu = Sorumlu</span>
         <span>○ Boş = Personel</span>
-        <span style={{ fontFamily: 'monospace', background: 'var(--surface)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>1234</span> = Dahili
         <span>✓ = Sisteme davet edildi</span>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#2563eb' }}>İsme tıkla → profil</span>
       </div>

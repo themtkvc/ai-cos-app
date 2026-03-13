@@ -10,7 +10,7 @@ const UNIT_ICONS = ['⚖️', '🌍', '📝', '💰', '🤝', '📊', '🏛', '�
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 const emptyMember = () => ({
-  id: newId(), name: '', isLead: false, ext: '',
+  id: newId(), name: '', isLead: false,
   position: '', expertise: '', email: '', phone: '', birthday: '',
   invited: false,
 });
@@ -99,12 +99,6 @@ function MemberRow({ m, color, onChange, onRemove, canRemove }) {
             borderColor: m.email ? 'var(--border)' : '#fbbf24',
             background: m.email ? 'white' : '#fffbeb',
           }} />
-
-        {/* Ext */}
-        <input className="form-input"
-          placeholder="Dahili" value={m.ext}
-          onChange={e => onChange({ ...m, ext: e.target.value })}
-          style={{ width: 54, padding: '3px 7px', fontSize: 11.5, fontFamily: 'monospace' }} />
 
         {/* Expand toggle */}
         <button onClick={() => setExp(e => !e)}
@@ -260,7 +254,6 @@ function UnitEditor({ unit, color, onChange, onRemove, onMoveUp, onMoveDown, isF
             <div style={{ flex: 1 }}>Ad Soyad</div>
             <div style={{ width: 120 }}>Pozisyon</div>
             <div style={{ width: 160 }}>E-posta ✉</div>
-            <div style={{ width: 54 }}>Dahili</div>
             <div style={{ width: 22 }}>+</div>
             <div style={{ width: 22 }}>✕</div>
           </div>
@@ -334,7 +327,6 @@ function DirectStaffEditor({ members, onChange }) {
           <div style={{ flex: 1 }}>Ad Soyad</div>
           <div style={{ width: 120 }}>Pozisyon</div>
           <div style={{ width: 160 }}>E-posta ✉</div>
-          <div style={{ width: 54 }}>Dahili</div>
           <div style={{ width: 22 }}>+</div>
           <div style={{ width: 22 }}>✕</div>
         </div>
