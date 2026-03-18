@@ -462,7 +462,7 @@ export const inviteStaffMember = async (email, name, role = "personel") => {
 export const getNetworkAll = async () => {
   const [orgs, contacts, events, connections] = await Promise.all([
     supabase.from('network_organizations').select('*').order('name'),
-    supabase.from('network_contacts').select('*, network_organizations(id,name,logo_url)').order('full_name'),
+    supabase.from('network_contacts').select('*').order('full_name'),
     supabase.from('network_events').select('*').order('event_date', { ascending: false }),
     supabase.from('network_connections').select('*').order('created_at'),
   ]);

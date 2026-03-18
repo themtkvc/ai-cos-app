@@ -202,6 +202,9 @@ function HubView({ center, nodes }) {
 function DetailPanel({ item, type, orgs, contacts, events, connections, onClose, onEdit, onDelete, onAddConnection, onRemoveConnection }) {
   if (!item) return null;
 
+  const contactOrg = type==='contact' && item.organization_id
+    ? orgs.find(o=>o.id===item.organization_id) : null;
+
   const myConnections = connections.filter(c =>
     (c.source_type === type && c.source_id === item.id) ||
     (c.target_type === type && c.target_id === item.id)
@@ -258,9 +261,9 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
                 {type === 'contact' && item.position && (
                   <div style={{ fontSize:13, color:'#6b7280', marginTop:3 }}>{item.position}</div>
                 )}
-                {type === 'contact' && item.network_organizations && (
+                {type === 'contact' && contactOrg && (
                   <div style={{ fontSize:12.5, color:'#9ca3af', marginTop:2 }}>
-                    🏢 {item.network_organizations.name}
+                    🏢 {contactOrg.name}
                   </div>
                 )}
                 {type === 'organization' && (
@@ -372,7 +375,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             fontFamily:'inherit',
             transition:'all 0.15s',
           }}>
-            + Bağlantı Ekle
+            {type === 'event' ? '+ Katılımcı / Kurum Ekle' : '+ Etkinliğe Bağla'}
           </button>
         </div>
       </div>
@@ -452,10 +455,15 @@ function FormModal({ type, initial, orgs, user, onSave, onClose }) {
     if (!name?.trim()) { setError('İsim zorunlu'); return; }
     setSaving(true); setError('');
 
+    // Nested nesneleri ve undefined FK'ları temizle
     let payload = { ...form };
     if (!payload.organization_id) delete payload.organization_id;
     if (!payload.event_date)      delete payload.event_date;
     if (!payload.end_date)        delete payload.end_date;
+    // Supabase join artıkları varsa sil
+    delete payload.network_organizations;
+    delete payload.network_contacts;
+    delete payload.network_events;
 
     // Resim yükle
     if (imgFile && user) {
@@ -634,9 +642,21 @@ function FormModal({ type, initial, orgs, user, onSave, onClose }) {
   );
 }
 
+const EVENT_CONNECTION_LABELS = [
+  'Katıldı', 'Konuşmacı', 'Organizatör', 'Sponsor',
+  'Partner', 'Davetli', 'Moderatör', 'Diğer',
+];
+
 // ── BAĞLANTI EKLEME MODAL ─────────────────────────────────────────────────────
+// Bağlantılar yalnızca etkinlik eksenlidir:
+//   • Kaynak etkinlikse → kişi veya kurum seçilir
+//   • Kaynak kişi/kurumsa → etkinlik seçilir
 function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, connections, onSave, onClose }) {
-  const [targetType, setTargetType] = useState('contact');
+  // Etkinlik tarafı kaynak mı hedef mi?
+  const isEventSource = sourceType === 'event';
+
+  // Eğer kaynak etkinlikse kullanıcı kişi/kurum seçer; değilse etkinlik seçer
+  const [targetType, setTargetType] = useState(isEventSource ? 'contact' : 'event');
   const [targetId, setTargetId]     = useState('');
   const [label, setLabel]           = useState('');
   const [notes, setNotes]           = useState('');
@@ -674,27 +694,40 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
         padding:'24px', boxShadow:'0 20px 60px rgba(0,0,0,0.25)',
       }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h3 style={{ margin:0, fontSize:16, fontWeight:800 }}>Bağlantı Ekle</h3>
+          <h3 style={{ margin:0, fontSize:16, fontWeight:800 }}>
+            {isEventSource ? 'Katılımcı / Kurum Ekle' : 'Etkinliğe Bağla'}
+          </h3>
           <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20, color:'#9ca3af' }}>✕</button>
         </div>
 
-        {/* Hedef tipi */}
-        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-          {[{id:'contact',label:'🧑 Kişi'},{id:'organization',label:'🏢 Kurum'},{id:'event',label:'📅 Etkinlik'}].map(t=>(
-            <button key={t.id} onClick={()=>{setTargetType(t.id);setTargetId('');}}
-              style={{
-                flex:1, padding:'8px 4px', borderRadius:8, cursor:'pointer',
-                border:`2px solid ${targetType===t.id ? '#111827' : '#e5e7eb'}`,
-                background: targetType===t.id ? '#111827' : 'white',
-                color: targetType===t.id ? 'white' : '#374151',
-                fontWeight:600, fontSize:12.5, fontFamily:'inherit',
-              }}>{t.label}</button>
-          ))}
-        </div>
+        {/* Kaynak etkinlikse kişi/kurum seçimi göster */}
+        {isEventSource && (
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            {[{id:'contact',label:'🧑 Kişi'},{id:'organization',label:'🏢 Kurum'}].map(t=>(
+              <button key={t.id} onClick={()=>{setTargetType(t.id);setTargetId('');}}
+                style={{
+                  flex:1, padding:'8px 4px', borderRadius:8, cursor:'pointer',
+                  border:`2px solid ${targetType===t.id ? '#2563eb' : '#e5e7eb'}`,
+                  background: targetType===t.id ? '#eff6ff' : 'white',
+                  color: targetType===t.id ? '#1d4ed8' : '#374151',
+                  fontWeight:600, fontSize:12.5, fontFamily:'inherit',
+                }}>{t.label}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Kaynak kişi/kurumsa etkinlik seçimi */}
+        {!isEventSource && (
+          <div style={{ padding:'8px 12px', borderRadius:8, background:'#eff6ff', color:'#1d4ed8', fontSize:12.5, fontWeight:600, marginBottom:14 }}>
+            📅 Bu kişi/kurum bir etkinlikte tanışılanlar listesine eklenecek
+          </div>
+        )}
 
         {/* Hedef seç */}
         <div style={{ marginBottom:14 }}>
-          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Seç</label>
+          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+            {targetType==='contact' ? 'Kişi Seç' : targetType==='organization' ? 'Kurum Seç' : 'Etkinlik Seç'}
+          </label>
           <select value={targetId} onChange={e=>setTargetId(e.target.value)}
             style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
             <option value=''>-- Seçin --</option>
@@ -706,7 +739,7 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>İlişki Etiketi</label>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-            {CONNECTION_LABELS.map(l=>(
+            {EVENT_CONNECTION_LABELS.map(l=>(
               <button key={l} type="button" onClick={()=>setLabel(l)}
                 style={{
                   padding:'4px 12px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:600,
@@ -743,9 +776,11 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
 }
 
 // ── LİSTE SATIRI ─────────────────────────────────────────────────────────────
-function ListRow({ item, type, connCount, onClick }) {
+function ListRow({ item, type, connCount, onClick, orgs=[] }) {
   const name   = item.full_name || item.name;
   const imgUrl = item.avatar_url || item.logo_url || item.cover_url;
+  const orgName = type==='contact' && item.organization_id
+    ? orgs.find(o=>o.id===item.organization_id)?.name : null;
   return (
     <div onClick={onClick} style={{
       display:'flex', alignItems:'center', gap:14, padding:'13px 20px',
@@ -759,7 +794,7 @@ function ListRow({ item, type, connCount, onClick }) {
         <div style={{ fontWeight:700, fontSize:14, color:'#111827', marginBottom:2 }}>{name}</div>
         <div style={{ fontSize:12.5, color:'#9ca3af', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           {type==='contact' && item.position && <span>{item.position}</span>}
-          {type==='contact' && item.network_organizations?.name && <span>🏢 {item.network_organizations.name}</span>}
+          {type==='contact' && orgName && <span>🏢 {orgName}</span>}
           {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
           {type==='event' && item.event_date && <span>📅 {fmtDate(item.event_date)}</span>}
           {type==='event' && item.location && <span>📍 {item.location}</span>}
@@ -781,9 +816,11 @@ function ListRow({ item, type, connCount, onClick }) {
 }
 
 // ── KART ──────────────────────────────────────────────────────────────────────
-function Card({ item, type, connCount, onClick }) {
+function Card({ item, type, connCount, onClick, orgs=[] }) {
   const name   = item.full_name || item.name;
   const imgUrl = item.avatar_url || item.logo_url || item.cover_url;
+  const orgName = type==='contact' && item.organization_id
+    ? orgs.find(o=>o.id===item.organization_id)?.name : null;
   return (
     <div onClick={onClick} style={{
       background:'white', borderRadius:14, border:'1px solid #e5e7eb',
@@ -803,8 +840,8 @@ function Card({ item, type, connCount, onClick }) {
           {type==='contact' && item.position && (
             <div style={{ fontSize:12.5, color:'#6b7280', marginBottom:2 }}>{item.position}</div>
           )}
-          {type==='contact' && item.network_organizations?.name && (
-            <div style={{ fontSize:12, color:'#9ca3af' }}>🏢 {item.network_organizations.name}</div>
+          {type==='contact' && orgName && (
+            <div style={{ fontSize:12, color:'#9ca3af' }}>🏢 {orgName}</div>
           )}
           {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
           {type==='event' && (
@@ -1129,6 +1166,7 @@ export default function NetworkManager({ user, profile }) {
               {currentItems.map(item => (
                 <ListRow key={item.id} item={item} type={currentType}
                   connCount={connCount(currentType, item.id)}
+                  orgs={data.organizations}
                   onClick={()=>{ setSelectedItem(item); setSelectedType(currentType); }} />
               ))}
             </div>
@@ -1140,6 +1178,7 @@ export default function NetworkManager({ user, profile }) {
               {currentItems.map(item => (
                 <Card key={item.id} item={item} type={currentType}
                   connCount={connCount(currentType, item.id)}
+                  orgs={data.organizations}
                   onClick={()=>{ setSelectedItem(item); setSelectedType(currentType); }} />
               ))}
             </div>
@@ -1159,6 +1198,7 @@ export default function NetworkManager({ user, profile }) {
               {currentItems.map(item => (
                 <ListRow key={item.id} item={item} type={currentType}
                   connCount={connCount(currentType, item.id)}
+                  orgs={data.organizations}
                   onClick={()=>{ setSelectedItem(item); setSelectedType(currentType); }} />
               ))}
             </div>
