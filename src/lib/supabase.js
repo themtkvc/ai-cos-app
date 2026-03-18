@@ -257,15 +257,6 @@ export const upsertUserProfile = async (profile) => {
   return { data, error };
 };
 
-export const updateUserProfile = async (userId, updates) => {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .select();
-  return { data, error };
-};
-
 // Admin: invite/create a new user via Supabase Auth (only admin service key can do this,
 // so we just create the profile record; actual user must sign up themselves)
 export const inviteUser = async (email, role, unit, fullName) => {
@@ -368,6 +359,43 @@ export const saveOrgChart = async (chartData) => {
   return { data, error };
 };
 
+
+// ── PROFIL GÜNCELLEME ──
+export const updateUserProfile = async (userId, updates) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const updateAuthEmail = async (newEmail) => {
+  const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+  return { data, error };
+};
+
+export const updateAuthPassword = async (newPassword) => {
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  return { data, error };
+};
+
+// Profil resmi yükle → avatars/{userId}/avatar.{ext}
+export const uploadAvatar = async (userId, file) => {
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${userId}/avatar.${ext}`;
+  // Önce varsa sil
+  await supabase.storage.from('avatars').remove([path]);
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (error) return { data: null, error };
+  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+  // cache-bust
+  const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+  return { data: publicUrl, error: null };
+};
 
 // ── GÜNDEMLER (AGENDAS) ──
 export const getAllAgendas = async () => {

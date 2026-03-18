@@ -9,6 +9,7 @@ import UnitReports from './pages/UnitReports';
 import DailyLog from './pages/DailyLog';
 import LogsDashboard from './pages/LogsDashboard';
 import LogsViewer from './pages/LogsViewer';
+import ProfileSettings from './pages/ProfileSettings';
 import DonationTracker from './pages/DonationTracker';
 import OrgChart from './pages/OrgChart';
 import Admin from './pages/Admin';
@@ -22,11 +23,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','admin','users'],
-  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart'],
-  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart'],
-  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart'],
-  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','profile'],
+  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','profile'],
+  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','profile'],
+  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','profile'],
 };
 
 export const ROLE_LABELS = {
@@ -205,6 +206,7 @@ export default function App() {
     dailylog:   DailyLog,
     logsviewer: LogsViewer,
     analytics:  LogsDashboard,
+    profile:    ProfileSettings,
     donations: DonationTracker,
     orgchart:  OrgChart,
     admin:     Admin,
@@ -227,8 +229,13 @@ export default function App() {
               onClearInitialMessage={() => setChatInitialMessage(null)}
             />
           ) : PageComponent ? (
-            <PageComponent user={user} profile={profile} onNavigate={navigate}
-              defaultTab={activePage === 'users' ? 'users' : undefined} />
+            <PageComponent
+              user={user}
+              profile={profile}
+              onNavigate={navigate}
+              defaultTab={activePage === 'users' ? 'users' : undefined}
+              onProfileUpdate={() => loadProfile(user)}
+            />
           ) : (
             <Dashboard user={user} profile={profile} onNavigate={navigate} />
           )}

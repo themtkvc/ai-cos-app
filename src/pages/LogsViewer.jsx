@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getDashboardLogs, getAllProfiles } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
+import { UserAvatar } from './ProfileSettings';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
@@ -223,15 +224,12 @@ function PersonGroup({ person, logs, mode }) {
         onClick={() => setCollapsed(c => !c)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(26,58,92,0.15)', color: '#1a3a5c',
-            fontWeight: 800, fontSize: 15,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            {(person.full_name || '?')[0].toUpperCase()}
-          </div>
+          <UserAvatar
+            profile={{ full_name: person.full_name, avatar_url: person.avatar_url }}
+            size={36}
+            fontSize={15}
+            style={{ border: '2px solid rgba(26,58,92,0.15)' }}
+          />
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1a3a5c' }}>
               {person.full_name}
@@ -375,9 +373,10 @@ export default function LogsViewer({ user, profile }) {
     const uid = log.user_id;
     if (!personMap[uid]) {
       personMap[uid] = {
-        user_id:   uid,
-        full_name: log.full_name || uid.slice(0,8),
-        role:      log.user_role,
+        user_id:    uid,
+        full_name:  log.full_name  || uid.slice(0,8),
+        role:       log.user_role,
+        avatar_url: log.avatar_url || null,
         unit:      log.unit,
         logs:      [],
       };

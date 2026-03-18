@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 import OrgChartAdmin from '../components/OrgChartAdmin';
+import { UserAvatar } from './ProfileSettings';
 
 const DEFAULT_ORG = {
   orgName: 'Uluslararası İnsani Yardım Örgütü',
@@ -154,13 +155,12 @@ function UserManagement({ currentUser, notify }) {
       padding:'12px 16px', borderRadius:10, border:'1px solid var(--border)',
       background:'var(--surface)', display:'flex', alignItems:'center', gap:12,
     }}>
-      <div style={{
-        width:38, height:38, borderRadius:'50%', flexShrink:0, display:'flex',
-        alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:15,
-        background: roleColor(p.role) + '22', color: roleColor(p.role), border: `2px solid ${roleColor(p.role)}44`
-      }}>
-        {(p.full_name?.[0] || '?').toUpperCase()}
-      </div>
+      <UserAvatar
+        profile={{ full_name: p.full_name, avatar_url: p.avatar_url }}
+        size={38}
+        fontSize={15}
+        style={{ border: `2px solid ${roleColor(p.role)}44` }}
+      />
 
       <div style={{flex:1, minWidth:0}}>
         {editingId === p.user_id ? (

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles } from '../lib/supabase';
 import { differenceInCalendarDays } from 'date-fns';
 import { ROLE_LABELS } from '../App';
+import { UserAvatar } from './ProfileSettings';
 
 // ── SABİTLER ─────────────────────────────────────────────────────────────────
 const PRIORITIES = [
@@ -461,13 +462,12 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
           <div key={p.user_id} className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: '50%', background: 'var(--navy)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'white', fontWeight: 700, fontSize: 15, flexShrink: 0,
-                }}>
-                  {(p.full_name || p.user_id).slice(0, 2).toUpperCase()}
-                </div>
+                <UserAvatar
+                  profile={{ full_name: p.full_name, avatar_url: p.avatar_url }}
+                  size={38}
+                  fontSize={15}
+                  style={{ border: '2px solid rgba(26,58,92,0.15)' }}
+                />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>{p.full_name || p.user_id}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>

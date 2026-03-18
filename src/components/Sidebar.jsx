@@ -21,8 +21,35 @@ const ADMIN_NAV = [
   { id: 'users', icon: '👥', label: 'Kullanıcı Yönetimi' },
 ];
 
+// Küçük avatar bileşeni — foto varsa göster, yoksa baş harfi
+function SidebarAvatar({ profile, size = 34 }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = (profile?.full_name?.[0] || '?').toUpperCase();
+  const avatarUrl = profile?.avatar_url;
+
+  if (avatarUrl && !imgError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={profile?.full_name || ''}
+        onError={() => setImgError(true)}
+        style={{
+          width: size, height: size, borderRadius: '50%',
+          objectFit: 'cover', flexShrink: 0,
+          border: '2px solid rgba(255,255,255,0.2)',
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="sidebar-user-avatar" style={{ width: size, height: size, fontSize: 14 }}>
+      {initials}
+    </div>
+  );
+}
+
 export default function Sidebar({ activePage, onNavigate, user, profile }) {
-  const [urgentCount, setUrgentCount] = useState(0);
   const [openActionsCount, setOpenActionsCount] = useState(0);
 
   const role = profile?.role || 'personel';
@@ -39,8 +66,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
   }, [user, role]);
 
   const badges = { meetings: openActionsCount || null };
-  const initials = (profile?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase();
-  const displayName = profile?.full_name || user?.email || '';
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || '';
   const roleLabel = ROLE_LABELS[role] || role;
 
   const visibleNav = ALL_NAV.filter(item => allowed.includes(item.id));
@@ -85,13 +111,32 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
       </div>
 
       <div className="sidebar-footer">
-        <div className="sidebar-user">
-          <div className="sidebar-user-avatar">{initials}</div>
+        {/* Profil ayarlarına git butonu */}
+        <button
+          className={`nav-item ${activePage === 'profile' ? 'active' : ''}`}
+          onClick={() => onNavigate('profile')}
+          style={{ marginBottom: 6, width: '100%' }}
+        >
+          <span className="nav-icon">⚙️</span>
+          Profil Ayarları
+        </button>
+
+        <div
+          className="sidebar-user"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onNavigate('profile')}
+          title="Profil Ayarları"
+        >
+          <SidebarAvatar profile={profile} />
           <div className="sidebar-user-info">
-            <div className="sidebar-user-name" title={user?.email}>{displayName.split('@')[0]}</div>
+            <div className="sidebar-user-name" title={user?.email}>{displayName}</div>
             <div className="sidebar-user-role">{roleLabel}</div>
           </div>
-          <button className="sign-out-btn" onClick={() => signOut()} title="Çıkış">⎋</button>
+          <button
+            className="sign-out-btn"
+            onClick={e => { e.stopPropagation(); signOut(); }}
+            title="Çıkış"
+          >⎋</button>
         </div>
       </div>
     </nav>
