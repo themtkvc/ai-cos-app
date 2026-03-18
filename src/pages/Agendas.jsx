@@ -228,10 +228,14 @@ export default function Agendas({ user, profile }) {
       { key: 'my_items',     label: '📋 Gündemlerim' },
     ];
     if (isKoord) return [
-      { key: 'team', label: `🏢 ${myUnit || 'Birimim'}` },
-      { key: 'mine', label: '📋 Bana Atananlar' },
+      { key: 'team',     label: `🏢 ${myUnit || 'Birimim'}` },
+      { key: 'mine',     label: '📋 Bana Atananlar' },
+      { key: 'my_items', label: '📒 Gündemlerim' },
     ];
-    return [{ key: 'mine', label: '📋 Bana Atananlar' }];
+    return [
+      { key: 'mine',     label: '📋 Bana Atananlar' },
+      { key: 'my_items', label: '📒 Gündemlerim' },
+    ];
   }, [isDirector, isKoord, myUnit]);
 
   if (loading) return (
@@ -274,7 +278,7 @@ export default function Agendas({ user, profile }) {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {(isDirector || isKoord) && (
+            {(isDirector || isKoord || activeTab === 'my_items') && (
               <button className="btn btn-primary" onClick={openNew}>+ Yeni Gündem</button>
             )}
           </div>
