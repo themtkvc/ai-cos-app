@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getDeadlines, getMeetingActions, signOut } from '../lib/supabase';
+import { getMeetingActions, signOut } from '../lib/supabase';
 import { ROLE_ACCESS, ROLE_LABELS } from '../App';
 
 const ALL_NAV = [
   { id: 'dashboard', icon: '⚡', label: 'Dashboard' },
   { id: 'chat',      icon: '🤖', label: 'AI Asistan' },
-  { id: 'deadlines', icon: '📅', label: 'Görevler & Tarihler' },
+  { id: 'agendas',   icon: '📋', label: 'Gündemler' },
   { id: 'donors',    icon: '🤝', label: 'Donör CRM' },
   { id: 'meetings',  icon: '📋', label: 'Toplantı Logu' },
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
@@ -29,16 +29,6 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
 
   useEffect(() => {
     if (!user) return;
-    if (allowed.includes('deadlines')) {
-      getDeadlines(user.id).then(({ data }) => {
-        if (!data) return;
-        const n = data.filter(d => {
-          const days = Math.ceil((new Date(d.due_date) - new Date()) / 86400000);
-          return days <= 3 && days >= 0 && d.status !== '✅ Completed';
-        }).length;
-        setUrgentCount(n);
-      });
-    }
     if (allowed.includes('meetings')) {
       getMeetingActions(user.id).then(({ data }) => {
         if (!data) return;
@@ -47,7 +37,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
     }
   }, [user, role]);
 
-  const badges = { deadlines: urgentCount || null, meetings: openActionsCount || null };
+  const badges = { meetings: openActionsCount || null };
   const initials = (profile?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase();
   const displayName = profile?.full_name || user?.email || '';
   const roleLabel = ROLE_LABELS[role] || role;

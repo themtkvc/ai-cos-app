@@ -2,7 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { supabase, getUserProfile, upsertUserProfile } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
-import Deadlines from './pages/Deadlines';
+import Agendas from './pages/Agendas';
 import Donors from './pages/Donors';
 import MeetingLog from './pages/MeetingLog';
 import UnitReports from './pages/UnitReports';
@@ -21,11 +21,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart','admin','users'],
-  direktor_yardimcisi:  ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
-  asistan:              ['dashboard','chat','deadlines','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
-  koordinator:          ['dashboard','chat','reports','dailylog','analytics','orgchart'],
-  personel:             ['dashboard','chat','reports','dailylog','analytics','orgchart'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart','admin','users'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
+  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
+  koordinator:          ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart'],
+  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart'],
 };
 
 export const ROLE_LABELS = {
@@ -197,7 +197,7 @@ export default function App() {
 
   const pages = {
     dashboard: Dashboard,
-    deadlines: Deadlines,
+    agendas:   Agendas,
     donors:    Donors,
     meetings:  MeetingLog,
     reports:   UnitReports,

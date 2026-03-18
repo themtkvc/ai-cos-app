@@ -369,6 +369,40 @@ export const saveOrgChart = async (chartData) => {
 };
 
 
+// ── GÜNDEMLER (AGENDAS) ──
+export const getAllAgendas = async () => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .select('*')
+    .order('due_date', { ascending: true });
+  return { data, error };
+};
+
+export const createAgendaItem = async (agenda) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .insert([agenda])
+    .select();
+  return { data, error };
+};
+
+export const updateAgendaItem = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+export const deleteAgendaItem = async (id) => {
+  const { error } = await supabase
+    .from('agendas')
+    .delete()
+    .eq('id', id);
+  return { error };
+};
+
 // ── INVITE STAFF (Edge Function proxy) ──
 export const inviteStaffMember = async (email, name, role = "personel") => {
   const { data: { session } } = await supabase.auth.getSession();
