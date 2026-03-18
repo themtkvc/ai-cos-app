@@ -253,7 +253,13 @@ function processLogs(logs, dateRange) {
 export default function LogsDashboard({ user, profile }) {
   const [period, setPeriod]           = useState('week');
   const [offset, setOffset]           = useState(0);
-  const [filterType, setFilterType]   = useState('personal'); // 'personal' | 'person' | 'unit' | 'all'
+  const [filterType, setFilterType]   = useState(() => {
+    // Başlangıç filtresi: profil henüz yüklenmemiş olabilir, useEffect ile düzeltilir
+    const r = profile?.role;
+    if (['direktor','direktor_yardimcisi','asistan'].includes(r)) return 'all';
+    if (r === 'koordinator') return 'unit';
+    return 'personal';
+  });
   const [selectedPerson, setSelectedPerson] = useState('');   // user_id
   const [selectedUnit, setSelectedUnit]     = useState('');   // unit name
   const [allLogs, setAllLogs]         = useState([]);
@@ -261,8 +267,21 @@ export default function LogsDashboard({ user, profile }) {
   const [error, setError]             = useState(null);
 
   const role = profile?.role;
-  const canViewUnit = ['koordinator','direktor','direktor_yardimcisi'].includes(role) || profile?.can_view_dashboard;
-  const canViewAll  = ['direktor','direktor_yardimcisi'].includes(role) || profile?.can_view_dashboard;
+  const isDirectorLevel = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
+  const canViewUnit = ['koordinator','direktor','direktor_yardimcisi','asistan'].includes(role) || profile?.can_view_dashboard;
+  const canViewAll  = isDirectorLevel || profile?.can_view_dashboard;
+
+  // Profile async yüklenince filterType'ı düzelt (race condition fix)
+  useEffect(() => {
+    if (!profile?.role) return;
+    setFilterType(curr => {
+      if (curr !== 'personal') return curr; // kullanıcı zaten değiştirdi
+      const r = profile.role;
+      if (['direktor','direktor_yardimcisi','asistan'].includes(r)) return 'all';
+      if (r === 'koordinator') return 'unit';
+      return 'personal';
+    });
+  }, [profile?.role]); // eslint-disable-line
 
   const dateRange = useMemo(
     () => period === 'week' ? getWeekRange(offset) : getMonthRange(offset),
