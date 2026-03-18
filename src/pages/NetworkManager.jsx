@@ -397,7 +397,7 @@ function InfoRow({ icon, label, val, href }) {
 }
 
 // ── FORM MODAL ────────────────────────────────────────────────────────────────
-function FormModal({ type, initial, orgs, user, onSave, onClose }) {
+function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
   const isEdit   = !!initial?.id;
   const fileRef  = useRef();
   const [saving, setSaving] = useState(false);
@@ -405,6 +405,28 @@ function FormModal({ type, initial, orgs, user, onSave, onClose }) {
   const [imgPreview, setImgPreview] = useState(null);
   const [tagInput, setTagInput]   = useState('');
   const [error, setError]         = useState('');
+
+  // Yerel kurum listesi — modal açıkken yeni oluşturulanlar da eklenir
+  const [orgs, setOrgs]           = useState(orgsProp);
+  const [showNewOrg, setShowNewOrg]   = useState(false);
+  const [newOrgName, setNewOrgName]   = useState('');
+  const [newOrgType, setNewOrgType]   = useState('ngo');
+  const [creatingOrg, setCreatingOrg] = useState(false);
+
+  const handleCreateOrg = async (e) => {
+    e.preventDefault();
+    if (!newOrgName.trim()) return;
+    setCreatingOrg(true);
+    const result = await createNetworkOrg({ name: newOrgName.trim(), org_type: newOrgType, unit: user?.unit });
+    if (result.data) {
+      const newOrg = result.data;
+      setOrgs(prev => [...prev, newOrg].sort((a,b)=>a.name.localeCompare(b.name)));
+      set('organization_id', newOrg.id);
+      setShowNewOrg(false);
+      setNewOrgName('');
+    }
+    setCreatingOrg(false);
+  };
 
   const defaultForm = () => {
     if (type === 'contact') return {
@@ -554,13 +576,60 @@ function FormModal({ type, initial, orgs, user, onSave, onClose }) {
             <>
               {inp('Ad Soyad', 'full_name', 'text', 'Ad Soyad', true)}
               {inp('Pozisyon / Unvan', 'position', 'text', 'Örn: Program Müdürü')}
-              <div style={{ marginBottom:14 }}>
+              <div style={{ marginBottom: showNewOrg ? 6 : 14 }}>
                 <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kurum</label>
-                <select value={form.organization_id||''} onChange={e=>set('organization_id',e.target.value)}
-                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
-                  <option value=''>Kurum seçin (isteğe bağlı)</option>
-                  {orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <select value={form.organization_id||''} onChange={e=>set('organization_id',e.target.value)}
+                    style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    <option value=''>Kurum seçin (isteğe bağlı)</option>
+                    {orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                  <button type="button" onClick={()=>setShowNewOrg(v=>!v)} title="Yeni kurum oluştur"
+                    style={{
+                      width:36, height:36, borderRadius:9, border:'1.5px solid #e5e7eb',
+                      background: showNewOrg ? '#eff6ff' : 'white',
+                      color: showNewOrg ? '#2563eb' : '#6b7280',
+                      cursor:'pointer', fontSize:20, lineHeight:1,
+                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                    }}>
+                    {showNewOrg ? '×' : '+'}
+                  </button>
+                </div>
+
+                {/* Inline yeni kurum formu */}
+                {showNewOrg && (
+                  <form onSubmit={handleCreateOrg} style={{
+                    marginTop:8, padding:'12px 14px', borderRadius:10,
+                    background:'#f8faff', border:'1.5px solid #bfdbfe',
+                  }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#1d4ed8', marginBottom:8 }}>
+                      ➕ Yeni Kurum Oluştur
+                    </div>
+                    <input
+                      value={newOrgName} onChange={e=>setNewOrgName(e.target.value)}
+                      placeholder="Kurum adı…" autoFocus required
+                      style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px', borderRadius:8,
+                        border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none',
+                        marginBottom:8, background:'white' }}
+                    />
+                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                      <select value={newOrgType} onChange={e=>setNewOrgType(e.target.value)}
+                        style={{ flex:1, padding:'7px 10px', borderRadius:8, border:'1.5px solid #bfdbfe',
+                          fontSize:12.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                        {ORG_TYPES.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      <button type="submit" disabled={!newOrgName.trim()||creatingOrg}
+                        style={{
+                          padding:'7px 16px', borderRadius:8, border:'none',
+                          background: !newOrgName.trim()||creatingOrg ? '#93c5fd' : '#2563eb',
+                          color:'white', cursor: !newOrgName.trim()||creatingOrg ? 'not-allowed' : 'pointer',
+                          fontSize:12.5, fontWeight:700, fontFamily:'inherit', whiteSpace:'nowrap',
+                        }}>
+                        {creatingOrg ? '⏳' : '✓ Oluştur'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
               {inp('E-posta', 'email', 'email', 'ornek@kurum.org')}
               {inp('Telefon', 'phone', 'tel', '+90 5xx xxx xx xx')}
