@@ -119,9 +119,26 @@ export default function App() {
   const [user, setUser]       = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activePage, setActivePage] = useState('dashboard');
+  // URL hash'ten başlangıç sayfasını oku (yenileme sonrası koru)
+  const pageFromHash = () => {
+    const h = window.location.hash.replace('#', '').trim();
+    const allPages = Object.values(ROLE_ACCESS).flat();
+    return allPages.includes(h) ? h : 'dashboard';
+  };
+  const [activePage, setActivePage] = useState(pageFromHash);
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
+
+  // Browser geri/ileri tuşu desteği
+  useEffect(() => {
+    const onHashChange = () => {
+      const page = pageFromHash();
+      const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
+      if (allowed.includes(page)) setActivePage(page);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [profile]);
 
   // Load user + profile
   const loadProfile = async (authUser) => {
@@ -181,6 +198,7 @@ export default function App() {
     const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
     if (!allowed.includes(page)) return;
     setActivePage(page);
+    window.location.hash = page; // URL'ye yaz → yenileme sonrası korunur
     if (opts && opts.initialMessage !== undefined) {
       setChatInitialMessage(opts.initialMessage || null);
     }
