@@ -244,7 +244,7 @@ export const getUserProfile = async (userId) => {
 export const getAllProfiles = async () => {
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('*, auth_user:user_id(email)')
+    .select('*')
     .order('created_at', { ascending: true });
   return { data, error };
 };
