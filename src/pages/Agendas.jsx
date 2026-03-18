@@ -46,7 +46,6 @@ export default function Agendas({ user, profile }) {
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [editId,   setEditId]   = useState(null);
   const [saving,   setSaving]   = useState(false);
-  const [activeTab, setActiveTab] = useState(() => initialTab);
   const [filter,   setFilter]   = useState({ search: '', priority: '', status: '' });
 
   const role       = profile?.role;
@@ -55,8 +54,13 @@ export default function Agendas({ user, profile }) {
   const myUnit     = profile?.unit;
   const myId       = user?.id;
 
-  // Role'e göre başlangıç tab'ı
-  const initialTab = isKoord ? 'team' : isDirector ? 'koordinators' : 'mine';
+  // useState'i role hesaplandıktan sonra, doğrudan değerle başlatıyoruz
+  const [activeTab, setActiveTab] = useState(() => {
+    const r = profile?.role;
+    if (r === 'koordinator') return 'team';
+    if (['direktor', 'direktor_yardimcisi', 'asistan'].includes(r)) return 'koordinators';
+    return 'mine';
+  });
 
   // ── FETCH ──
   const load = useCallback(async () => {
