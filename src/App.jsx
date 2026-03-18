@@ -12,6 +12,7 @@ import LogsViewer from './pages/LogsViewer';
 import ProfileSettings from './pages/ProfileSettings';
 import DonationTracker from './pages/DonationTracker';
 import OrgChart from './pages/OrgChart';
+import NetworkManager from './pages/NetworkManager';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -23,11 +24,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','profile'],
-  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','profile'],
-  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','profile'],
-  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','profile'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','profile'],
+  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','profile'],
+  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','profile'],
+  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','network','profile'],
 };
 
 export const ROLE_LABELS = {
@@ -209,6 +210,7 @@ export default function App() {
     profile:    ProfileSettings,
     donations: DonationTracker,
     orgchart:  OrgChart,
+    network:   NetworkManager,
     admin:     Admin,
     users:     Admin,
   };

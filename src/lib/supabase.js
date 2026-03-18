@@ -455,3 +455,94 @@ export const inviteStaffMember = async (email, name, role = "personel") => {
   }
 };
 
+
+// ── NETWORK MANAGEMENT ───────────────────────────────────────────────────────
+
+// Tüm network verisini tek seferde çek
+export const getNetworkAll = async () => {
+  const [orgs, contacts, events, connections] = await Promise.all([
+    supabase.from('network_organizations').select('*').order('name'),
+    supabase.from('network_contacts').select('*, network_organizations(id,name,logo_url)').order('full_name'),
+    supabase.from('network_events').select('*').order('event_date', { ascending: false }),
+    supabase.from('network_connections').select('*').order('created_at'),
+  ]);
+  return {
+    organizations: orgs.data   || [],
+    contacts:      contacts.data || [],
+    events:        events.data  || [],
+    connections:   connections.data || [],
+    error: orgs.error || contacts.error || events.error || connections.error,
+  };
+};
+
+// ── ORGANIZATIONS ──
+export const createNetworkOrg = async (data) => {
+  const { data: d, error } = await supabase.from('network_organizations')
+    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+  return { data: d, error };
+};
+export const updateNetworkOrg = async (id, data) => {
+  const { data: d, error } = await supabase.from('network_organizations')
+    .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  return { data: d, error };
+};
+export const deleteNetworkOrg = async (id) => {
+  const { error } = await supabase.from('network_organizations').delete().eq('id', id);
+  return { error };
+};
+
+// ── CONTACTS ──
+export const createNetworkContact = async (data) => {
+  const { data: d, error } = await supabase.from('network_contacts')
+    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+  return { data: d, error };
+};
+export const updateNetworkContact = async (id, data) => {
+  const { data: d, error } = await supabase.from('network_contacts')
+    .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  return { data: d, error };
+};
+export const deleteNetworkContact = async (id) => {
+  const { error } = await supabase.from('network_contacts').delete().eq('id', id);
+  return { error };
+};
+
+// ── EVENTS ──
+export const createNetworkEvent = async (data) => {
+  const { data: d, error } = await supabase.from('network_events')
+    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+  return { data: d, error };
+};
+export const updateNetworkEvent = async (id, data) => {
+  const { data: d, error } = await supabase.from('network_events')
+    .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  return { data: d, error };
+};
+export const deleteNetworkEvent = async (id) => {
+  const { error } = await supabase.from('network_events').delete().eq('id', id);
+  return { error };
+};
+
+// ── CONNECTIONS ──
+export const createNetworkConnection = async (data) => {
+  const { data: d, error } = await supabase.from('network_connections')
+    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id })
+    .select().single();
+  return { data: d, error };
+};
+export const deleteNetworkConnection = async (id) => {
+  const { error } = await supabase.from('network_connections').delete().eq('id', id);
+  return { error };
+};
+
+// ── NETWORK MEDIA UPLOAD ──
+export const uploadNetworkMedia = async (userId, entityType, entityId, file) => {
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${userId}/${entityType}_${entityId}.${ext}`;
+  await supabase.storage.from('network-media').remove([path]);
+  const { error } = await supabase.storage
+    .from('network-media').upload(path, file, { upsert: true, contentType: file.type });
+  if (error) return { data: null, error };
+  const { data: urlData } = supabase.storage.from('network-media').getPublicUrl(path);
+  return { data: urlData.publicUrl + '?t=' + Date.now(), error: null };
+};
