@@ -413,8 +413,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
   const [newOrgType, setNewOrgType]   = useState('ngo');
   const [creatingOrg, setCreatingOrg] = useState(false);
 
-  const handleCreateOrg = async (e) => {
-    e.preventDefault();
+  const handleCreateOrg = async () => {
     if (!newOrgName.trim()) return;
     setCreatingOrg(true);
     const result = await createNetworkOrg({ name: newOrgName.trim(), org_type: newOrgType, unit: user?.unit });
@@ -596,9 +595,9 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
                   </button>
                 </div>
 
-                {/* Inline yeni kurum formu */}
+                {/* Inline yeni kurum — form içinde form olmaz, div kullan */}
                 {showNewOrg && (
-                  <form onSubmit={handleCreateOrg} style={{
+                  <div style={{
                     marginTop:8, padding:'12px 14px', borderRadius:10,
                     background:'#f8faff', border:'1.5px solid #bfdbfe',
                   }}>
@@ -607,7 +606,8 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
                     </div>
                     <input
                       value={newOrgName} onChange={e=>setNewOrgName(e.target.value)}
-                      placeholder="Kurum adı…" autoFocus required
+                      onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); handleCreateOrg(); }}}
+                      placeholder="Kurum adı…" autoFocus
                       style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px', borderRadius:8,
                         border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none',
                         marginBottom:8, background:'white' }}
@@ -618,7 +618,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
                           fontSize:12.5, fontFamily:'inherit', background:'white', outline:'none' }}>
                         {ORG_TYPES.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
-                      <button type="submit" disabled={!newOrgName.trim()||creatingOrg}
+                      <button type="button" onClick={handleCreateOrg} disabled={!newOrgName.trim()||creatingOrg}
                         style={{
                           padding:'7px 16px', borderRadius:8, border:'none',
                           background: !newOrgName.trim()||creatingOrg ? '#93c5fd' : '#2563eb',
@@ -628,7 +628,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
                         {creatingOrg ? '⏳' : '✓ Oluştur'}
                       </button>
                     </div>
-                  </form>
+                  </div>
                 )}
               </div>
               {inp('E-posta', 'email', 'email', 'ornek@kurum.org')}
