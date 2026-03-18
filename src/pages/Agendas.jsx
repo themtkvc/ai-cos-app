@@ -191,6 +191,26 @@ export default function Agendas({ user, profile }) {
   return (
     <div className="page" style={{ maxWidth: 1100, margin: '0 auto' }}>
 
+      {/* KORDİNATÖR BİRİM UYARISI */}
+      {isKoord && !myUnit && (
+        <div style={{
+          marginBottom: 16, padding: '14px 18px', borderRadius: 10,
+          background: '#fff7ed', border: '1.5px solid #f97316',
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <div style={{ fontSize: 20, flexShrink: 0 }}>⚠️</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: '#c2410c', marginBottom: 3 }}>
+              Biriminiz henüz atanmamış
+            </div>
+            <div style={{ fontSize: 12.5, color: '#92400e', lineHeight: 1.6 }}>
+              Personele görev atayabilmek ve birim dashboardını görebilmek için yöneticinizden
+              profilinize birim ataması yapmasını isteyin. (Admin Paneli → Kullanıcı Yönetimi → Birim seç)
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* BAŞLIK */}
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -541,14 +561,23 @@ function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoo
           {(isDirector || isKoord) && (
             <div className="form-group">
               <label className="form-label">Atanan Kişi</label>
-              <select className="form-select" value={form.assigned_to} onChange={e => handleAssigneeChange(e.target.value)}>
-                <option value="">— Kişi seçin —</option>
-                {assignableUsers.map(p => (
-                  <option key={p.user_id} value={p.user_id}>
-                    {p.full_name || p.user_id} {p.unit ? `(${p.unit})` : ''}
-                  </option>
-                ))}
-              </select>
+              {isKoord && assignableUsers.length === 0 ? (
+                <div style={{
+                  padding: '9px 12px', borderRadius: 8, fontSize: 12,
+                  background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e',
+                }}>
+                  ⚠️ Biriminizde atanabilecek personel bulunamadı. Yöneticinize birim ataması için başvurun.
+                </div>
+              ) : (
+                <select className="form-select" value={form.assigned_to} onChange={e => handleAssigneeChange(e.target.value)}>
+                  <option value="">— Kişi seçin —</option>
+                  {assignableUsers.map(p => (
+                    <option key={p.user_id} value={p.user_id}>
+                      {p.full_name || p.user_id} {p.unit ? `(${p.unit})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           <div className="form-group">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, supabase } from '../lib/supabase';
+import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 import OrgChartAdmin from '../components/OrgChartAdmin';
 
@@ -64,6 +64,7 @@ function UserManagement({ currentUser, notify }) {
   const [inviteUnit, setInviteUnit]   = useState('');
   const [inviteName, setInviteName]   = useState('');
   const [inviting, setInviting]       = useState(false);
+  const [viewMode, setViewMode]       = useState('list'); // 'list' | 'hierarchy'
 
   const loadProfiles = async () => {
     setLoading(true);
@@ -100,29 +101,22 @@ function UserManagement({ currentUser, notify }) {
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    // Create auth user via admin API — requires service role key (not available client-side)
-    // Best approach: use Supabase signUp to create user, then set profile
-    const { data: authData, error: authError } = await supabase.auth.admin?.createUser?.({
-      email: inviteEmail.trim(),
-      password: 'TempPass2026!',
-      email_confirm: true,
-    });
-    if (authError || !authData?.user) {
-      // Fallback: just show instructions
-      notify('Kullanıcı otomatik oluşturulamadı. Kullanıcı sisteme kendisi kayıt olmalı, siz rolünü atayabilirsiniz.', 'error');
-      setInviting(false);
+    const { data, error } = await inviteStaffMember(
+      inviteEmail.trim(),
+      inviteName.trim() || inviteEmail.split('@')[0],
+      inviteRole,
+    );
+    setInviting(false);
+    if (error) {
+      notify('Hata: ' + error.message, 'error');
       return;
     }
-    // Create profile
-    const { error: profileError } = await updateUserProfile(authData.user.id, {
-      full_name: inviteName || inviteEmail.split('@')[0],
-      role: inviteRole,
-      unit: inviteUnit,
-    });
-    setInviting(false);
-    if (profileError) { notify('Hata: ' + profileError.message, 'error'); return; }
-    notify(`✅ ${inviteEmail} sisteme eklendi.`);
+    notify(`✅ Davet gönderildi: ${inviteEmail}. Kullanıcı e-posta ile şifresini belirleyecek.`);
     setInviteEmail(''); setInviteName(''); setInviteRole('personel'); setInviteUnit('');
+    // Unit'i ayrıca set et (davet sonrası profil oluşur, birimi atayacağız)
+    if (inviteUnit && data?.user?.id) {
+      await updateUserProfile(data.user.id, { unit: inviteUnit });
+    }
     loadProfiles();
   };
 
@@ -134,126 +128,274 @@ function UserManagement({ currentUser, notify }) {
     return map[role] || '#666';
   };
 
+  // Birim hiyerarşisi: koordinatörler ve onların personeli
+  const hierarchyGroups = React.useMemo(() => {
+    const coordinators = profiles.filter(p => p.role === 'koordinator');
+    const senior = profiles.filter(p => ['direktor','direktor_yardimcisi','asistan'].includes(p.role));
+    const unassigned = profiles.filter(p =>
+      ['koordinator','personel'].includes(p.role) && !p.unit
+    );
+    const groups = coordinators.map(coord => ({
+      coordinator: coord,
+      staff: profiles.filter(p => p.role === 'personel' && p.unit && p.unit === coord.unit),
+    }));
+    // personel with unit but no matching coordinator
+    const assignedUnits = new Set(coordinators.map(c => c.unit).filter(Boolean));
+    const orphanStaff = profiles.filter(p =>
+      p.role === 'personel' && p.unit && !assignedUnits.has(p.unit)
+    );
+    return { senior, groups, unassigned, orphanStaff };
+  }, [profiles]);
+
   if (loading) return <div style={{padding:32,textAlign:'center',color:'var(--text-muted)'}}>Yükleniyor…</div>;
+
+  const UserRow = ({ p }) => (
+    <div key={p.user_id} style={{
+      padding:'12px 16px', borderRadius:10, border:'1px solid var(--border)',
+      background:'var(--surface)', display:'flex', alignItems:'center', gap:12,
+    }}>
+      <div style={{
+        width:38, height:38, borderRadius:'50%', flexShrink:0, display:'flex',
+        alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:15,
+        background: roleColor(p.role) + '22', color: roleColor(p.role), border: `2px solid ${roleColor(p.role)}44`
+      }}>
+        {(p.full_name?.[0] || '?').toUpperCase()}
+      </div>
+
+      <div style={{flex:1, minWidth:0}}>
+        {editingId === p.user_id ? (
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <input className="form-input" style={{width:130,padding:'4px 8px',fontSize:12}}
+              placeholder="Ad Soyad" value={editDraft.full_name}
+              onChange={e => setEditDraft(d => ({...d, full_name: e.target.value}))} />
+            <select className="form-input" style={{width:160,padding:'4px 8px',fontSize:12}}
+              value={editDraft.role}
+              onChange={e => setEditDraft(d => ({...d, role: e.target.value}))}>
+              {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {['koordinator','personel'].includes(editDraft.role) && (
+              <select className="form-input" style={{width:170,padding:'4px 8px',fontSize:12}}
+                value={editDraft.unit}
+                onChange={e => setEditDraft(d => ({...d, unit: e.target.value}))}>
+                <option value="">— Birim seç —</option>
+                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{fontWeight:600, fontSize:13, color:'var(--text)', display:'flex', alignItems:'center', gap:6}}>
+              {p.full_name || 'İsimsiz'}
+              {['koordinator','personel'].includes(p.role) && !p.unit && (
+                <span title="Birim atanmamış — görev ataması çalışmaz" style={{
+                  fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4,
+                  background:'#fff7ed', color:'#c2410c', border:'1px solid #f9731644',
+                }}>⚠️ Birim yok</span>
+              )}
+            </div>
+            <div style={{fontSize:11.5, color:'var(--text-muted)', marginTop:2}}>
+              {p.unit ? `🏢 ${p.unit}` : <span style={{color:'#9ca3af'}}>Birim atanmamış</span>}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+        {editingId !== p.user_id && (
+          <span style={{
+            padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600,
+            background: roleColor(p.role) + '18', color: roleColor(p.role),
+          }}>
+            {ROLE_LABELS[p.role] || p.role}
+          </span>
+        )}
+        {p.user_id === currentUser.id && (
+          <span style={{fontSize:10,color:'var(--text-muted)'}}>(siz)</span>
+        )}
+        {editingId !== p.user_id && !['direktor','direktor_yardimcisi'].includes(p.role) && (
+          <button
+            title={p.can_view_dashboard ? 'Dashboard erişimi var — kaldırmak için tıkla' : 'Dashboard erişimi ver'}
+            onClick={() => toggleDashboard(p)}
+            style={{
+              padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer',
+              background: p.can_view_dashboard ? '#16a34a18' : 'var(--surface)',
+              color: p.can_view_dashboard ? '#16a34a' : 'var(--text-muted)',
+              border: `1px solid ${p.can_view_dashboard ? '#16a34a44' : 'var(--border)'}`,
+              transition: 'all 0.15s',
+            }}
+          >
+            📊 {p.can_view_dashboard ? 'Dashboard ✓' : 'Dashboard'}
+          </button>
+        )}
+        {editingId === p.user_id ? (
+          <>
+            <button className="btn btn-outline btn-sm"
+              onClick={() => setEditingId(null)} disabled={saving}>İptal</button>
+            <button className="btn btn-primary btn-sm"
+              onClick={() => saveEdit(p.user_id)} disabled={saving}>
+              {saving ? '⏳' : '✓ Kaydet'}
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div>
-      {/* Mevcut Kullanıcılar */}
+      {/* Başlık + görünüm seçici */}
       <div className="card" style={{marginBottom:20}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
           <div className="card-title" style={{marginBottom:0}}>👥 Sistem Kullanıcıları ({profiles.length})</div>
-          <button className="btn btn-outline btn-sm" onClick={loadProfiles}>↺ Yenile</button>
+          <div style={{display:'flex',gap:8}}>
+            <div style={{display:'flex',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+              {[{k:'list',l:'📋 Liste'},{k:'hierarchy',l:'🏢 Hiyerarşi'}].map(v => (
+                <button key={v.k} onClick={() => setViewMode(v.k)} style={{
+                  padding:'5px 12px', border:'none', cursor:'pointer', fontSize:12, fontFamily:'inherit',
+                  background: viewMode===v.k ? 'var(--navy)' : 'transparent',
+                  color: viewMode===v.k ? 'white' : 'var(--text-muted)', fontWeight: viewMode===v.k ? 700 : 400,
+                }}>{v.l}</button>
+              ))}
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={loadProfiles}>↺ Yenile</button>
+          </div>
         </div>
 
         {profiles.length === 0 ? (
           <div style={{padding:24,textAlign:'center',color:'var(--text-muted)'}}>Kayıtlı kullanıcı yok</div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            {profiles.map(p => (
-              <div key={p.user_id} style={{
-                padding:'12px 16px', borderRadius:10, border:'1px solid var(--border)',
-                background:'var(--surface)', display:'flex', alignItems:'center', gap:12
-              }}>
-                <div style={{
-                  width:38, height:38, borderRadius:'50%', flexShrink:0, display:'flex',
-                  alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:15,
-                  background: roleColor(p.role) + '22', color: roleColor(p.role), border: `2px solid ${roleColor(p.role)}44`
-                }}>
-                  {(p.full_name?.[0] || p.auth_user?.email?.[0] || '?').toUpperCase()}
-                </div>
-
-                <div style={{flex:1, minWidth:0}}>
-                  {editingId === p.user_id ? (
-                    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-                      <input className="form-input" style={{width:130,padding:'4px 8px',fontSize:12}}
-                        placeholder="Ad Soyad" value={editDraft.full_name}
-                        onChange={e => setEditDraft(d => ({...d, full_name: e.target.value}))} />
-                      <select className="form-input" style={{width:160,padding:'4px 8px',fontSize:12}}
-                        value={editDraft.role}
-                        onChange={e => setEditDraft(d => ({...d, role: e.target.value}))}>
-                        {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                      </select>
-                      {['koordinator','personel'].includes(editDraft.role) && (
-                        <select className="form-input" style={{width:160,padding:'4px 8px',fontSize:12}}
-                          value={editDraft.unit}
-                          onChange={e => setEditDraft(d => ({...d, unit: e.target.value}))}>
-                          <option value="">— Birim seç —</option>
-                          {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{fontWeight:600, fontSize:13, color:'var(--text)'}}>
-                        {p.full_name || p.auth_user?.email?.split('@')[0] || 'İsimsiz'}
-                      </div>
-                      <div style={{fontSize:11.5, color:'var(--text-muted)', marginTop:2}}>
-                        {p.auth_user?.email || '—'}
-                        {p.unit ? ` · ${p.unit}` : ''}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                  {editingId !== p.user_id && (
-                    <span style={{
-                      padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600,
-                      background: roleColor(p.role) + '18', color: roleColor(p.role),
-                    }}>
-                      {ROLE_LABELS[p.role] || p.role}
-                    </span>
-                  )}
-                  {p.user_id === currentUser.id && (
-                    <span style={{fontSize:10,color:'var(--text-muted)'}}>(siz)</span>
-                  )}
-                  {/* Dashboard erişim toggle — sadece direktör yetkisiyle */}
-                  {editingId !== p.user_id && !['direktor','direktor_yardimcisi'].includes(p.role) && (
-                    <button
-                      title={p.can_view_dashboard ? 'Dashboard erişimi var — kaldırmak için tıkla' : 'Dashboard erişimi ver'}
-                      onClick={() => toggleDashboard(p)}
-                      style={{
-                        padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer',
-                        background: p.can_view_dashboard ? '#16a34a18' : 'var(--surface)',
-                        color: p.can_view_dashboard ? '#16a34a' : 'var(--text-muted)',
-                        border: `1px solid ${p.can_view_dashboard ? '#16a34a44' : 'var(--border)'}`,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      📊 {p.can_view_dashboard ? 'Dashboard ✓' : 'Dashboard'}
-                    </button>
-                  )}
-                  {editingId === p.user_id ? (
-                    <>
-                      <button className="btn btn-outline btn-sm"
-                        onClick={() => setEditingId(null)} disabled={saving}>İptal</button>
-                      <button className="btn btn-primary btn-sm"
-                        onClick={() => saveEdit(p.user_id)} disabled={saving}>
-                        {saving ? '⏳' : '✓ Kaydet'}
-                      </button>
-                    </>
-                  ) : (
-                    <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
-                  )}
+            {profiles.map(p => <UserRow key={p.user_id} p={p} />)}
+          </div>
+        ) : (
+          /* HİYERARŞİ GÖRÜNÜMÜ */
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            {/* Üst yönetim */}
+            {hierarchyGroups.senior.length > 0 && (
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',letterSpacing:'0.06em',marginBottom:8}}>ÜST YÖNETİM</div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {hierarchyGroups.senior.map(p => <UserRow key={p.user_id} p={p} />)}
                 </div>
               </div>
+            )}
+
+            {/* Birim grupları */}
+            {hierarchyGroups.groups.map(({ coordinator: coord, staff }) => (
+              <div key={coord.user_id} style={{
+                border:'1.5px solid var(--border)', borderRadius:12, overflow:'hidden',
+              }}>
+                {/* Koordinatör başlığı */}
+                <div style={{
+                  background:'linear-gradient(90deg,#fef3c7,#fffbeb)',
+                  padding:'10px 14px', display:'flex', alignItems:'center', gap:10,
+                  borderBottom: staff.length > 0 ? '1px solid var(--border)' : 'none',
+                }}>
+                  <span style={{fontSize:16}}>🏢</span>
+                  <div style={{flex:1}}>
+                    <span style={{fontWeight:700,fontSize:13,color:'#92400e'}}>
+                      {coord.unit || 'Birim Atanmamış'} — Koordinatör
+                    </span>
+                    <span style={{fontSize:12,color:'#a16207',marginLeft:8}}>
+                      {coord.full_name || 'İsimsiz'}
+                    </span>
+                  </div>
+                  <span style={{fontSize:11,color:'#a16207',background:'#fef3c7',padding:'2px 8px',borderRadius:10,border:'1px solid #f59e0b44'}}>
+                    {staff.length} personel
+                  </span>
+                  <button className="btn btn-outline btn-sm" onClick={() => startEdit(coord)} style={{fontSize:11}}>✏️</button>
+                </div>
+                {/* Personel */}
+                {staff.length > 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',gap:0}}>
+                    {staff.map((p, i) => (
+                      <div key={p.user_id} style={{
+                        borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                        padding:'0 0 0 24px',
+                      }}>
+                        <UserRow p={p} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{padding:'10px 14px 10px 38px',fontSize:12.5,color:'var(--text-muted)',fontStyle:'italic'}}>
+                    Bu birimde henüz personel yok — kullanıcı düzenle (✏️) ile birim atayın
+                  </div>
+                )}
+              </div>
             ))}
+
+            {/* Koordinatörsüz personel */}
+            {hierarchyGroups.orphanStaff.length > 0 && (
+              <div style={{border:'1px dashed var(--border)',borderRadius:10,padding:12}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#9ca3af',letterSpacing:'0.05em',marginBottom:8}}>BİRİM KOORDİNATÖRSÜZ PERSONEL</div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {hierarchyGroups.orphanStaff.map(p => <UserRow key={p.user_id} p={p} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Birimsiz koordinatör/personel */}
+            {hierarchyGroups.unassigned.length > 0 && (
+              <div style={{border:'1.5px solid #f9731644',borderRadius:10,padding:12,background:'#fff7ed'}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#c2410c',letterSpacing:'0.05em',marginBottom:8}}>
+                  ⚠️ BİRİM ATANMAMIŞ ({hierarchyGroups.unassigned.length} kişi)
+                </div>
+                <div style={{fontSize:12,color:'#92400e',marginBottom:10}}>
+                  Aşağıdaki kullanıcıların birim ataması yapılana kadar koordinatör-personel hiyerarşisi çalışmaz.
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {hierarchyGroups.unassigned.map(p => <UserRow key={p.user_id} p={p} />)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Kullanıcı Ekleme */}
+      {/* Davet Et / Yeni Kullanıcı */}
       <div className="card">
-        <div className="card-title">➕ Yeni Kullanıcı</div>
-        <p style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:14,lineHeight:1.5}}>
-          Yeni kullanıcı sisteme <strong>https://ai-cos-app.vercel.app</strong> adresinden kayıt olabilir.
-          Kayıt olduktan sonra bu panelden rolünü ve birimini atayın.
+        <div className="card-title">✉️ Personel Davet Et</div>
+        <p style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:16,lineHeight:1.6}}>
+          Sisteme davet e-postası gönderin. Kişi <strong>irdp.app</strong> adresine yönlendirilecek
+          ve şifresini kendisi belirleyecek.
         </p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <input className="form-input" style={{flex:1,minWidth:180}} placeholder="E-posta *"
+              value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+            <input className="form-input" style={{flex:1,minWidth:140}} placeholder="Ad Soyad"
+              value={inviteName} onChange={e => setInviteName(e.target.value)} />
+          </div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <select className="form-select" style={{flex:1}} value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+              {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {['koordinator','personel'].includes(inviteRole) && (
+              <select className="form-select" style={{flex:1}} value={inviteUnit} onChange={e => setInviteUnit(e.target.value)}>
+                <option value="">— Birim seç (opsiyonel) —</option>
+                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            )}
+          </div>
+          {['koordinator','personel'].includes(inviteRole) && !inviteUnit && (
+            <div style={{fontSize:12,color:'#92400e',background:'#fff7ed',padding:'8px 12px',borderRadius:7,border:'1px solid #f9731644'}}>
+              💡 Koordinatör/Personel için birim seçmeniz önerilir — aksi hâlde görev ataması ve hiyerarşi davet sonrasında çalışmaz.
+            </div>
+          )}
+          <button className="btn btn-primary" onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} style={{alignSelf:'flex-start'}}>
+            {inviting ? '⏳ Gönderiliyor…' : '✉️ Davet Gönder'}
+          </button>
+        </div>
+
         <div style={{
-          padding:'12px 16px', background:'var(--gold-pale,#fef9ec)', borderRadius:8,
-          border:'1px solid var(--gold,#c8a84b)22', fontSize:12.5, color:'var(--text-muted)'
+          marginTop:16, padding:'12px 14px', background:'var(--surface)', borderRadius:8,
+          border:'1px solid var(--border)', fontSize:12, color:'var(--text-muted)', lineHeight:1.7,
         }}>
-          💡 Kullanıcıya şu bilgileri iletin: Siteye gidin → "Henüz hesabınız yok mu? Kayıt olun" → Email ve şifre belirlesin → Siz buradan rol atayın.
+          <strong style={{color:'var(--text)'}}>Manuel kayıt:</strong> Kullanıcı <strong>irdp.app</strong> adresine gidip
+          "Henüz hesabınız yok mu?" linkinden kayıt olabilir. Kayıt sonrası bu panelden rol ve birim atayın.
         </div>
       </div>
     </div>
