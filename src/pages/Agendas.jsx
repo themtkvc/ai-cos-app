@@ -46,7 +46,8 @@ export default function Agendas({ user, profile }) {
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [editId,   setEditId]   = useState(null);
   const [saving,   setSaving]   = useState(false);
-  const [filter,   setFilter]   = useState({ search: '', priority: '', status: '' });
+  const [filter,    setFilter]    = useState({ search: '', priority: '', status: '' });
+  const [saveError, setSaveError] = useState('');
 
   const role       = profile?.role;
   const isDirector = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
@@ -61,6 +62,18 @@ export default function Agendas({ user, profile }) {
     if (['direktor', 'direktor_yardimcisi', 'asistan'].includes(r)) return 'koordinators';
     return 'mine';
   });
+
+  // Profile async geldiğinde tab'ı düzelt (race condition fix)
+  useEffect(() => {
+    if (!profile?.role) return;
+    setActiveTab(curr => {
+      if (curr !== 'mine') return curr; // kullanıcı zaten başka tab'a geçti
+      const r = profile.role;
+      if (r === 'koordinator') return 'team';
+      if (['direktor', 'direktor_yardimcisi', 'asistan'].includes(r)) return 'koordinators';
+      return 'mine';
+    });
+  }, [profile?.role]); // eslint-disable-line
 
   // ── FETCH ──
   const load = useCallback(async () => {
@@ -157,11 +170,12 @@ export default function Agendas({ user, profile }) {
     setEditId(a.id);
     setModal(true);
   };
-  const closeModal = () => { setModal(false); setForm(EMPTY_FORM); setEditId(null); };
+  const closeModal = () => { setModal(false); setForm(EMPTY_FORM); setEditId(null); setSaveError(''); };
 
   const save = async () => {
     if (!form.title.trim()) return;
     setSaving(true);
+    setSaveError('');
     // Atanan kişinin adını profile'dan bul
     const assignedProfile = profiles.find(p => p.user_id === form.assigned_to);
     const payload = {
@@ -171,18 +185,23 @@ export default function Agendas({ user, profile }) {
       unit: form.unit || assignedProfile?.unit || myUnit || null,
       completed_at: form.status === 'tamamlandi' ? new Date().toISOString() : null,
     };
+    let error;
     if (editId) {
-      await updateAgendaItem(editId, payload);
+      ({ error } = await updateAgendaItem(editId, payload));
     } else {
-      await createAgendaItem({
+      ({ error } = await createAgendaItem({
         ...payload,
         created_by: myId,
         created_by_name: profile?.full_name || user?.email,
-      });
+      }));
+    }
+    setSaving(false);
+    if (error) {
+      setSaveError('Kayıt hatası: ' + (error.message || JSON.stringify(error)));
+      return;
     }
     await load();
     closeModal();
-    setSaving(false);
   };
 
   const remove = async (id) => {
@@ -394,7 +413,7 @@ export default function Agendas({ user, profile }) {
           assignableUsers={assignableUsers}
           isDirector={isDirector} isKoord={isKoord}
           myUnit={myUnit}
-          saving={saving}
+          saving={saving} saveError={saveError}
           onSave={save} onClose={closeModal}
         />
       )}
@@ -704,7 +723,7 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
-function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoord, myUnit, saving, onSave, onClose }) {
+function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
   const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
 
   const handleAssigneeChange = (userId) => {
@@ -785,6 +804,15 @@ function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoo
           <label className="form-label">Notlar</label>
           <textarea className="form-textarea" placeholder="Ek notlar..." rows={2} value={form.notes} onChange={e => f('notes', e.target.value)} />
         </div>
+
+        {saveError && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+            background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', fontSize: 12.5,
+          }}>
+            ❌ {saveError}
+          </div>
+        )}
 
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={onClose}>İptal</button>
