@@ -340,7 +340,7 @@ export default function DailyLog({ user, profile }) {
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 className="page-title">📋 Günlük İş Logu</h1>
+            <h1 className="page-title">📋 Günlük İş Kayıtları</h1>
             <p className="page-subtitle">
               {profile?.full_name || user?.email?.split('@')[0]} ·{' '}
               {ROLE_LABELS[profile?.role] || 'Personel'}

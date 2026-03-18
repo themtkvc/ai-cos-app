@@ -139,7 +139,7 @@ export default function Login({ onLogin }) {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[
-              { icon: '📋', text: 'Günlük İş Logu — Personel çalışma kayıtları' },
+              { icon: '📋', text: 'Günlük İş Kayıtları — Personel çalışma kayıtları' },
               { icon: '📊', text: 'Birim Raporları — Birim bazlı ilerleme takibi' },
               { icon: '📈', text: 'Çalışma Analizi — Haftalık & aylık analitik' },
               { icon: '🤖', text: 'AI Asistan — Claude destekli karar desteği' },

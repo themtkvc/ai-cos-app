@@ -9,8 +9,9 @@ const ALL_NAV = [
   { id: 'donors',    icon: '🤝', label: 'Donör CRM' },
   { id: 'meetings',  icon: '📋', label: 'Toplantı Logu' },
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
-  { id: 'dailylog',  icon: '🗓', label: 'Günlük İş Logu' },
-  { id: 'analytics', icon: '📈', label: 'Çalışma Analizi' },
+  { id: 'dailylog',   icon: '🗓', label: 'Günlük İş Kayıtları' },
+  { id: 'logsviewer', icon: '📂', label: 'İş Kayıtları - Dashboard' },
+  { id: 'analytics',  icon: '📈', label: 'Çalışma Analizi' },
   { id: 'donations', icon: '💰', label: 'Bağış Takip' },
   { id: 'orgchart',  icon: '🏢', label: 'Org Şeması' },
 ];

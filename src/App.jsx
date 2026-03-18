@@ -8,6 +8,7 @@ import MeetingLog from './pages/MeetingLog';
 import UnitReports from './pages/UnitReports';
 import DailyLog from './pages/DailyLog';
 import LogsDashboard from './pages/LogsDashboard';
+import LogsViewer from './pages/LogsViewer';
 import DonationTracker from './pages/DonationTracker';
 import OrgChart from './pages/OrgChart';
 import Admin from './pages/Admin';
@@ -21,10 +22,10 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart','admin','users'],
-  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
-  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','analytics','donations','orgchart'],
-  koordinator:          ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','admin','users'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart'],
+  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart'],
+  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart'],
   personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart'],
 };
 
@@ -201,8 +202,9 @@ export default function App() {
     donors:    Donors,
     meetings:  MeetingLog,
     reports:   UnitReports,
-    dailylog:  DailyLog,
-    analytics: LogsDashboard,
+    dailylog:   DailyLog,
+    logsviewer: LogsViewer,
+    analytics:  LogsDashboard,
     donations: DonationTracker,
     orgchart:  OrgChart,
     admin:     Admin,
