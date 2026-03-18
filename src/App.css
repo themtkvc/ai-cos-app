@@ -104,6 +104,7 @@ body {
 }
 .sidebar-nav {
   flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto; min-height: 0;
 }
 .nav-section-label {
   font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
