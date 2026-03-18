@@ -46,14 +46,17 @@ export default function Agendas({ user, profile }) {
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [editId,   setEditId]   = useState(null);
   const [saving,   setSaving]   = useState(false);
-  const [activeTab, setActiveTab] = useState('mine');   // 'mine' | 'team' | 'all'
+  const [activeTab, setActiveTab] = useState(() => initialTab);
   const [filter,   setFilter]   = useState({ search: '', priority: '', status: '' });
 
   const role       = profile?.role;
-  const isDirector = ['direktor', 'direktor_yardimcisi'].includes(role);
+  const isDirector = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
   const isKoord    = role === 'koordinator';
   const myUnit     = profile?.unit;
   const myId       = user?.id;
+
+  // Role'e göre başlangıç tab'ı
+  const initialTab = isKoord ? 'team' : isDirector ? 'koordinators' : 'mine';
 
   // ── FETCH ──
   const load = useCallback(async () => {
@@ -83,13 +86,31 @@ export default function Agendas({ user, profile }) {
     return profiles.filter(p => p.unit === myUnit);
   }, [profiles, myUnit]);
 
+  // Koordinatör user_id seti (direktör tabları için)
+  const koordinatorIds = useMemo(() =>
+    new Set(profiles.filter(p => p.role === 'koordinator').map(p => p.user_id)),
+    [profiles]
+  );
+
   // ── Filtrelenmiş gündemler (tab + search/öncelik/durum) ──
   const filtered = useMemo(() => {
     let base = agendas;
-    if (activeTab === 'mine') base = agendas.filter(a => a.assigned_to === myId);
-    if (activeTab === 'team') base = agendas.filter(a =>
-      (a.created_by === myId) || (myUnit && a.unit === myUnit)
-    );
+    if (activeTab === 'mine') {
+      base = agendas.filter(a => a.assigned_to === myId);
+    } else if (activeTab === 'my_items') {
+      // Direktörün kendi gündemi: kendinize atanan veya atansız kendinizin girdiği
+      base = agendas.filter(a =>
+        a.created_by === myId && (!a.assigned_to || a.assigned_to === myId)
+      );
+    } else if (activeTab === 'koordinators') {
+      // Direktörün koordinatörlere atadıkları
+      base = agendas.filter(a =>
+        a.created_by === myId && a.assigned_to && koordinatorIds.has(a.assigned_to)
+      );
+    } else if (activeTab === 'all') {
+      base = agendas; // tüm departman
+    }
+    // team tab: TeamDashboard kendi filtreler, burası boş geçer
     // filtreler
     if (filter.search)   base = base.filter(a => a.title?.toLowerCase().includes(filter.search.toLowerCase()));
     if (filter.priority) base = base.filter(a => a.priority === filter.priority);
@@ -98,19 +119,22 @@ export default function Agendas({ user, profile }) {
       if (!a.due_date) return 1; if (!b.due_date) return -1;
       return new Date(a.due_date) - new Date(b.due_date);
     });
-  }, [agendas, activeTab, myId, myUnit, filter]);
+  }, [agendas, activeTab, myId, myUnit, filter, koordinatorIds]);
 
   // ── KPI ──
   const kpi = useMemo(() => {
-    const base = activeTab === 'mine' ? agendas.filter(a => a.assigned_to === myId)
-               : activeTab === 'team' ? agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit))
-               : agendas;
+    let base;
+    if (activeTab === 'mine')         base = agendas.filter(a => a.assigned_to === myId);
+    else if (activeTab === 'my_items') base = agendas.filter(a => a.created_by === myId && (!a.assigned_to || a.assigned_to === myId));
+    else if (activeTab === 'koordinators') base = agendas.filter(a => a.created_by === myId && koordinatorIds.has(a.assigned_to));
+    else if (activeTab === 'team')    base = agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit));
+    else                              base = agendas;
     const active     = base.filter(a => a.status !== 'tamamlandi');
     const overdue    = active.filter(a => a.due_date && daysLeft(a.due_date) < 0);
     const thisWeek   = active.filter(a => { const d = daysLeft(a.due_date); return d !== null && d >= 0 && d <= 7; });
     const completed  = base.filter(a => a.status === 'tamamlandi');
     return { total: base.length, overdue: overdue.length, thisWeek: thisWeek.length, completed: completed.length };
-  }, [agendas, activeTab, myId, myUnit]);
+  }, [agendas, activeTab, myId, myUnit, koordinatorIds]);
 
   // ── MODAL ──
   const openNew = () => {
@@ -172,13 +196,16 @@ export default function Agendas({ user, profile }) {
 
   // ── Tab yapılandırması (role'e göre) ──
   const tabs = useMemo(() => {
-    const t = [{ key: 'mine', label: '📋 Bana Atananlar' }];
-    if (isKoord) t.push({ key: 'team', label: `🏢 ${myUnit || 'Birimim'}` });
-    if (isDirector) {
-      t.push({ key: 'team', label: '📤 Atadıklarım' });
-      t.push({ key: 'all',  label: '🌐 Tümü' });
-    }
-    return t;
+    if (isDirector) return [
+      { key: 'koordinators', label: '📤 Koordinatörlere Atadığım' },
+      { key: 'all',          label: '🌐 Departman Gündemi' },
+      { key: 'my_items',     label: '📋 Gündemlerim' },
+    ];
+    if (isKoord) return [
+      { key: 'team', label: `🏢 ${myUnit || 'Birimim'}` },
+      { key: 'mine', label: '📋 Bana Atananlar' },
+    ];
+    return [{ key: 'mine', label: '📋 Bana Atananlar' }];
   }, [isDirector, isKoord, myUnit]);
 
   if (loading) return (
@@ -261,22 +288,49 @@ export default function Agendas({ user, profile }) {
         </div>
       )}
 
-      {/* KORDİNATÖR BİRİM DASHBOARDI */}
-      {(isKoord || isDirector) && activeTab === 'team' && (
+      {/* KORDİNATÖR: BİRİM DASHBOARDI */}
+      {isKoord && activeTab === 'team' && (
         <TeamDashboard
-          agendas={agendas}
-          members={isKoord ? unitMembers : profiles}
+          agendas={agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit))}
+          members={unitMembers}
           myId={myId}
           myUnit={myUnit}
-          isDirector={isDirector}
+          isDirector={false}
           onStatusChange={quickStatus}
           onEdit={openEdit}
           onDelete={remove}
         />
       )}
 
-      {/* STANDART LİSTE GÖRÜNÜMÜ */}
-      {activeTab !== 'team' && (
+      {/* DİREKTÖR: Koordinatörlere Atadığım — kişi kartları */}
+      {isDirector && activeTab === 'koordinators' && (
+        <TeamDashboard
+          agendas={agendas.filter(a => a.created_by === myId)}
+          members={profiles.filter(p => p.role === 'koordinator')}
+          myId={myId}
+          myUnit={null}
+          isDirector={true}
+          onStatusChange={quickStatus}
+          onEdit={openEdit}
+          onDelete={remove}
+          emptyMessage="Henüz koordinatöre atanmış gündem yok. '+ Yeni Gündem' ile başlayın."
+        />
+      )}
+
+      {/* DİREKTÖR: Departman Gündemi — TÜM gündemler listesi */}
+      {isDirector && activeTab === 'all' && (
+        <DepartmanGundem
+          agendas={agendas}
+          profiles={profiles}
+          myId={myId}
+          onEdit={openEdit}
+          onDelete={remove}
+          onStatusChange={quickStatus}
+        />
+      )}
+
+      {/* STANDART LİSTE GÖRÜNÜMÜ (mine / my_items) */}
+      {(activeTab === 'mine' || activeTab === 'my_items') && (
         <>
           {/* FİLTRELER */}
           <div className="card" style={{ marginBottom: 14, padding: '12px 16px' }}>
@@ -321,7 +375,7 @@ export default function Agendas({ user, profile }) {
                   onDelete={remove}
                   onStatusChange={quickStatus}
                   showAssignee={activeTab !== 'mine'}
-                  showCreator={activeTab === 'all'}
+                  showCreator={false}
                 />
               ))}
             </div>
@@ -344,27 +398,27 @@ export default function Agendas({ user, profile }) {
   );
 }
 
-// ── KORDİNATÖR BİRİM DASHBOARDI ───────────────────────────────────────────────
-function TeamDashboard({ agendas, members, myId, myUnit, isDirector, onStatusChange, onEdit, onDelete }) {
-  const teamAgendas = useMemo(() => {
-    if (isDirector) return agendas.filter(a => a.created_by === myId);
-    return agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit));
-  }, [agendas, myId, myUnit, isDirector]);
-
+// ── TEAM DASHBOARD (koordinatör + direktör kişi kartları) ─────────────────────
+function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage }) {
   const byPerson = useMemo(() => {
     const map = {};
-    members.forEach(m => {
-      map[m.user_id] = { profile: m, tasks: [] };
-    });
-    teamAgendas.forEach(a => {
+    members.forEach(m => { map[m.user_id] = { profile: m, tasks: [] }; });
+    agendas.forEach(a => {
       if (a.assigned_to && map[a.assigned_to]) {
         map[a.assigned_to].tasks.push(a);
       }
     });
     return Object.values(map);
-  }, [members, teamAgendas]);
+  }, [members, agendas]);
 
-  const unassigned = teamAgendas.filter(a => !a.assigned_to);
+  const unassigned = agendas.filter(a => !a.assigned_to);
+
+  if (members.length === 0) return (
+    <div className="card" style={{ padding: 48, textAlign: 'center' }}>
+      <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
+      <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>{emptyMessage || 'Gösterilecek kişi bulunamadı.'}</div>
+    </div>
+  );
 
   return (
     <div>
@@ -375,7 +429,6 @@ function TeamDashboard({ agendas, members, myId, myUnit, isDirector, onStatusCha
         const pct     = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
         return (
           <div key={p.user_id} className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
-            {/* Kişi başlığı */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
@@ -387,7 +440,9 @@ function TeamDashboard({ agendas, members, myId, myUnit, isDirector, onStatusCha
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>{p.full_name || p.user_id}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{ROLE_LABELS[p.role] || p.role} {p.unit ? `· ${p.unit}` : ''}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                    {ROLE_LABELS[p.role] || p.role}{p.unit ? ` · ${p.unit}` : ''}
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -403,8 +458,6 @@ function TeamDashboard({ agendas, members, myId, myUnit, isDirector, onStatusCha
                 <span style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--navy)', minWidth: 32 }}>%{pct}</span>
               </div>
             </div>
-
-            {/* Görevler */}
             {tasks.length === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '8px 0', fontStyle: 'italic' }}>Henüz görev atanmamış</div>
             ) : (
@@ -422,6 +475,121 @@ function TeamDashboard({ agendas, members, myId, myUnit, isDirector, onStatusCha
           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Kişiye Atanmamış</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DEPARTMAN GÜNDEMİ (Direktör — tüm departman, birime göre gruplu) ──────────
+function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange }) {
+  const koordinatorlar = profiles.filter(p => p.role === 'koordinator');
+
+  // Birim grupları: her koordinatör için kendi biriminin gündemleri
+  const byUnit = useMemo(() => {
+    const groups = koordinatorlar.map(k => ({
+      koordinator: k,
+      agendas: agendas.filter(a => a.unit === k.unit || a.assigned_to === k.user_id ||
+        profiles.find(p => p.user_id === a.assigned_to)?.unit === k.unit
+      ),
+    }));
+    // Birime atanmamış / birim dışı gündemler
+    const assignedUnits = new Set(koordinatorlar.map(k => k.unit).filter(Boolean));
+    const diger = agendas.filter(a => {
+      const assigneeUnit = profiles.find(p => p.user_id === a.assigned_to)?.unit;
+      return !assignedUnits.has(a.unit) && !assignedUnits.has(assigneeUnit);
+    });
+    return { groups, diger };
+  }, [agendas, koordinatorlar, profiles]);
+
+  const [filter, setFilter] = useState({ search: '', status: '' });
+
+  const filterFn = (list) => {
+    let r = list;
+    if (filter.search) r = r.filter(a => a.title?.toLowerCase().includes(filter.search.toLowerCase()));
+    if (filter.status) r = r.filter(a => a.status === filter.status);
+    return r.sort((a, b) => {
+      if (!a.due_date) return 1; if (!b.due_date) return -1;
+      return new Date(a.due_date) - new Date(b.due_date);
+    });
+  };
+
+  return (
+    <div>
+      {/* Filtre */}
+      <div className="card" style={{ marginBottom: 14, padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input className="form-input" style={{ width: 220 }} placeholder="🔍 Gündem ara..."
+            value={filter.search} onChange={e => setFilter(f => ({ ...f, search: e.target.value }))} />
+          <select className="form-select" style={{ width: 160 }} value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
+            <option value="">Tüm Durumlar</option>
+            {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          {(filter.search || filter.status) && (
+            <button className="btn btn-outline btn-sm" onClick={() => setFilter({ search: '', status: '' })}>✕ Temizle</button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+            {agendas.length} toplam gündem
+          </span>
+        </div>
+      </div>
+
+      {/* Birim grupları */}
+      {byUnit.groups.map(({ koordinator: k, agendas: unitAgs }) => {
+        const visible = filterFn(unitAgs);
+        const done = unitAgs.filter(a => a.status === 'tamamlandi').length;
+        const pct = unitAgs.length > 0 ? Math.round((done / unitAgs.length) * 100) : 0;
+        return (
+          <div key={k.user_id} className="card" style={{ marginBottom: 14 }}>
+            {/* Birim başlığı */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, marginBottom: visible.length > 0 ? 12 : 0,
+              paddingBottom: visible.length > 0 ? 12 : 0,
+              borderBottom: visible.length > 0 ? '1px solid var(--border)' : 'none',
+            }}>
+              <span style={{ fontSize: 18 }}>🏢</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--navy)' }}>{k.unit || 'Birim Belirtilmemiş'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Koordinatör: {k.full_name || k.user_id}</div>
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{done}/{unitAgs.length}</span>
+              <div style={{ width: 60, height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#22c55e' : 'var(--navy)', borderRadius: 3 }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--navy)', minWidth: 28 }}>%{pct}</span>
+            </div>
+            {visible.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontStyle: 'italic', paddingTop: 4 }}>
+                {unitAgs.length === 0 ? 'Bu birime atanmış gündem yok.' : 'Filtre sonucu bulunamadı.'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {visible.map(a => (
+                  <AgendaCard key={a.id} agenda={a}
+                    canEdit={true} canUpdateStatus={true}
+                    onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
+                    showAssignee={true} showCreator={false}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Birim dışı gündemler */}
+      {byUnit.diger.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Diğer / Birimi Belirsiz</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filterFn(byUnit.diger).map(a => (
+              <AgendaCard key={a.id} agenda={a}
+                canEdit={true} canUpdateStatus={true}
+                onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
+                showAssignee={true} showCreator={true}
+              />
+            ))}
           </div>
         </div>
       )}
