@@ -180,10 +180,13 @@ export default function Agendas({ user, profile }) {
     const assignedProfile = profiles.find(p => p.user_id === form.assigned_to);
     const payload = {
       ...form,
-      assigned_to: form.assigned_to || null,
+      assigned_to:      form.assigned_to      || null,
       assigned_to_name: assignedProfile?.full_name || form.assigned_to_name || null,
-      unit: form.unit || assignedProfile?.unit || myUnit || null,
-      completed_at: form.status === 'tamamlandi' ? new Date().toISOString() : null,
+      unit:             form.unit || assignedProfile?.unit || myUnit || null,
+      due_date:         form.due_date          || null,
+      notes:            form.notes             || null,
+      description:      form.description       || null,
+      completed_at:     form.status === 'tamamlandi' ? new Date().toISOString() : null,
     };
     let error;
     if (editId) {
