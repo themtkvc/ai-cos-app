@@ -864,7 +864,7 @@ function AgendaCard({
           </div>
 
           {/* Aksiyon butonları */}
-          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate) || canNotify) && (
+          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate)) && (
             <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {canMarkDone && onMarkDone && (
                 <button
@@ -882,15 +882,6 @@ function AgendaCard({
                   onClick={() => onNavigate('dailylog', { linkedTask: a })}
                 >
                   📝 İş Kaydı Ekle
-                </button>
-              )}
-              {canNotify && onNotify && (
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
-                  onClick={() => onNotify(a)}
-                >
-                  📧 Mail Gönder
                 </button>
               )}
               {canApproveRevise && (
@@ -925,6 +916,9 @@ function AgendaCard({
             <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: dc.bg, color: dc.color }}>
               {dc.label}
             </span>
+          )}
+          {canNotify && onNotify && (
+            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title="Mail Gönder">📧</button>
           )}
           {canEdit && (
             <>
