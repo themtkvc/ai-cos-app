@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles } from '../lib/supabase';
+import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles, markTaskPendingReview, approveTask, requestRevision } from '../lib/supabase';
 import { differenceInCalendarDays } from 'date-fns';
 import { ROLE_LABELS } from '../App';
 import { UserAvatar } from './ProfileSettings';
@@ -17,8 +17,44 @@ const STATUSES = [
   { value: 'tamamlandi',   label: '✅ Tamamlandı',   color: '#22c55e' },
 ];
 
+const COMPLETION_STATUS = {
+  pending_review:     { label: '⏳ Onay Bekliyor', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+  approved:           { label: '✅ Onaylandı',     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+  revision_requested: { label: '🔄 Revize İstendi', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+};
+
 const prioMeta  = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[1];
 const statMeta  = (v) => STATUSES.find(s => s.value === v)   || STATUSES[0];
+
+// ── REVİZE NOTU MODAL ─────────────────────────────────────────────────────────
+function RevisionModal({ task, onConfirm, onClose }) {
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <h2 className="modal-title">🔄 Revizeye Gönder</h2>
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 16 }}>
+          <strong>{task.title}</strong> görevi personele geri gönderilecek.
+        </p>
+        <div className="form-group">
+          <label className="form-label">Revize Notu (isteğe bağlı)</label>
+          <textarea className="form-textarea" rows={3}
+            placeholder="Neyin düzeltilmesi gerektiğini açıklayın…"
+            value={note} onChange={e => setNote(e.target.value)}
+          />
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>İptal</button>
+          <button className="btn btn-danger" disabled={saving}
+            onClick={async () => { setSaving(true); await onConfirm(note); setSaving(false); }}>
+            {saving ? '⏳…' : '🔄 Revizeye Gönder'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function daysLeft(date) {
   if (!date) return null;
@@ -39,7 +75,7 @@ const EMPTY_FORM = {
 };
 
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
-export default function Agendas({ user, profile }) {
+export default function Agendas({ user, profile, onNavigate }) {
   const [agendas,  setAgendas]  = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -47,8 +83,9 @@ export default function Agendas({ user, profile }) {
   const [form,     setForm]     = useState(EMPTY_FORM);
   const [editId,   setEditId]   = useState(null);
   const [saving,   setSaving]   = useState(false);
-  const [filter,    setFilter]    = useState({ search: '', priority: '', status: '' });
-  const [saveError, setSaveError] = useState('');
+  const [filter,        setFilter]       = useState({ search: '', priority: '', status: '' });
+  const [saveError,     setSaveError]    = useState('');
+  const [revisionModal, setRevisionModal] = useState(null); // agenda item waiting for revision note
 
   const role       = profile?.role;
   const isDirector = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
@@ -116,20 +153,22 @@ export default function Agendas({ user, profile }) {
     if (activeTab === 'mine') {
       base = agendas.filter(a => a.assigned_to === myId);
     } else if (activeTab === 'my_items') {
-      // Direktörün kendi gündemi: kendinize atanan veya atansız kendinizin girdiği
       base = agendas.filter(a =>
         a.created_by === myId && (!a.assigned_to || a.assigned_to === myId)
       );
     } else if (activeTab === 'koordinators') {
-      // Direktörün koordinatörlere atadıkları
       base = agendas.filter(a =>
         a.created_by === myId && a.assigned_to && koordinatorIds.has(a.assigned_to)
       );
     } else if (activeTab === 'all') {
-      base = agendas; // tüm departman
+      base = agendas;
+    } else if (activeTab === 'pending_review') {
+      base = agendas.filter(a =>
+        a.completion_status === 'pending_review' &&
+        (a.created_by === myId || (myUnit && a.unit === myUnit))
+      );
     }
     // team tab: TeamDashboard kendi filtreler, burası boş geçer
-    // filtreler
     if (filter.search)   base = base.filter(a => a.title?.toLowerCase().includes(filter.search.toLowerCase()));
     if (filter.priority) base = base.filter(a => a.priority === filter.priority);
     if (filter.status)   base = base.filter(a => a.status   === filter.status);
@@ -221,6 +260,40 @@ export default function Agendas({ user, profile }) {
     setAgendas(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
+  // ── ONAY AKIŞI ──
+  const handleMarkDone = async (id) => {
+    const { error } = await markTaskPendingReview(id);
+    if (error) { alert('Hata: ' + error.message); return; }
+    setAgendas(prev => prev.map(a => a.id === id ? { ...a, completion_status: 'pending_review' } : a));
+  };
+
+  const handleApprove = async (id) => {
+    const { error } = await approveTask(id, myId);
+    if (error) { alert('Hata: ' + error.message); return; }
+    setAgendas(prev => prev.map(a =>
+      a.id === id ? { ...a, completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString() } : a
+    ));
+  };
+
+  const handleRevisionConfirm = async (note) => {
+    if (!revisionModal) return;
+    const { error } = await requestRevision(revisionModal.id, note, myId);
+    if (error) { alert('Hata: ' + error.message); return; }
+    setAgendas(prev => prev.map(a =>
+      a.id === revisionModal.id ? { ...a, completion_status: 'revision_requested', revision_note: note } : a
+    ));
+    setRevisionModal(null);
+  };
+
+  // ── Onay bekleyen sayısı (koordinatör için badge) ──
+  const pendingReviewCount = useMemo(() => {
+    if (!isKoord) return 0;
+    return agendas.filter(a =>
+      a.completion_status === 'pending_review' &&
+      (a.created_by === myId || (myUnit && a.unit === myUnit))
+    ).length;
+  }, [agendas, isKoord, myId, myUnit]);
+
   // ── Tab yapılandırması (role'e göre) ──
   const tabs = useMemo(() => {
     if (isDirector) return [
@@ -229,15 +302,16 @@ export default function Agendas({ user, profile }) {
       { key: 'my_items',     label: '📋 Gündemlerim' },
     ];
     if (isKoord) return [
-      { key: 'team',     label: `🏢 ${myUnit || 'Birimim'}` },
-      { key: 'mine',     label: '📋 Bana Atananlar' },
-      { key: 'my_items', label: '📒 Gündemlerim' },
+      { key: 'team',           label: `🏢 ${myUnit || 'Birimim'}` },
+      { key: 'pending_review', label: `⏳ Onay Bekleyenler`, badge: pendingReviewCount },
+      { key: 'mine',           label: '📋 Bana Atananlar' },
+      { key: 'my_items',       label: '📒 Gündemlerim' },
     ];
     return [
       { key: 'mine',     label: '📋 Bana Atananlar' },
       { key: 'my_items', label: '📒 Gündemlerim' },
     ];
-  }, [isDirector, isKoord, myUnit]);
+  }, [isDirector, isKoord, myUnit, pendingReviewCount]);
 
   if (loading) return (
     <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -306,7 +380,7 @@ export default function Agendas({ user, profile }) {
 
       {/* TABS */}
       {tabs.length > 1 && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface)', borderRadius: 10, padding: 4, border: '1px solid var(--border)', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface)', borderRadius: 10, padding: 4, border: '1px solid var(--border)', width: 'fit-content', flexWrap: 'wrap' }}>
           {tabs.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
               padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer',
@@ -314,7 +388,17 @@ export default function Agendas({ user, profile }) {
               color: activeTab === t.key ? 'white' : 'var(--text-muted)',
               fontWeight: activeTab === t.key ? 700 : 400, fontSize: 13,
               fontFamily: 'var(--font-body)', transition: 'all 0.15s',
-            }}>{t.label}</button>
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              {t.label}
+              {t.badge > 0 && (
+                <span style={{
+                  background: activeTab === t.key ? 'rgba(255,255,255,0.3)' : '#ef4444',
+                  color: 'white', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                  padding: '1px 6px', lineHeight: 1.5,
+                }}>{t.badge}</span>
+              )}
+            </button>
           ))}
         </div>
       )}
@@ -360,8 +444,8 @@ export default function Agendas({ user, profile }) {
         />
       )}
 
-      {/* STANDART LİSTE GÖRÜNÜMÜ (mine / my_items) */}
-      {(activeTab === 'mine' || activeTab === 'my_items') && (
+      {/* STANDART LİSTE GÖRÜNÜMÜ (mine / my_items / pending_review) */}
+      {(activeTab === 'mine' || activeTab === 'my_items' || activeTab === 'pending_review') && (
         <>
           {/* FİLTRELER */}
           <div className="card" style={{ marginBottom: 14, padding: '12px 16px' }}>
@@ -390,9 +474,17 @@ export default function Agendas({ user, profile }) {
           {/* GÖREV LİSTESİ */}
           {filtered.length === 0 ? (
             <div className="card" style={{ padding: 48, textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)', marginBottom: 6 }}>Gündem bulunamadı</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Bu sekme için henüz gündem yok.</div>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>
+                {activeTab === 'pending_review' ? '✅' : '📭'}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)', marginBottom: 6 }}>
+                {activeTab === 'pending_review' ? 'Bekleyen onay yok' : 'Gündem bulunamadı'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {activeTab === 'pending_review'
+                  ? 'Personelden onay bekleyen görev bulunmuyor.'
+                  : 'Bu sekme için henüz gündem yok.'}
+              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -406,7 +498,13 @@ export default function Agendas({ user, profile }) {
                   onDelete={remove}
                   onStatusChange={quickStatus}
                   showAssignee={activeTab !== 'mine'}
-                  showCreator={false}
+                  showCreator={activeTab === 'pending_review'}
+                  myId={myId}
+                  isKoord={isKoord}
+                  onMarkDone={handleMarkDone}
+                  onApprove={handleApprove}
+                  onRevision={setRevisionModal}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>
@@ -423,6 +521,15 @@ export default function Agendas({ user, profile }) {
           myUnit={myUnit}
           saving={saving} saveError={saveError}
           onSave={save} onClose={closeModal}
+        />
+      )}
+
+      {/* REVİZE MODAL */}
+      {revisionModal && (
+        <RevisionModal
+          task={revisionModal}
+          onConfirm={handleRevisionConfirm}
+          onClose={() => setRevisionModal(null)}
         />
       )}
     </div>
@@ -513,7 +620,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
 }
 
 // ── DEPARTMAN GÜNDEMİ (Direktör — tüm departman, birime göre gruplu) ──────────
-function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange }) {
+function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange }) { // eslint-disable-line
   const koordinatorlar = profiles.filter(p => p.role === 'koordinator');
 
   // Birim grupları: her koordinatör için kendi biriminin gündemleri
@@ -600,6 +707,7 @@ function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusCh
                     canEdit={true} canUpdateStatus={true}
                     onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
                     showAssignee={true} showCreator={false}
+                    myId={myId}
                   />
                 ))}
               </div>
@@ -628,18 +736,38 @@ function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusCh
 }
 
 // ── GÜNDEM KARTI (Liste görünümü) ─────────────────────────────────────────────
-function AgendaCard({ agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onStatusChange, showAssignee, showCreator }) {
+function AgendaCard({
+  agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onStatusChange,
+  showAssignee, showCreator,
+  myId, isKoord, onMarkDone, onApprove, onRevision, onNavigate,
+}) {
   const pm   = prioMeta(a.priority);
   const sm   = statMeta(a.status);
   const days = daysLeft(a.due_date);
   const dc   = daysChip(days);
+  const cs   = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
+
+  const isMyTask     = a.assigned_to === myId;
+  const canMarkDone  = isMyTask && a.status !== 'tamamlandi' &&
+                       !['pending_review', 'approved'].includes(a.completion_status);
+  const canApproveRevise = isKoord && a.completion_status === 'pending_review';
 
   return (
     <div className="card" style={{
       padding: '14px 18px',
       borderLeft: `4px solid ${pm.color}`,
-      opacity: a.status === 'tamamlandi' ? 0.65 : 1,
+      opacity: a.status === 'tamamlandi' && a.completion_status !== 'pending_review' ? 0.65 : 1,
     }}>
+      {/* Revize notu banner */}
+      {a.completion_status === 'revision_requested' && a.revision_note && (
+        <div style={{
+          marginBottom: 10, padding: '8px 12px', borderRadius: 7,
+          background: '#fef2f2', border: '1px solid #fecaca', fontSize: 12.5, color: '#dc2626',
+        }}>
+          🔄 <strong>Revize notu:</strong> {a.revision_note}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
         {/* Durum toggle */}
         <button
@@ -666,10 +794,15 @@ function AgendaCard({ agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onS
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{
               fontWeight: 700, fontSize: 14, color: 'var(--navy)',
-              textDecoration: a.status === 'tamamlandi' ? 'line-through' : 'none',
+              textDecoration: a.status === 'tamamlandi' && !a.completion_status ? 'line-through' : 'none',
             }}>{a.title}</span>
             <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: pm.bg, color: pm.color }}>{pm.label}</span>
             <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6, color: sm.color, background: sm.color + '18' }}>{sm.label}</span>
+            {cs && (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, color: cs.color, background: cs.bg, border: `1px solid ${cs.border}` }}>
+                {cs.label}
+              </span>
+            )}
           </div>
           {a.description && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 4 }}>{a.description}</div>}
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-muted)' }}>
@@ -678,6 +811,52 @@ function AgendaCard({ agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onS
             {a.unit && <span>🏢 {a.unit}</span>}
             {a.due_date && <span>📅 {a.due_date}</span>}
           </div>
+
+          {/* Aksiyon butonları */}
+          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate)) && (
+            <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {canMarkDone && onMarkDone && (
+                <button
+                  className="btn btn-sm"
+                  style={{ background: '#16a34a', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
+                  onClick={() => onMarkDone(a.id)}
+                >
+                  ✓ Tamamlandım — Onaya Gönder
+                </button>
+              )}
+              {isMyTask && onNavigate && a.status !== 'tamamlandi' && (
+                <button
+                  className="btn btn-sm"
+                  style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
+                  onClick={() => onNavigate('dailylog', { linkedTask: a })}
+                >
+                  📝 İş Kaydı Ekle
+                </button>
+              )}
+              {canApproveRevise && (
+                <>
+                  {onApprove && (
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#16a34a', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
+                      onClick={() => onApprove(a.id)}
+                    >
+                      ✅ Onayla
+                    </button>
+                  )}
+                  {onRevision && (
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#ef4444', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
+                      onClick={() => onRevision(a)}
+                    >
+                      🔄 Revize İste
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sağ: kalan gün + aksiyonlar */}
@@ -703,19 +882,21 @@ function AgendaCard({ agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onS
 function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
   const pm = prioMeta(a.priority);
   const dc = daysChip(daysLeft(a.due_date));
+  const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
       background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)',
-      opacity: a.status === 'tamamlandi' ? 0.55 : 1,
+      opacity: a.status === 'tamamlandi' && !a.completion_status ? 0.55 : 1,
     }}>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: pm.color, flexShrink: 0 }} />
       <span style={{
         flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--navy)',
-        textDecoration: a.status === 'tamamlandi' ? 'line-through' : 'none',
+        textDecoration: a.status === 'tamamlandi' && !a.completion_status ? 'line-through' : 'none',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>{a.title}</span>
+      {cs && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: cs.bg, color: cs.color, border: `1px solid ${cs.border}`, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>{cs.label}</span>}
       {dc && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: dc.bg, color: dc.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{dc.label}</span>}
       <select
         value={a.status}

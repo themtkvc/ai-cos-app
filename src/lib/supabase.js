@@ -431,6 +431,67 @@ export const deleteAgendaItem = async (id) => {
   return { error };
 };
 
+// ── GÖREV ONAY AKIŞI ──
+
+// Personel: "Tamamlandım" → pending_review
+export const markTaskPendingReview = async (id, completedNote = null) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({
+      completion_status: 'pending_review',
+      completed_note: completedNote,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Koordinatör: "Onayla"
+export const approveTask = async (id, reviewerId) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({
+      completion_status: 'approved',
+      status: 'tamamlandi',
+      completed_at: new Date().toISOString(),
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+      revision_note: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Koordinatör: "Revizeye Gönder"
+export const requestRevision = async (id, note, reviewerId) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({
+      completion_status: 'revision_requested',
+      revision_note: note,
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Personel: kendi açık görevlerini getir (iş kaydında bağlantı için)
+export const getMyOpenTasks = async (userId) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .select('id, title, priority, due_date')
+    .eq('assigned_to', userId)
+    .neq('status', 'tamamlandi')
+    .order('due_date', { ascending: true });
+  return { data, error };
+};
+
 // ── INVITE STAFF (Edge Function proxy) ──
 export const inviteStaffMember = async (email, name, role = "personel") => {
   const { data: { session } } = await supabase.auth.getSession();

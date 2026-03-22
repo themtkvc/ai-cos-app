@@ -127,6 +127,7 @@ export default function App() {
   };
   const [activePage, setActivePage] = useState(pageFromHash);
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
+  const [dailyLogLinkedTask, setDailyLogLinkedTask] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
 
   // Browser geri/ileri tuşu desteği
@@ -202,6 +203,9 @@ export default function App() {
     if (opts && opts.initialMessage !== undefined) {
       setChatInitialMessage(opts.initialMessage || null);
     }
+    if (opts && opts.linkedTask !== undefined) {
+      setDailyLogLinkedTask(opts.linkedTask || null);
+    }
   };
 
   if (loading) return (
@@ -255,6 +259,7 @@ export default function App() {
               onNavigate={navigate}
               defaultTab={activePage === 'users' ? 'users' : undefined}
               onProfileUpdate={() => loadProfile(user)}
+              linkedTask={activePage === 'dailylog' ? dailyLogLinkedTask : undefined}
             />
           ) : (
             <Dashboard user={user} profile={profile} onNavigate={navigate} />

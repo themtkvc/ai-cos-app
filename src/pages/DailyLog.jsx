@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs } from '../lib/supabase';
+import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
@@ -61,13 +61,14 @@ function fmtMins(mins) {
   return h > 0 ? `${h}s${m > 0 ? ` ${m}dk` : ''}` : `${m}dk`;
 }
 
-function newItem() {
-  return { id: Date.now() + Math.random(), category: '', description: '', start_time: '', end_time: '', all_day: false };
+function newItem(prefillTaskId = null) {
+  return { id: Date.now() + Math.random(), category: '', description: '', start_time: '', end_time: '', all_day: false, agenda_item_id: prefillTaskId };
 }
 
 function migrateItem(raw) {
-  if (raw.start_time !== undefined || raw.all_day !== undefined) return raw;
-  return { ...raw, start_time: '', end_time: '', all_day: false };
+  const base = (raw.start_time !== undefined || raw.all_day !== undefined) ? raw : { ...raw, start_time: '', end_time: '', all_day: false };
+  if (base.agenda_item_id === undefined) return { ...base, agenda_item_id: null };
+  return base;
 }
 
 const AUTO_SAVE_DELAY = 2000;
@@ -88,12 +89,14 @@ function StatusBadge({ status }) {
 }
 
 // ── İŞ KALEMİ SATIRI ─────────────────────────────────────────────────────────
-function WorkItemRow({ item, disabled, onChange, onRemove }) {
+function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
   const mins = calcItemMinutes(item);
+  const linkedTask = myTasks.find(t => t.id === item.agenda_item_id);
   return (
+    <div style={{ marginBottom: 10 }}>
     <div style={{
       display: 'grid', gridTemplateColumns: '155px 1fr auto 32px',
-      gap: 8, marginBottom: 10, alignItems: 'center',
+      gap: 8, alignItems: 'center',
     }}>
       <select
         className="form-select"
@@ -191,17 +194,49 @@ function WorkItemRow({ item, disabled, onChange, onRemove }) {
         }}>×</button>
       ) : <span />}
     </div>
+
+    {/* Göreve Bağla satırı */}
+    {(myTasks.length > 0 || item.agenda_item_id) && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, paddingLeft: 163 }}>
+        <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>🔗 Göreve Bağla:</span>
+        {disabled ? (
+          linkedTask ? (
+            <span style={{
+              fontSize: 11.5, padding: '2px 8px', borderRadius: 6,
+              background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontWeight: 600,
+            }}>
+              📋 {linkedTask.title}
+            </span>
+          ) : item.agenda_item_id ? (
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>Bağlı görev</span>
+          ) : null
+        ) : (
+          <select
+            className="form-select"
+            value={item.agenda_item_id || ''}
+            onChange={e => onChange('agenda_item_id', e.target.value || null)}
+            style={{ fontSize: 11.5, padding: '4px 8px', maxWidth: 360 }}
+          >
+            <option value="">— Göreve bağlamayın —</option>
+            {myTasks.map(t => (
+              <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    )}
+    </div>
   );
 }
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
-export default function DailyLog({ user, profile }) {
+export default function DailyLog({ user, profile, linkedTask }) {
   const today = toLocalDateStr(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
   const [weekOffset, setWeekOffset]     = useState(0);
   const [weekLogs, setWeekLogs]         = useState({});
   const [status, setStatus]             = useState('ofis');
-  const [items, setItems]               = useState([newItem()]);
+  const [items, setItems]               = useState([newItem(linkedTask?.id || null)]);
   const [overtime, setOvertime]         = useState([]);
   const [notes, setNotes]               = useState('');
   const [submitted, setSubmitted]       = useState(false);
@@ -209,6 +244,7 @@ export default function DailyLog({ user, profile }) {
   const [editing, setEditing]           = useState(false);
   const [autoSaveState, setAutoSaveState] = useState('idle');
   const [draft, setDraft]               = useState(false);
+  const [myTasks, setMyTasks]           = useState([]);
 
   const autoSaveTimer = useRef(null);
 
@@ -261,6 +297,14 @@ export default function DailyLog({ user, profile }) {
 
   useEffect(() => { loadLog(selectedDate); }, [selectedDate]);
   useEffect(() => { loadWeekLogs(); }, [weekOffset, user.id]);
+
+  // Kişisel açık görevleri çek (görev bağlama için)
+  useEffect(() => {
+    if (!user?.id) return;
+    getMyOpenTasks(user.id).then(({ data }) => {
+      setMyTasks(data || []);
+    });
+  }, [user.id]);
 
   // ── Otomatik kaydet — stateRef kullanarak stale closure'ı önler
   const triggerAutoSave = useCallback(() => {
@@ -573,6 +617,17 @@ export default function DailyLog({ user, profile }) {
               <span />
             </div>
 
+            {/* linkedTask banner */}
+            {linkedTask && (
+              <div style={{
+                marginBottom: 12, padding: '8px 12px', borderRadius: 8,
+                background: '#eff6ff', border: '1px solid #bfdbfe',
+                fontSize: 12.5, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                🔗 <strong>{linkedTask.title}</strong> görevine bağlanarak açıldı — ilk iş kaleminde göreve bağlı
+              </div>
+            )}
+
             {items.map(item => (
               <WorkItemRow
                 key={item.id}
@@ -580,6 +635,7 @@ export default function DailyLog({ user, profile }) {
                 disabled={isReadOnly}
                 onChange={(f, v) => setItem(item.id, f, v)}
                 onRemove={() => removeItem(item.id)}
+                myTasks={myTasks}
               />
             ))}
 
@@ -643,6 +699,7 @@ export default function DailyLog({ user, profile }) {
                   disabled={isReadOnly}
                   onChange={(f, v) => setOtItem(item.id, f, v)}
                   onRemove={() => removeOtItem(item.id)}
+                  myTasks={myTasks}
                 />
               ))}
               {!isReadOnly ? (
