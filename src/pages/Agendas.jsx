@@ -473,6 +473,7 @@ export default function Agendas({ user, profile, onNavigate }) {
           onEdit={openEdit}
           onDelete={remove}
           onNotify={handleNotify}
+          profiles={profiles}
           emptyMessage="Henüz koordinatöre atanmış gündem yok. '+ Yeni Gündem' ile başlayın."
         />
       )}
@@ -553,6 +554,7 @@ export default function Agendas({ user, profile, onNavigate }) {
                   onNavigate={onNavigate}
                   isDirektor={isDirektor}
                   onNotify={handleNotify}
+                  profiles={profiles}
                 />
               ))}
             </div>
@@ -588,7 +590,7 @@ export default function Agendas({ user, profile, onNavigate }) {
 }
 
 // ── TEAM DASHBOARD (koordinatör + direktör kişi kartları) ─────────────────────
-function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage, onNotify }) {
+function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage, onNotify, profiles }) {
   const byPerson = useMemo(() => {
     const map = {};
     members.forEach(m => { map[m.user_id] = { profile: m, tasks: [] }; });
@@ -650,7 +652,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '8px 0', fontStyle: 'italic' }}>Henüz görev atanmamış</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {tasks.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} />)}
+                {tasks.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} profiles={profiles} />)}
               </div>
             )}
           </div>
@@ -662,7 +664,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
         <div className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Kişiye Atanmamış</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} />)}
+            {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} profiles={profiles} />)}
           </div>
         </div>
       )}
@@ -792,9 +794,10 @@ function AgendaCard({
   agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onStatusChange,
   showAssignee, showCreator,
   myId, isKoord, onMarkDone, onApprove, onRevision, onNavigate,
-  isDirektor, onNotify,
+  isDirektor, onNotify, profiles,
 }) {
   const pm   = prioMeta(a.priority);
+  const assignedEmail = profiles?.find(p => p.user_id === a.assigned_to)?.email || '';
   const sm   = statMeta(a.status);
   const days = daysLeft(a.due_date);
   const dc   = daysChip(days);
@@ -921,7 +924,7 @@ function AgendaCard({
             </span>
           )}
           {canNotify && onNotify && (
-            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${a.assigned_to_name || 'Atanan kişi'}`}>📧</button>
+            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${assignedEmail || a.assigned_to_name || 'Atanan kişi'}`}>📧</button>
           )}
           {canEdit && (
             <>
@@ -936,11 +939,12 @@ function AgendaCard({
 }
 
 // ── GÜNDEM SATIRI (Dashboard için kompakt) ────────────────────────────────────
-function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId }) {
+function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId, profiles }) {
   const pm = prioMeta(a.priority);
   const dc = daysChip(daysLeft(a.due_date));
   const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
   const canNotify = onNotify && !!a.assigned_to;
+  const assignedEmail = profiles?.find(p => p.user_id === a.assigned_to)?.email || '';
 
   return (
     <div style={{
@@ -964,7 +968,7 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId
         {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select>
       {canNotify && (
-        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${a.assigned_to_name || 'Atanan kişi'}`} style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
+        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${assignedEmail || a.assigned_to_name || 'Atanan kişi'}`} style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
       )}
       <button className="btn btn-outline btn-sm btn-icon" onClick={() => onEdit(a)} title="Düzenle" style={{ padding: '2px 6px', fontSize: 12 }}>✏️</button>
     </div>
