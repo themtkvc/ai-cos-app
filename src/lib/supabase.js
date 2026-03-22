@@ -399,12 +399,12 @@ export const uploadAvatar = async (userId, file) => {
 };
 
 // ── GÜNDEMLER (AGENDAS) ──
-// userId: sadece kendi private gündemlerini görür; başkalarının private olanları gizlenir
+// userId: is_private=false/null → herkes görür
+//         is_private=true  → sadece created_by=userId veya assigned_to=userId (asistan dahil)
 export const getAllAgendas = async (userId = null) => {
   let query = supabase.from('agendas').select('*').order('due_date', { ascending: true });
   if (userId) {
-    // is_private = false/null VEYA created_by = userId (kendi private görevlerini görebilir)
-    query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId}`);
+    query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId},assigned_to.eq.${userId}`);
   }
   const { data, error } = await query;
   return { data, error };

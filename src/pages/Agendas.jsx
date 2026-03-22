@@ -94,11 +94,15 @@ export default function Agendas({ user, profile, onNavigate }) {
   const myUnit     = profile?.unit;
   const myId       = user?.id;
 
+  const isAsistan = role === 'asistan';
+  const isDirektor = ['direktor', 'direktor_yardimcisi'].includes(role);
+
   // useState'i role hesaplandıktan sonra, doğrudan değerle başlatıyoruz
   const [activeTab, setActiveTab] = useState(() => {
     const r = profile?.role;
     if (r === 'koordinator') return 'team';
-    if (['direktor', 'direktor_yardimcisi', 'asistan'].includes(r)) return 'koordinators';
+    if (['direktor', 'direktor_yardimcisi'].includes(r)) return 'koordinators';
+    if (r === 'asistan') return 'mine';
     return 'mine';
   });
 
@@ -106,10 +110,11 @@ export default function Agendas({ user, profile, onNavigate }) {
   useEffect(() => {
     if (!profile?.role) return;
     setActiveTab(curr => {
-      if (curr !== 'mine') return curr; // kullanıcı zaten başka tab'a geçti
+      if (curr !== 'mine') return curr;
       const r = profile.role;
       if (r === 'koordinator') return 'team';
-      if (['direktor', 'direktor_yardimcisi', 'asistan'].includes(r)) return 'koordinators';
+      if (['direktor', 'direktor_yardimcisi'].includes(r)) return 'koordinators';
+      if (r === 'asistan') return 'mine';
       return 'mine';
     });
   }, [profile?.role]); // eslint-disable-line
@@ -152,6 +157,7 @@ export default function Agendas({ user, profile, onNavigate }) {
   const filtered = useMemo(() => {
     let base = agendas;
     if (activeTab === 'mine') {
+      // Bana atananlar: asistan için de çalışır
       base = agendas.filter(a => a.assigned_to === myId);
     } else if (activeTab === 'my_items') {
       base = agendas.filter(a =>
@@ -297,10 +303,14 @@ export default function Agendas({ user, profile, onNavigate }) {
 
   // ── Tab yapılandırması (role'e göre) ──
   const tabs = useMemo(() => {
-    if (isDirector) return [
+    if (isDirektor) return [
       { key: 'koordinators', label: '📤 Koordinatörlere Atadığım' },
       { key: 'all',          label: '🌐 Departman Gündemi' },
       { key: 'my_items',     label: '📋 Gündemlerim' },
+    ];
+    if (isAsistan) return [
+      { key: 'mine',     label: '📋 Bana Atananlar' },
+      { key: 'my_items', label: '📒 Gündemlerim' },
     ];
     if (isKoord) return [
       { key: 'team',           label: `🏢 ${myUnit || 'Birimim'}` },
@@ -312,7 +322,7 @@ export default function Agendas({ user, profile, onNavigate }) {
       { key: 'mine',     label: '📋 Bana Atananlar' },
       { key: 'my_items', label: '📒 Gündemlerim' },
     ];
-  }, [isDirector, isKoord, myUnit, pendingReviewCount]);
+  }, [isDirektor, isAsistan, isKoord, myUnit, pendingReviewCount]);
 
   if (loading) return (
     <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -419,7 +429,7 @@ export default function Agendas({ user, profile, onNavigate }) {
       )}
 
       {/* DİREKTÖR: Koordinatörlere Atadığım — kişi kartları */}
-      {isDirector && activeTab === 'koordinators' && (
+      {isDirektor && activeTab === 'koordinators' && (
         <TeamDashboard
           agendas={agendas.filter(a => a.created_by === myId)}
           members={profiles.filter(p => p.role === 'koordinator')}
@@ -434,7 +444,7 @@ export default function Agendas({ user, profile, onNavigate }) {
       )}
 
       {/* DİREKTÖR: Departman Gündemi — TÜM gündemler listesi */}
-      {isDirector && activeTab === 'all' && (
+      {isDirektor && activeTab === 'all' && (
         <DepartmanGundem
           agendas={agendas}
           profiles={profiles}
@@ -520,6 +530,7 @@ export default function Agendas({ user, profile, onNavigate }) {
           assignableUsers={assignableUsers}
           allProfiles={profiles}
           myId={myId}
+          role={role}
           isDirector={isDirector} isKoord={isKoord}
           myUnit={myUnit}
           saving={saving} saveError={saveError}
@@ -914,30 +925,36 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
-const TARGET_GROUPS = [
-  { key: 'koordinator', label: '📤 Koordinatöre', desc: 'Koordinatöre atanacak' },
-  { key: 'personel',    label: '👤 Personele',    desc: 'Personele atanacak' },
-  { key: 'self',        label: '📋 Kendime',      desc: 'Kendi gündemim' },
+// Direktör/yardımcısı için tam liste (asistan dahil)
+const TARGET_GROUPS_FULL = [
+  { key: 'asistan',     label: '🗂️ Asistana',      desc: 'Yönetici asistanına atanacak' },
+  { key: 'koordinator', label: '📤 Koordinatöre',  desc: 'Koordinatöre atanacak' },
+  { key: 'personel',    label: '👤 Personele',      desc: 'Personele atanacak' },
+  { key: 'self',        label: '📋 Kendime',        desc: 'Kendi gündemim' },
 ];
 
-function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
+function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId, role, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
   const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
-  const [targetGroup, setTargetGroup] = React.useState('koordinator');
+  const isDirektor = ['direktor', 'direktor_yardimcisi'].includes(role);
+  const isAsistanRole = role === 'asistan';
+
+  const [targetGroup, setTargetGroup] = React.useState(isDirektor ? 'asistan' : 'self');
 
   // targetGroup değişince assigned_to + is_private güncelle
   const handleTargetChange = (key) => {
     setTargetGroup(key);
-    // "Kendime": assigned_to = myId, is_private = true
     f('assigned_to', key === 'self' ? (myId || '') : '');
-    f('is_private', key === 'self');
+    // Asistana atanan görevler + "Kendime" görevler private
+    f('is_private', key === 'self' || key === 'asistan');
   };
 
   // Direktör için filtrelenmiş atanabilir kişi listesi
   const filteredAssignees = React.useMemo(() => {
     if (!isDirector) return assignableUsers;
     if (targetGroup === 'self') return [];
+    if (targetGroup === 'asistan')     return (allProfiles || []).filter(p => p.role === 'asistan' && p.user_id !== myId);
     if (targetGroup === 'koordinator') return (allProfiles || []).filter(p => p.role === 'koordinator' && p.user_id !== myId);
-    // personel: koordinatör olmayan + direktör olmayan herkes
+    // personel: yönetici kadro dışındakiler
     return (allProfiles || []).filter(p =>
       p.user_id !== myId &&
       !['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(p.role)
@@ -949,18 +966,18 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
       <div className="modal" style={{ maxWidth: 520 }}>
         <h2 className="modal-title">{editId ? '✏️ Gündem Düzenle' : '📋 Yeni Gündem Ekle'}</h2>
 
-        {/* Direktör: Kime atanacak seçimi */}
-        {isDirector && !editId && (
+        {/* Direktör/Yardımcısı: Kime atanacak seçimi */}
+        {isDirektor && !editId && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>KİME ATANACAK?</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {TARGET_GROUPS.map(tg => (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {TARGET_GROUPS_FULL.map(tg => (
                 <button
                   key={tg.key}
                   type="button"
                   onClick={() => handleTargetChange(tg.key)}
                   style={{
-                    flex: 1, padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                    flex: '1 1 80px', padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
                     background: targetGroup === tg.key ? 'var(--primary,#2563eb)' : 'var(--surface)',
                     color: targetGroup === tg.key ? 'white' : 'var(--text-muted)',
                     fontWeight: targetGroup === tg.key ? 700 : 500,
@@ -990,11 +1007,13 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
 
         {/* Atanan kişi + Birim */}
         <div className="form-row">
-          {/* Direktör: "Kendime" seçilmediyse kişi seç */}
-          {isDirector && targetGroup !== 'self' && (
+          {/* Direktör/Yardımcısı: "Kendime" seçilmediyse kişi seç */}
+          {isDirektor && targetGroup !== 'self' && (
             <div className="form-group">
               <label className="form-label">
-                {targetGroup === 'koordinator' ? 'Koordinatör Seç' : 'Personel Seç'}
+                {targetGroup === 'asistan' ? 'Asistan Seç'
+                  : targetGroup === 'koordinator' ? 'Koordinatör Seç'
+                  : 'Personel Seç'}
               </label>
               {filteredAssignees.length === 0 ? (
                 <div style={{ padding: '9px 12px', borderRadius: 8, fontSize: 12, background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e' }}>
