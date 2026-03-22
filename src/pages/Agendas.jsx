@@ -472,6 +472,7 @@ export default function Agendas({ user, profile, onNavigate }) {
           onStatusChange={quickStatus}
           onEdit={openEdit}
           onDelete={remove}
+          onNotify={handleNotify}
           emptyMessage="Henüz koordinatöre atanmış gündem yok. '+ Yeni Gündem' ile başlayın."
         />
       )}
@@ -485,6 +486,7 @@ export default function Agendas({ user, profile, onNavigate }) {
           onEdit={openEdit}
           onDelete={remove}
           onStatusChange={quickStatus}
+          onNotify={handleNotify}
         />
       )}
 
@@ -586,7 +588,7 @@ export default function Agendas({ user, profile, onNavigate }) {
 }
 
 // ── TEAM DASHBOARD (koordinatör + direktör kişi kartları) ─────────────────────
-function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage }) {
+function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage, onNotify }) {
   const byPerson = useMemo(() => {
     const map = {};
     members.forEach(m => { map[m.user_id] = { profile: m, tasks: [] }; });
@@ -648,7 +650,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '8px 0', fontStyle: 'italic' }}>Henüz görev atanmamış</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {tasks.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />)}
+                {tasks.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} />)}
               </div>
             )}
           </div>
@@ -660,7 +662,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
         <div className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Kişiye Atanmamış</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />)}
+            {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} />)}
           </div>
         </div>
       )}
@@ -669,7 +671,7 @@ function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelet
 }
 
 // ── DEPARTMAN GÜNDEMİ (Direktör — tüm departman, birime göre gruplu) ──────────
-function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange }) { // eslint-disable-line
+function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange, onNotify }) { // eslint-disable-line
   const koordinatorlar = profiles.filter(p => p.role === 'koordinator');
 
   // Birim grupları: her koordinatör için kendi biriminin gündemleri
@@ -756,7 +758,7 @@ function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusCh
                     canEdit={true} canUpdateStatus={true}
                     onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
                     showAssignee={true} showCreator={false}
-                    myId={myId}
+                    myId={myId} isDirektor={true} onNotify={onNotify}
                   />
                 ))}
               </div>
@@ -775,6 +777,7 @@ function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusCh
                 canEdit={true} canUpdateStatus={true}
                 onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
                 showAssignee={true} showCreator={true}
+                myId={myId} isDirektor={true} onNotify={onNotify}
               />
             ))}
           </div>
@@ -933,10 +936,11 @@ function AgendaCard({
 }
 
 // ── GÜNDEM SATIRI (Dashboard için kompakt) ────────────────────────────────────
-function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
+function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId }) {
   const pm = prioMeta(a.priority);
   const dc = daysChip(daysLeft(a.due_date));
   const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
+  const canNotify = onNotify && a.assigned_to && a.assigned_to !== myId;
 
   return (
     <div style={{
@@ -959,6 +963,9 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
       >
         {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select>
+      {canNotify && (
+        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title="Mail Gönder" style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
+      )}
       <button className="btn btn-outline btn-sm btn-icon" onClick={() => onEdit(a)} title="Düzenle" style={{ padding: '2px 6px', fontSize: 12 }}>✏️</button>
     </div>
   );
