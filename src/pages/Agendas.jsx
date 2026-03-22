@@ -282,11 +282,12 @@ export default function Agendas({ user, profile, onNavigate }) {
 
   // ── MANUEL MAİL BİLDİRİMİ ──
   const handleNotify = async (a) => {
-    if (!a.assigned_to) return;
+    // assigned_to yoksa direktörün kendi görevi — kendisine gönder
+    const targetUserId = a.assigned_to || myId;
     const createdByName = profile?.full_name || user?.email;
     try {
       await notifyTaskAssigned({
-        assignedToUserId: a.assigned_to,
+        assignedToUserId: targetUserId,
         taskTitle:        a.title,
         taskDescription:  a.description,
         taskPriority:     a.priority,
@@ -294,7 +295,7 @@ export default function Agendas({ user, profile, onNavigate }) {
         taskUnit:         a.unit,
         createdByName,
       });
-      alert('✅ Mail gönderildi: ' + (a.assigned_to_name || a.assigned_to));
+      alert('✅ Mail gönderildi: ' + (a.assigned_to_name || 'Siz'));
     } catch (err) {
       alert('Mail gönderilemedi: ' + (err?.message || 'Bilinmeyen hata'));
     }
@@ -797,7 +798,7 @@ function AgendaCard({
   isDirektor, onNotify, profiles,
 }) {
   const pm   = prioMeta(a.priority);
-  const assignedEmail = profiles?.find(p => p.user_id === a.assigned_to)?.email || '';
+  const assignedEmail = profiles?.find(p => p.user_id === (a.assigned_to || a.created_by))?.email || '';
   const sm   = statMeta(a.status);
   const days = daysLeft(a.due_date);
   const dc   = daysChip(days);
@@ -807,7 +808,7 @@ function AgendaCard({
   const canMarkDone  = isMyTask && a.status !== 'tamamlandi' &&
                        !['pending_review', 'approved'].includes(a.completion_status);
   const canApproveRevise = isKoord && a.completion_status === 'pending_review';
-  const canNotify    = isDirektor && !!a.assigned_to;
+  const canNotify    = isDirektor && (!!a.assigned_to || a.created_by === myId);
 
   return (
     <div className="card" style={{
@@ -943,8 +944,8 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId
   const pm = prioMeta(a.priority);
   const dc = daysChip(daysLeft(a.due_date));
   const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
-  const canNotify = onNotify && !!a.assigned_to;
-  const assignedEmail = profiles?.find(p => p.user_id === a.assigned_to)?.email || '';
+  const canNotify = !!onNotify;
+  const assignedEmail = profiles?.find(p => p.user_id === (a.assigned_to || a.created_by))?.email || '';
 
   return (
     <div style={{
