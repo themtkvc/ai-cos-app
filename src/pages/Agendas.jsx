@@ -282,7 +282,7 @@ export default function Agendas({ user, profile, onNavigate }) {
 
   // ── MANUEL MAİL BİLDİRİMİ ──
   const handleNotify = async (a) => {
-    if (!a.assigned_to || a.assigned_to === myId) return;
+    if (!a.assigned_to) return;
     const createdByName = profile?.full_name || user?.email;
     try {
       await notifyTaskAssigned({
@@ -804,7 +804,7 @@ function AgendaCard({
   const canMarkDone  = isMyTask && a.status !== 'tamamlandi' &&
                        !['pending_review', 'approved'].includes(a.completion_status);
   const canApproveRevise = isKoord && a.completion_status === 'pending_review';
-  const canNotify    = isDirektor && a.assigned_to && a.assigned_to !== myId;
+  const canNotify    = isDirektor && !!a.assigned_to;
 
   return (
     <div className="card" style={{
@@ -940,7 +940,7 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId
   const pm = prioMeta(a.priority);
   const dc = daysChip(daysLeft(a.due_date));
   const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
-  const canNotify = onNotify && a.assigned_to && a.assigned_to !== myId;
+  const canNotify = onNotify && !!a.assigned_to;
 
   return (
     <div style={{
