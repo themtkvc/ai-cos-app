@@ -245,18 +245,18 @@ export default function Agendas({ user, profile, onNavigate }) {
         created_by: myId,
         created_by_name: createdByName,
       }));
-      // Başka birine atandıysa bildirim maili gönder (arka planda, hata varsa sessizce geç)
-      if (!error && payload.assigned_to && payload.assigned_to !== myId) {
-        notifyTaskAssigned({
-          assignedToUserId: payload.assigned_to,
-          taskTitle:        payload.title,
-          taskDescription:  payload.description,
-          taskPriority:     payload.priority,
-          taskDueDate:      payload.due_date,
-          taskUnit:         payload.unit,
-          createdByName,
-        }).catch(() => {/* bildirimi bloke etme */});
-      }
+      // Mail bildirimi şu an devre dışı (Resend günlük limit koruması)
+      // if (!error && payload.assigned_to && payload.assigned_to !== myId) {
+      //   notifyTaskAssigned({
+      //     assignedToUserId: payload.assigned_to,
+      //     taskTitle:        payload.title,
+      //     taskDescription:  payload.description,
+      //     taskPriority:     payload.priority,
+      //     taskDueDate:      payload.due_date,
+      //     taskUnit:         payload.unit,
+      //     createdByName,
+      //   }).catch(() => {});
+      // }
     }
     setSaving(false);
     if (error) {
