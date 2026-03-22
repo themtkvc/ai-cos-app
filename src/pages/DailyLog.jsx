@@ -217,7 +217,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
             onChange={e => onChange('agenda_item_id', e.target.value || null)}
             style={{ fontSize: 11.5, padding: '4px 8px', maxWidth: 360 }}
           >
-            <option value="">— Göreve bağlamayın —</option>
+            <option value="">Göreve Bağlayın…</option>
             {myTasks.map(t => (
               <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
             ))}
