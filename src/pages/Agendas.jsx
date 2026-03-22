@@ -923,10 +923,11 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
   const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
   const [targetGroup, setTargetGroup] = React.useState('koordinator');
 
-  // targetGroup değişince assigned_to sıfırla (düzenleme dışında)
+  // targetGroup değişince assigned_to güncelle
   const handleTargetChange = (key) => {
     setTargetGroup(key);
-    f('assigned_to', '');
+    // "Kendime" seçilince assigned_to = myId → getMyOpenTasks bu görevi bulabilir
+    f('assigned_to', key === 'self' ? (myId || '') : '');
   };
 
   // Direktör için filtrelenmiş atanabilir kişi listesi
