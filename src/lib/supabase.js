@@ -219,13 +219,14 @@ export const submitDailyLog = async (log) => {
   return { data, error };
 };
 
-// Direktör için: tüm personelin loglarını gör
+// Direktör/koordinatör: personel & koordinatör loglarını görür — direktör kendi logunu gizler
 export const getAllDailyLogs = async (fromDate, toDate) => {
   const { data, error } = await supabase
     .from('daily_logs')
     .select('*, user_profiles!inner(full_name, role, unit)')
     .gte('log_date', fromDate)
     .lte('log_date', toDate)
+    .not('user_profiles.role', 'in', '("direktor","direktor_yardimcisi","asistan")')
     .order('log_date', { ascending: false })
     .order('user_id');
   return { data, error };
@@ -398,11 +399,14 @@ export const uploadAvatar = async (userId, file) => {
 };
 
 // ── GÜNDEMLER (AGENDAS) ──
-export const getAllAgendas = async () => {
-  const { data, error } = await supabase
-    .from('agendas')
-    .select('*')
-    .order('due_date', { ascending: true });
+// userId: sadece kendi private gündemlerini görür; başkalarının private olanları gizlenir
+export const getAllAgendas = async (userId = null) => {
+  let query = supabase.from('agendas').select('*').order('due_date', { ascending: true });
+  if (userId) {
+    // is_private = false/null VEYA created_by = userId (kendi private görevlerini görebilir)
+    query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId}`);
+  }
+  const { data, error } = await query;
   return { data, error };
 };
 
@@ -481,12 +485,12 @@ export const requestRevision = async (id, note, reviewerId) => {
   return { data, error };
 };
 
-// Personel: kendi açık görevlerini getir (iş kaydında bağlantı için)
+// Açık görevleri getir: assigned_to = userId  VEYA  (created_by = userId ve assigned_to = null → "Kendime" görevler)
 export const getMyOpenTasks = async (userId) => {
   const { data, error } = await supabase
     .from('agendas')
-    .select('id, title, priority, due_date')
-    .eq('assigned_to', userId)
+    .select('id, title, priority, due_date, unit')
+    .or(`assigned_to.eq.${userId},and(created_by.eq.${userId},assigned_to.is.null)`)
     .neq('status', 'tamamlandi')
     .order('due_date', { ascending: true });
   return { data, error };

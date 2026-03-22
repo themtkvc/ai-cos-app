@@ -72,6 +72,7 @@ function daysChip(d) {
 const EMPTY_FORM = {
   title: '', description: '', assigned_to: '', assigned_to_name: '',
   unit: '', due_date: '', priority: 'yuksek', status: 'bekliyor', notes: '',
+  is_private: false,
 };
 
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
@@ -117,13 +118,13 @@ export default function Agendas({ user, profile, onNavigate }) {
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: ag }, { data: pr }] = await Promise.all([
-      getAllAgendas(),
+      getAllAgendas(myId),   // myId: kendi private gündemlerini görür, başkalarınınkini görmez
       getAllProfiles(),
     ]);
     setAgendas(ag || []);
     setProfiles(pr || []);
     setLoading(false);
-  }, []);
+  }, [myId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -923,11 +924,12 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
   const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
   const [targetGroup, setTargetGroup] = React.useState('koordinator');
 
-  // targetGroup değişince assigned_to güncelle
+  // targetGroup değişince assigned_to + is_private güncelle
   const handleTargetChange = (key) => {
     setTargetGroup(key);
-    // "Kendime" seçilince assigned_to = myId → getMyOpenTasks bu görevi bulabilir
+    // "Kendime": assigned_to = myId, is_private = true
     f('assigned_to', key === 'self' ? (myId || '') : '');
+    f('is_private', key === 'self');
   };
 
   // Direktör için filtrelenmiş atanabilir kişi listesi
