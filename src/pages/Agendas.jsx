@@ -921,7 +921,7 @@ function AgendaCard({
             </span>
           )}
           {canNotify && onNotify && (
-            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title="Mail Gönder">📧</button>
+            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${a.assigned_to_name || 'Atanan kişi'}`}>📧</button>
           )}
           {canEdit && (
             <>
@@ -964,7 +964,7 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId
         {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select>
       {canNotify && (
-        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title="Mail Gönder" style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
+        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${a.assigned_to_name || 'Atanan kişi'}`} style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
       )}
       <button className="btn btn-outline btn-sm btn-icon" onClick={() => onEdit(a)} title="Düzenle" style={{ padding: '2px 6px', fontSize: 12 }}>✏️</button>
     </div>
