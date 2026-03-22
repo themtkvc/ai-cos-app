@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles, markTaskPendingReview, approveTask, requestRevision } from '../lib/supabase';
+import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles, markTaskPendingReview, approveTask, requestRevision, notifyTaskAssigned } from '../lib/supabase';
 import { differenceInCalendarDays } from 'date-fns';
 import { ROLE_LABELS } from '../App';
 import { UserAvatar } from './ProfileSettings';
@@ -239,11 +239,24 @@ export default function Agendas({ user, profile, onNavigate }) {
     if (editId) {
       ({ error } = await updateAgendaItem(editId, payload));
     } else {
+      const createdByName = profile?.full_name || user?.email;
       ({ error } = await createAgendaItem({
         ...payload,
         created_by: myId,
-        created_by_name: profile?.full_name || user?.email,
+        created_by_name: createdByName,
       }));
+      // Başka birine atandıysa bildirim maili gönder (arka planda, hata varsa sessizce geç)
+      if (!error && payload.assigned_to && payload.assigned_to !== myId) {
+        notifyTaskAssigned({
+          assignedToUserId: payload.assigned_to,
+          taskTitle:        payload.title,
+          taskDescription:  payload.description,
+          taskPriority:     payload.priority,
+          taskDueDate:      payload.due_date,
+          taskUnit:         payload.unit,
+          createdByName,
+        }).catch(() => {/* bildirimi bloke etme */});
+      }
     }
     setSaving(false);
     if (error) {

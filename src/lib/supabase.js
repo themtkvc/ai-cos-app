@@ -521,6 +521,30 @@ export const inviteStaffMember = async (email, name, role = "personel") => {
 };
 
 
+// ── GÖREV BİLDİRİMİ (notify-task-assigned Edge Function) ──
+export const notifyTaskAssigned = async ({ assignedToUserId, taskTitle, taskDescription, taskPriority, taskDueDate, taskUnit, createdByName }) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: { message: 'Oturum bulunamadı' } };
+  try {
+    const res = await fetch(
+      `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/notify-task-assigned`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ assignedToUserId, taskTitle, taskDescription, taskPriority, taskDueDate, taskUnit, createdByName }),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) return { error: { message: json.error || 'Bildirim gönderilemedi' } };
+    return { data: json, error: null };
+  } catch (e) {
+    return { error: { message: e.message } };
+  }
+};
+
 // ── NETWORK MANAGEMENT ───────────────────────────────────────────────────────
 
 // Tüm network verisini tek seferde çek
