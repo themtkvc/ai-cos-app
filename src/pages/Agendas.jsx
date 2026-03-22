@@ -998,6 +998,8 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
   // Direktör için filtrelenmiş atanabilir kişi listesi
   const filteredAssignees = React.useMemo(() => {
     if (!isDirector) return assignableUsers;
+    // Düzenleme modunda tüm atanabilir kişileri göster (targetGroup filtresi uygulanmaz)
+    if (editId) return (allProfiles || []).filter(p => p.user_id !== myId);
     if (targetGroup === 'self') return [];
     if (targetGroup === 'asistan')     return (allProfiles || []).filter(p => p.role === 'asistan' && p.user_id !== myId);
     if (targetGroup === 'koordinator') return (allProfiles || []).filter(p => p.role === 'koordinator' && p.user_id !== myId);
@@ -1006,7 +1008,7 @@ function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId
       p.user_id !== myId &&
       !['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(p.role)
     );
-  }, [isDirector, targetGroup, assignableUsers, allProfiles, myId]);
+  }, [isDirector, editId, targetGroup, assignableUsers, allProfiles, myId]);
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
