@@ -280,6 +280,26 @@ export default function Agendas({ user, profile, onNavigate }) {
     setAgendas(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
+  // ── MANUEL MAİL BİLDİRİMİ ──
+  const handleNotify = async (a) => {
+    if (!a.assigned_to || a.assigned_to === myId) return;
+    const createdByName = profile?.full_name || user?.email;
+    try {
+      await notifyTaskAssigned({
+        assignedToUserId: a.assigned_to,
+        taskTitle:        a.title,
+        taskDescription:  a.description,
+        taskPriority:     a.priority,
+        taskDueDate:      a.due_date,
+        taskUnit:         a.unit,
+        createdByName,
+      });
+      alert('✅ Mail gönderildi: ' + (a.assigned_to_name || a.assigned_to));
+    } catch (err) {
+      alert('Mail gönderilemedi: ' + (err?.message || 'Bilinmeyen hata'));
+    }
+  };
+
   // ── ONAY AKIŞI ──
   const handleMarkDone = async (id) => {
     const { error } = await markTaskPendingReview(id);
@@ -529,6 +549,8 @@ export default function Agendas({ user, profile, onNavigate }) {
                   onApprove={handleApprove}
                   onRevision={setRevisionModal}
                   onNavigate={onNavigate}
+                  isDirektor={isDirektor}
+                  onNotify={handleNotify}
                 />
               ))}
             </div>
@@ -767,6 +789,7 @@ function AgendaCard({
   agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onStatusChange,
   showAssignee, showCreator,
   myId, isKoord, onMarkDone, onApprove, onRevision, onNavigate,
+  isDirektor, onNotify,
 }) {
   const pm   = prioMeta(a.priority);
   const sm   = statMeta(a.status);
@@ -778,6 +801,7 @@ function AgendaCard({
   const canMarkDone  = isMyTask && a.status !== 'tamamlandi' &&
                        !['pending_review', 'approved'].includes(a.completion_status);
   const canApproveRevise = isKoord && a.completion_status === 'pending_review';
+  const canNotify    = isDirektor && a.assigned_to && a.assigned_to !== myId;
 
   return (
     <div className="card" style={{
@@ -840,7 +864,7 @@ function AgendaCard({
           </div>
 
           {/* Aksiyon butonları */}
-          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate)) && (
+          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate) || canNotify) && (
             <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {canMarkDone && onMarkDone && (
                 <button
@@ -858,6 +882,15 @@ function AgendaCard({
                   onClick={() => onNavigate('dailylog', { linkedTask: a })}
                 >
                   📝 İş Kaydı Ekle
+                </button>
+              )}
+              {canNotify && onNotify && (
+                <button
+                  className="btn btn-sm"
+                  style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
+                  onClick={() => onNotify(a)}
+                >
+                  📧 Mail Gönder
                 </button>
               )}
               {canApproveRevise && (
