@@ -517,6 +517,8 @@ export default function Agendas({ user, profile, onNavigate }) {
         <AgendaModal
           form={form} setForm={setForm} editId={editId}
           assignableUsers={assignableUsers}
+          allProfiles={profiles}
+          myId={myId}
           isDirector={isDirector} isKoord={isKoord}
           myUnit={myUnit}
           saving={saving} saveError={saveError}
@@ -911,17 +913,65 @@ function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete }) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
-function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
-  const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+const TARGET_GROUPS = [
+  { key: 'koordinator', label: '📤 Koordinatöre', desc: 'Koordinatöre atanacak' },
+  { key: 'personel',    label: '👤 Personele',    desc: 'Personele atanacak' },
+  { key: 'self',        label: '📋 Kendime',      desc: 'Kendi gündemim' },
+];
 
-  const handleAssigneeChange = (userId) => {
-    f('assigned_to', userId);
+function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
+  const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+  const [targetGroup, setTargetGroup] = React.useState('koordinator');
+
+  // targetGroup değişince assigned_to sıfırla (düzenleme dışında)
+  const handleTargetChange = (key) => {
+    setTargetGroup(key);
+    f('assigned_to', '');
   };
+
+  // Direktör için filtrelenmiş atanabilir kişi listesi
+  const filteredAssignees = React.useMemo(() => {
+    if (!isDirector) return assignableUsers;
+    if (targetGroup === 'self') return [];
+    if (targetGroup === 'koordinator') return (allProfiles || []).filter(p => p.role === 'koordinator' && p.user_id !== myId);
+    // personel: koordinatör olmayan + direktör olmayan herkes
+    return (allProfiles || []).filter(p =>
+      p.user_id !== myId &&
+      !['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(p.role)
+    );
+  }, [isDirector, targetGroup, assignableUsers, allProfiles, myId]);
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <h2 className="modal-title">{editId ? '✏️ Gündem Düzenle' : '📋 Yeni Gündem Ekle'}</h2>
+
+        {/* Direktör: Kime atanacak seçimi */}
+        {isDirector && !editId && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>KİME ATANACAK?</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {TARGET_GROUPS.map(tg => (
+                <button
+                  key={tg.key}
+                  type="button"
+                  onClick={() => handleTargetChange(tg.key)}
+                  style={{
+                    flex: 1, padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                    background: targetGroup === tg.key ? 'var(--primary,#2563eb)' : 'var(--surface)',
+                    color: targetGroup === tg.key ? 'white' : 'var(--text-muted)',
+                    fontWeight: targetGroup === tg.key ? 700 : 500,
+                    fontSize: 12.5, fontFamily: 'var(--font-body)',
+                    outline: targetGroup !== tg.key ? '1px solid var(--border)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {tg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Başlık */}
         <div className="form-group">
@@ -937,18 +987,39 @@ function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoo
 
         {/* Atanan kişi + Birim */}
         <div className="form-row">
-          {(isDirector || isKoord) && (
+          {/* Direktör: "Kendime" seçilmediyse kişi seç */}
+          {isDirector && targetGroup !== 'self' && (
+            <div className="form-group">
+              <label className="form-label">
+                {targetGroup === 'koordinator' ? 'Koordinatör Seç' : 'Personel Seç'}
+              </label>
+              {filteredAssignees.length === 0 ? (
+                <div style={{ padding: '9px 12px', borderRadius: 8, fontSize: 12, background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e' }}>
+                  ⚠️ Bu kategoride atanabilecek kişi bulunamadı.
+                </div>
+              ) : (
+                <select className="form-select" value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)}>
+                  <option value="">— Kişi seçin —</option>
+                  {filteredAssignees.map(p => (
+                    <option key={p.user_id} value={p.user_id}>
+                      {p.full_name || p.user_id}{p.unit ? ` (${p.unit})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Koordinatör kendi personeline atıyor */}
+          {isKoord && (
             <div className="form-group">
               <label className="form-label">Atanan Kişi</label>
-              {isKoord && assignableUsers.length === 0 ? (
-                <div style={{
-                  padding: '9px 12px', borderRadius: 8, fontSize: 12,
-                  background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e',
-                }}>
+              {assignableUsers.length === 0 ? (
+                <div style={{ padding: '9px 12px', borderRadius: 8, fontSize: 12, background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e' }}>
                   ⚠️ Biriminizde atanabilecek personel bulunamadı. Yöneticinize birim ataması için başvurun.
                 </div>
               ) : (
-                <select className="form-select" value={form.assigned_to} onChange={e => handleAssigneeChange(e.target.value)}>
+                <select className="form-select" value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)}>
                   <option value="">— Kişi seçin —</option>
                   {assignableUsers.map(p => (
                     <option key={p.user_id} value={p.user_id}>
@@ -959,6 +1030,7 @@ function AgendaModal({ form, setForm, editId, assignableUsers, isDirector, isKoo
               )}
             </div>
           )}
+
           <div className="form-group">
             <label className="form-label">Birim</label>
             <input className="form-input" placeholder="Birim..." value={form.unit} onChange={e => f('unit', e.target.value)} />
