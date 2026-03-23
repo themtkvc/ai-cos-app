@@ -16,6 +16,7 @@ import {
   addAgendaComment,
   deleteAgendaComment,
   getAllProfiles,
+  notifyTaskAssigned,
 } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
 
@@ -140,15 +141,18 @@ function RevisionModal({ task, onConfirm, onClose }) {
 }
 
 // ── GÖREV KARTI ───────────────────────────────────────────────────────────────
-function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
+function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNotify }) {
   const [revModal, setRevModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   const isAssigned = task.assigned_to === myId;
   const isCreator  = task.created_by === myId || agendaCreatedBy === myId;
   const isKoord    = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role);
   const canApprove = isKoord && task.completion_status === 'pending_review';
   const canMarkDone = isAssigned && task.completion_status !== 'approved' && task.completion_status !== 'pending_review';
+  // Mail gönderilebilir: göreve atanan kişi var, ben atayan ya da koordinatörüm, kendime atanmış değil
+  const canNotifyTask = onNotify && task.assigned_to && task.assigned_to !== myId && isKoord;
 
   const assigneeProfile = profiles.find(p => p.user_id === task.assigned_to);
 
@@ -157,6 +161,12 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
     await fn();
     await onRefresh();
     setSaving(false);
+  };
+
+  const handleNotify = async () => {
+    setNotifying(true);
+    await onNotify(task);
+    setNotifying(false);
   };
 
   return (
@@ -217,6 +227,15 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
             </button>
           </>
         )}
+        {canNotifyTask && (
+          <button
+            disabled={notifying}
+            onClick={handleNotify}
+            title={`${task.assigned_to_name || ''} adresine mail gönder`}
+            style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: 12, padding: '4px 10px', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}>
+            {notifying ? '…' : '📧 Mail Gönder'}
+          </button>
+        )}
       </div>
 
       {revModal && (
@@ -235,7 +254,7 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
 }
 
 // ── GÜNDEM KARTININ DETAY GÖRÜNÜMERİ ─────────────────────────────────────────
-function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
+function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -285,6 +304,22 @@ function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, 
     await deleteAgendaTask(taskId);
     loadDetail();
     onRefresh();
+  };
+
+  // Görev mail bildirimi
+  const handleNotifyTask = async (task) => {
+    if (!task.assigned_to) return;
+    const { error } = await notifyTaskAssigned({
+      assignedToUserId: task.assigned_to,
+      taskTitle:        task.title,
+      taskDescription:  task.description || '',
+      taskPriority:     task.priority,
+      taskDueDate:      task.due_date,
+      taskUnit:         agenda.unit || '',
+      createdByName:    myName || myProfile?.full_name || '',
+    });
+    if (error) alert('Mail gönderilemedi: ' + error.message);
+    else alert('✅ Mail gönderildi → ' + (task.assigned_to_name || task.assigned_to));
   };
 
   if (loading) return (
@@ -368,6 +403,7 @@ function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, 
                           profiles={profiles}
                           onRefresh={loadDetail}
                           agendaCreatedBy={agenda.created_by}
+                          onNotify={handleNotifyTask}
                         />
                         {canAssign && (
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
@@ -744,7 +780,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
 }
 
 // ── GÜNDEM KARTI ──────────────────────────────────────────────────────────────
-function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen }) {
+function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify }) {
   const type = agenda.agenda_types;
   const typeColor = type?.color || '#6366f1';
   const typeIcon = type?.icon || '📋';
@@ -793,12 +829,24 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen }) 
               {agenda.title}
             </div>
           </div>
-          {canEdit && (
-            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-              <button className="btn btn-sm btn-outline" onClick={() => onEdit(agenda)} title="Düzenle" style={{ padding: '3px 8px' }}>✏️</button>
-              <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: '#ef4444' }}>🗑</button>
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            {/* Gündem mail bildirimi: atanmış gündem varsa direktör görebilir */}
+            {onNotify && agenda.assigned_to && agenda.assigned_to !== myId && (
+              <button
+                className="btn btn-sm"
+                onClick={() => onNotify(agenda)}
+                title={`${agenda.assigned_to_name || ''} adresine mail gönder`}
+                style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '3px 8px', fontSize: 12 }}>
+                📧
+              </button>
+            )}
+            {canEdit && (
+              <>
+                <button className="btn btn-sm btn-outline" onClick={() => onEdit(agenda)} title="Düzenle" style={{ padding: '3px 8px' }}>✏️</button>
+                <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: '#ef4444' }}>🗑</button>
+              </>
+            )}
+          </div>
         </div>
 
         {agenda.description && (
@@ -1013,6 +1061,22 @@ export default function Agendas({ user, profile }) {
     setAgendaModal(true);
   };
 
+  // Gündem düzeyinde mail bildirimi (direktör → koordinatöre atanmış gündem)
+  const handleNotifyAgenda = async (agenda) => {
+    if (!agenda.assigned_to) return;
+    const { error } = await notifyTaskAssigned({
+      assignedToUserId: agenda.assigned_to,
+      taskTitle:        agenda.title,
+      taskDescription:  agenda.description || '',
+      taskPriority:     null,
+      taskDueDate:      agenda.date || null,
+      taskUnit:         agenda.unit || '',
+      createdByName:    myName,
+    });
+    if (error) alert('Mail gönderilemedi: ' + error.message);
+    else alert('✅ Mail gönderildi → ' + (agenda.assigned_to_name || agenda.assigned_to));
+  };
+
   const pendingApprovalCount = useMemo(() => {
     if (!['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role)) return 0;
     return agendas.reduce((sum, a) => {
@@ -1033,6 +1097,7 @@ export default function Agendas({ user, profile }) {
           onEdit={handleEdit}
           onDelete={handleDeleteAgenda}
           onOpen={(a) => { setDetailAgenda(a); setDetailIsMine(isMineTab); }}
+          onNotify={handleNotifyAgenda}
         />
       ))}
     </div>
@@ -1283,6 +1348,7 @@ export default function Agendas({ user, profile }) {
         <AgendaDetailView
           agenda={detailAgenda}
           myId={myId}
+          myName={myName}
           role={role}
           profiles={allProfiles}
           allProfiles={allProfiles}
