@@ -542,6 +542,8 @@ export const getAgendasV2 = async (userId = null, unit = null) => {
 
   if (userId) {
     query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId},assigned_to.eq.${userId}`);
+    // Başkasının kişisel gündemlerini gizle: is_personal=true ise sadece kendi oluşturduğu görünsün
+    query = query.or(`is_personal.is.null,is_personal.eq.false,created_by.eq.${userId}`);
   }
   // Birime göre filtrele (direktör değilse sadece kendi birimi)
   if (unit) {

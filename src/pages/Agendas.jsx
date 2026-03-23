@@ -863,8 +863,8 @@ export default function Agendas({ user, profile }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
   const [searchQ, setSearchQ] = useState('');
-  // Direktör/Yardımcısı için iki tab: 'department' | 'mine'
-  const [directorTab, setDirectorTab] = useState('department');
+  // Direktör/Yardımcısı/Koordinatör için iki tab: 'unit' | 'mine'
+  const [personalTab, setPersonalTab] = useState('unit');
 
   const myId   = user?.id;
   const role   = profile?.role || 'personel';
@@ -872,9 +872,15 @@ export default function Agendas({ user, profile }) {
   const myUnit = profile?.unit || null;
 
   const isDirektor     = ['direktor', 'direktor_yardimcisi'].includes(role);
+  const isKoordinator  = role === 'koordinator';
+  const hasPersonalTab = isDirektor || isKoordinator;
   const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
-  const isMineTab      = isDirektor && directorTab === 'mine';
+  const isMineTab      = hasPersonalTab && personalTab === 'mine';
+
+  // Tab başlığı role göre
+  const unitTabLabel = isDirektor ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
+  const unitTabIcon  = isDirektor ? '🏢' : '🏗';
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -986,15 +992,15 @@ export default function Agendas({ user, profile }) {
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Başlık */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDirektor ? 0 : 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasPersonalTab ? 0 : 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
             {isMineTab
               ? `${filteredAgendas.length} gündem · kişisel`
               : canSeeAllUnits
-                ? `${agendas.length} gündem · tüm birimler`
-                : `${agendas.length} gündem · ${myUnit || 'birimsiz'}`}
+                ? `${agendas.filter(a => !a.is_personal).length} gündem · tüm birimler`
+                : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -1009,16 +1015,16 @@ export default function Agendas({ user, profile }) {
         )}
       </div>
 
-      {/* ── Direktör ana tab: Departman / Gündemlerim ── */}
-      {isDirektor && (
+      {/* ── Direktör / Koordinatör ana tab ── */}
+      {hasPersonalTab && (
         <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
           {[
-            { id: 'department', icon: '🏢', label: 'Departmanın Gündemleri' },
-            { id: 'mine',       icon: '📋', label: 'Gündemlerim' },
+            { id: 'unit', icon: unitTabIcon, label: unitTabLabel },
+            { id: 'mine', icon: '📋',        label: 'Gündemlerim' },
           ].map(tab => {
-            const isActive = directorTab === tab.id;
+            const isActive = personalTab === tab.id;
             return (
-              <button key={tab.id} onClick={() => { setDirectorTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
+              <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer',
