@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { updateUserProfile, updateAuthEmail, updateAuthPassword, uploadAvatar } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS } from '../lib/constants';
 
 // ── AVATAR BILEŞENI (yeniden kullanılabilir) ──────────────────────────────────
 export function UserAvatar({ profile, size = 36, fontSize = 15, style = {} }) {

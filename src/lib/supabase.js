@@ -115,6 +115,13 @@ export const getUnitReports = async (userId) => {
   return { data, error };
 };
 
+export const getAllUnitReports = async () => {
+  const { data, error } = await supabase
+    .from('unit_reports').select('*')
+    .order('submitted_at', { ascending: false });
+  return { data, error };
+};
+
 // ── CHAT HISTORY ──
 export const getChatHistory = async (userId, limit = 50) => {
   const { data, error } = await supabase

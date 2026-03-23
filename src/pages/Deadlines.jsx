@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { getDeadlines, createDeadline, updateDeadline, deleteDeadline } from '../lib/supabase';
 import { differenceInCalendarDays } from 'date-fns';
 import { UNIT_NAMES, UNIT_CSS_MAP, UNITS as UNIT_LIST } from '../lib/constants';
+import EmptyState from '../components/EmptyState';
 
 const UNITS = [...UNIT_NAMES, 'Director'];
 const OWNERS = ['Director', ...UNIT_LIST.map(u => u.coordinator)];
 const PRIORITIES = ['🔴 Critical','🟠 High','🟡 Medium','🟢 Low'];
 const STATUSES = ['⚪ Not Started','🔵 In Progress','✅ Completed','🔴 Overdue'];
 const DONORS = ['WFP','OCHA','Habitat for Humanity','Good Neighbors','—'];
+
+// Görüntüleme için Türkçe etiketler (veritabanı değerleri korunur)
+const STATUS_TR = { '⚪ Not Started':'⚪ Başlanmadı', '🔵 In Progress':'🔵 Devam Ediyor', '✅ Completed':'✅ Tamamlandı', '🔴 Overdue':'🔴 Gecikmiş' };
+const PRIORITY_TR = { '🔴 Critical':'🔴 Kritik', '🟠 High':'🟠 Yüksek', '🟡 Medium':'🟡 Orta', '🟢 Low':'🟢 Düşük' };
+const tr = (val, map) => map[val] || val;
 const UNIT_COLORS = { ...UNIT_CSS_MAP, 'Director': 'unit-director' };
 
 function daysLeft(date) { return differenceInCalendarDays(new Date(date), new Date()); }
@@ -120,11 +126,11 @@ export default function Deadlines({ user, onNavigate }) {
           </select>
           <select className="form-select" style={{width:150}} value={filter.priority} onChange={e=>setFilter(f=>({...f,priority:e.target.value}))}>
             <option value="">Tüm Öncelikler</option>
-            {PRIORITIES.map(p=><option key={p}>{p}</option>)}
+            {PRIORITIES.map(p=><option key={p} value={p}>{tr(p, PRIORITY_TR)}</option>)}
           </select>
           <select className="form-select" style={{width:160}} value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))}>
             <option value="">Tüm Durumlar</option>
-            {STATUSES.map(s=><option key={s}>{s}</option>)}
+            {STATUSES.map(s=><option key={s} value={s}>{tr(s, STATUS_TR)}</option>)}
           </select>
           {(filter.unit||filter.priority||filter.status||filter.search) && (
             <button className="btn btn-outline btn-sm" onClick={()=>setFilter({unit:'',priority:'',status:'',search:''})}>✕ Temizle</button>
@@ -136,7 +142,7 @@ export default function Deadlines({ user, onNavigate }) {
       {/* Table */}
       <div className="card" style={{padding:0,overflow:'hidden'}}>
         {filtered.length === 0 ? (
-          <div className="empty-state"><div className="empty-state-icon">📭</div><div className="empty-state-title">Görev bulunamadı</div></div>
+          <EmptyState icon="📭" title="Görev bulunamadı" sub="Filtre kriterlerinize uygun görev yok" />
         ) : (
           <div style={{overflowX:'auto'}}>
             <table className="data-table">
@@ -159,7 +165,7 @@ export default function Deadlines({ user, onNavigate }) {
                       <td style={{color:'var(--text-muted)',fontSize:13}}>{d.owner}</td>
                       <td style={{color:'var(--text-muted)',fontSize:13}}>{d.donor && d.donor !== '—' ? d.donor : '—'}</td>
                       <td style={{fontSize:13,fontWeight:500}}>{d.due_date}</td>
-                      <td><span style={{fontSize:13}}>{d.priority}</span></td>
+                      <td><span style={{fontSize:13}}>{tr(d.priority, PRIORITY_TR)}</span></td>
                       <td>
                         <select
                           value={d.status}
@@ -169,7 +175,7 @@ export default function Deadlines({ user, onNavigate }) {
                             d.status==='🔵 In Progress'?'var(--blue)':'var(--text-muted)'
                           }}
                         >
-                          {STATUSES.map(s=><option key={s}>{s}</option>)}
+                          {STATUSES.map(s=><option key={s} value={s}>{tr(s, STATUS_TR)}</option>)}
                         </select>
                       </td>
                       <td><span className={daysClass(days)} style={{fontSize:13,fontWeight:600}}>{daysLabel(days)}</span></td>
@@ -228,13 +234,13 @@ export default function Deadlines({ user, onNavigate }) {
               <div className="form-group">
                 <label className="form-label">Öncelik</label>
                 <select className="form-select" value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))}>
-                  {PRIORITIES.map(p=><option key={p}>{p}</option>)}
+                  {PRIORITIES.map(p=><option key={p} value={p}>{tr(p, PRIORITY_TR)}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Durum</label>
                 <select className="form-select" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                  {STATUSES.map(s=><option key={s}>{s}</option>)}
+                  {STATUSES.map(s=><option key={s} value={s}>{tr(s, STATUS_TR)}</option>)}
                 </select>
               </div>
             </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { sendMessage, buildContext } from '../lib/claude';
 import { getChatHistory, saveChatMessage, clearChatHistory, getDeadlines, getDonors, getMeetingActions, getUnitReports } from '../lib/supabase';
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS_DIREKTOR = [
   '⚡ Bu hafta ne yapmalıyım?',
   '📋 Koordinatörler toplantısı gündemi',
   '🏛 Board meeting brifingini hazırla',
@@ -12,6 +12,26 @@ const QUICK_ACTIONS = [
   '🚨 Kritik görevleri ve gecikmeleri listele',
   '✍️ Good Neighbors grant email taslağı',
 ];
+const QUICK_ACTIONS_KOORDINATOR = [
+  '⚡ Bu hafta ne yapmalıyım?',
+  '📋 Birimimin görev durumunu özetle',
+  '📊 Haftalık birim raporumu hazırla',
+  '🚨 Gecikmiş görevleri listele',
+  '📧 Direktöre durum güncellemesi yaz',
+  '📝 Toplantı notlarını derle',
+];
+const QUICK_ACTIONS_PERSONEL = [
+  '⚡ Bu hafta ne yapmalıyım?',
+  '📝 Bugünkü iş kaydımı oluştur',
+  '🚨 Gecikmiş görevlerimi göster',
+  '📋 Bana atanan gündemleri listele',
+  '📧 Koordinatörüme durum güncellemesi yaz',
+];
+function getQuickActions(role) {
+  if (['direktor','direktor_yardimcisi','asistan'].includes(role)) return QUICK_ACTIONS_DIREKTOR;
+  if (role === 'koordinator') return QUICK_ACTIONS_KOORDINATOR;
+  return QUICK_ACTIONS_PERSONEL;
+}
 
 function renderMarkdown(text) {
   let html = text
@@ -42,7 +62,7 @@ function renderMarkdown(text) {
   return html;
 }
 
-export default function Chat({ user, onNavigate, initialMessage, onClearInitialMessage }) {
+export default function Chat({ user, profile, onNavigate, initialMessage, onClearInitialMessage }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,7 +82,17 @@ export default function Chat({ user, onNavigate, initialMessage, onClearInitialM
         setMessages([{
           id: 'welcome',
           role: 'assistant',
-          content: `Merhaba Direktör. Ben AI Chief of Staff'ınızım.\n\nSisteminizdeki verilerle çalışıyorum — görevler, donörler, toplantı aksiyonları. Bana herhangi bir konuda sorabilirsiniz:\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — öncelikli görev listesi\n- "WFP için email yaz" — taslak email\n- "Board meeting brifingini hazırla" — hazır belge\n- "Koordinatörler toplantısı gündemi" — gündem taslağı\n\nNasıl yardımcı olabilirim?`,
+          content: (() => {
+            const name = profile?.full_name?.split(' ')[0] || '';
+            const r = profile?.role;
+            if (['direktor','direktor_yardimcisi','asistan'].includes(r)) {
+              return `Merhaba${name ? ' ' + name : ''}. Ben AI Chief of Staff'ınızım.\n\nSisteminizdeki verilerle çalışıyorum — görevler, donörler, toplantı aksiyonları. Bana herhangi bir konuda sorabilirsiniz:\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — öncelikli görev listesi\n- "WFP için email yaz" — taslak email\n- "Board meeting brifingini hazırla" — hazır belge\n- "Koordinatörler toplantısı gündemi" — gündem taslağı\n\nNasıl yardımcı olabilirim?`;
+            }
+            if (r === 'koordinator') {
+              return `Merhaba${name ? ' ' + name : ''}. Ben AI asistanınızım.\n\nBiriminizle ilgili görevler, raporlar ve gündemler hakkında size yardımcı olabilirim.\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — öncelikli görev listesi\n- "Birimimin görev durumunu özetle"\n- "Haftalık birim raporumu hazırla"\n- "Gecikmiş görevleri listele"\n\nNasıl yardımcı olabilirim?`;
+            }
+            return `Merhaba${name ? ' ' + name : ''}. Ben AI asistanınızım.\n\nGörevleriniz ve iş kayıtlarınız hakkında size yardımcı olabilirim.\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — görev listeniz\n- "Bugünkü iş kaydımı oluştur"\n- "Gecikmiş görevlerimi göster"\n\nNasıl yardımcı olabilirim?`;
+          })(),
           created_at: new Date().toISOString()
         }]);
       }
@@ -223,7 +253,7 @@ export default function Chat({ user, onNavigate, initialMessage, onClearInitialM
       {/* Input area */}
       <div className="chat-input-area">
         <div className="chat-quick-actions">
-          {QUICK_ACTIONS.map(q => (
+          {getQuickActions(profile?.role).map(q => (
             <button key={q} className="quick-action" onClick={() => sendMsg(q)}>{q}</button>
           ))}
         </div>

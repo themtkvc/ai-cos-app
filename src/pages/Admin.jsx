@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, supabase, getAgendaTypes, createAgendaType, updateAgendaType, deleteAgendaType } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
-import { UNITS as UNIT_LIST } from '../lib/constants';
+import { ROLE_LABELS, UNITS as UNIT_LIST } from '../lib/constants';
 import OrgChartAdmin from '../components/OrgChartAdmin';
 import { UserAvatar } from './ProfileSettings';
 

@@ -7,7 +7,7 @@ import {
   createNetworkConnection, deleteNetworkConnection,
   uploadNetworkMedia,
 } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS, avatarColor, fmtDisplayDate } from '../lib/constants';
 
 // ── SABİTLER ─────────────────────────────────────────────────────────────────
 const ORG_TYPES = [
@@ -34,22 +34,8 @@ const CONNECTION_LABELS = [
   'Organizatör', 'Sponsor',   'Partner',           'Donör',
   'Danışman',    'Üye',       'İletişim',          'Diğer',
 ];
-const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
-                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-
-// Avatar renk paleti
-const AVATAR_PALETTE = ['#7c3aed','#db2777','#16a34a','#2563eb','#d97706','#dc2626','#0891b2','#65a30d','#9333ea','#ea580c'];
-function avatarColor(str = '') {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xffff;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-
-function fmtDate(d) {
-  if (!d) return '';
-  const dt = new Date(d + 'T12:00:00');
-  return `${dt.getDate()} ${MONTHS_TR[dt.getMonth()]} ${dt.getFullYear()}`;
-}
+// fmtDate → fmtDisplayDate (constants.js'den import edildi)
+const fmtDate = fmtDisplayDate;
 
 // ── KÜÇÜK YARDIMCI BİLEŞENLER ────────────────────────────────────────────────
 function Avatar({ name='', url, size=40, radius='50%' }) {

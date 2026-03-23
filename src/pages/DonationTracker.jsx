@@ -319,6 +319,17 @@ export default function DonationTracker({ user, profile, onNavigate }) {
     })
     .join(' · ');
 
+  // ── Rol guard ────────────────────────────────────────────────────────────
+  const allowedRoles = ['direktor','direktor_yardimcisi','asistan'];
+  if (!allowedRoles.includes(profile?.role)) {
+    return (
+      <div style={{padding:40, textAlign:'center', color:'#6b7280'}}>
+        <p style={{fontSize:18, fontWeight:600}}>Erişim Yetkiniz Yok</p>
+        <p style={{fontSize:14, marginTop:8}}>Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p>
+      </div>
+    );
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page">

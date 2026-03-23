@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getDashboardLogs } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
-
-// ── SABITLER ──────────────────────────────────────────────────────────────────
-const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
-                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-const DAYS_TR   = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+import { ROLE_LABELS, avatarColor, fmtDateShort, fmtDayShort, toLocalDateStr } from '../lib/constants';
 
 const NON_WORK = ['saglik_izni','egitim_izni','yillik_izin','calismiyor'];
 const STATUS_LABELS = {
@@ -18,23 +13,7 @@ const STATUS_LABELS = {
   calismiyor:  'Çalışmıyor',
 };
 
-// Avatar renk paleti — isim hash'ine göre deterministik
-const AVATAR_PALETTE = [
-  '#7c3aed','#db2777','#16a34a','#2563eb',
-  '#d97706','#dc2626','#0891b2','#65a30d',
-  '#9333ea','#ea580c',
-];
-function avatarColor(name = '') {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-
 // ── TARİH YARDIMCILARI ────────────────────────────────────────────────────────
-function toLocalDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
 function today() { return toLocalDateStr(new Date()); }
 
 function thisWeek() {
@@ -51,15 +30,6 @@ function thisMonth() {
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
-}
-
-function fmtDateShort(str) {
-  const d = new Date(str + 'T12:00:00');
-  return `${d.getDate()} ${MONTHS_TR[d.getMonth()]} ${d.getFullYear()}`;
-}
-function fmtDayShort(str) {
-  const d = new Date(str + 'T12:00:00');
-  return DAYS_TR[d.getDay()];
 }
 
 // ── SÜRE HESAPLAMA ───────────────────────────────────────────────────────────

@@ -18,7 +18,7 @@ import {
   getAllProfiles,
   notifyTaskAssigned,
 } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS } from '../lib/constants';
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
@@ -531,14 +531,16 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
   // - Diğer durumlarda → direktör/direktor_yardimcisi rolleri hariç, kendisi hariç
   const DIREKTOR_ROLES = ['direktor', 'direktor_yardimcisi'];
   const assignableProfiles = useMemo(() => {
-    if (role === 'koordinator') return allProfiles.filter(p => p.role === 'personel');
+    // Birimi atanmamış kullanıcıları filtrele (direktör hariç — direktörün birim zorunluluğu yok)
+    const withUnit = allProfiles.filter(p => p.unit || DIREKTOR_ROLES.includes(p.role));
+    if (role === 'koordinator') return withUnit.filter(p => p.role === 'personel');
     if (allowSelfAssign) {
       // Direktör kendi gündemlerinde sadece kendine atayabilir
       return allProfiles.filter(p => p.user_id === myId);
     }
     // Direktörlere (direktor/direktor_yardimcisi) atama yapılamaz, sadece direktörler kendi aralarında atayabilir
     const isDirektorRole = DIREKTOR_ROLES.includes(role);
-    return allProfiles.filter(p => {
+    return withUnit.filter(p => {
       if (p.user_id === myId) return false; // kendine atama yok (allowSelfAssign dışında)
       if (!isDirektorRole && DIREKTOR_ROLES.includes(p.role)) return false; // direktöre atama yasak
       return true;
@@ -639,7 +641,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
   // Koordinatör profilleri — direktörler gündem atayabilir
   const koordinatorProfiles = useMemo(() => {
     if (!isDirektor || !allProfiles) return [];
-    return allProfiles.filter(p => p.role === 'koordinator');
+    return allProfiles.filter(p => p.role === 'koordinator' && p.unit);
   }, [isDirektor, allProfiles]);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getOrgChart, getAllProfiles } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS } from '../lib/constants';
 
 const UNIT_COLORS = [
   '#1a3a5c', '#2563eb', '#16a34a', '#7c3aed', '#d97706',

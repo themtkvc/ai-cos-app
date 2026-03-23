@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { supabase, getUserProfile, upsertUserProfile } from './lib/supabase';
+import { ROLE_LABELS as _ROLE_LABELS } from './lib/constants';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Agendas from './pages/Agendas';
@@ -31,13 +32,8 @@ export const ROLE_ACCESS = {
   personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','network','profile'],
 };
 
-export const ROLE_LABELS = {
-  direktor:            'Direktör',
-  direktor_yardimcisi: 'Direktör Yardımcısı',
-  asistan:             'Asistan',
-  koordinator:         'Koordinatör',
-  personel:            'Personel',
-};
+// Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
+export const ROLE_LABELS = _ROLE_LABELS;
 
 // ── Şifre Belirleme Ekranı (invite/recovery sonrası) ──────────────────────────
 function SetPasswordScreen({ onDone }) {

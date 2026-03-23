@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getMeetingActions, signOut } from '../lib/supabase';
-import { ROLE_ACCESS, ROLE_LABELS } from '../App';
+import { ROLE_ACCESS } from '../App';
+import { ROLE_LABELS } from '../lib/constants';
 
 const ALL_NAV = [
   { id: 'dashboard', icon: '⚡', label: 'Dashboard' },

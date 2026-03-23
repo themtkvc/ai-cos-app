@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS } from '../lib/constants';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
 const WORK_STATUS = [

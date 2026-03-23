@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, ComposedChart, Area,
 } from 'recharts';
 import { getDashboardLogs } from '../lib/supabase';
-import { ROLE_LABELS } from '../App';
+import { ROLE_LABELS, toLocalDateStr as _toLocalDateStr } from '../lib/constants';
 
 // ── SABITLER ─────────────────────────────────────────────────────────────────
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
@@ -54,9 +54,7 @@ function fmtHShort(mins) {
   return (mins / 60).toFixed(1);
 }
 
-function toLocalDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+const toLocalDateStr = _toLocalDateStr;
 
 function getWeekRange(offset = 0) {
   const now = new Date();
