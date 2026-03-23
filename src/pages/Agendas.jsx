@@ -91,19 +91,36 @@ function CommentBubble({ comment, myId, onDelete }) {
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
       {!isMe && <Avatar name={comment.created_by_name} url={comment.avatar_url} size={28} />}
       <div style={{ maxWidth: '75%' }}>
-        {!isMe && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{comment.created_by_name}</div>}
+        {!isMe && (
+          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>
+            {comment.created_by_name}
+          </div>
+        )}
         <div style={{
-          background: isMe ? 'var(--accent)' : 'var(--bg-card)',
-          color: isMe ? '#fff' : 'var(--text)',
-          border: isMe ? 'none' : '1px solid var(--border)',
+          background: isMe ? '#1e40af' : '#f1f5f9',
+          color: isMe ? '#ffffff' : '#1e293b',
+          border: isMe ? 'none' : '1px solid #e2e8f0',
           borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          padding: '8px 12px', fontSize: 13.5, lineHeight: 1.4,
+          padding: '9px 14px',
+          fontSize: 13.5,
+          fontWeight: 400,
+          lineHeight: 1.55,
+          wordBreak: 'break-word',
         }}>
           {comment.content}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, textAlign: isMe ? 'right' : 'left', display: 'flex', gap: 6, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+        <div style={{
+          fontSize: 11, color: '#94a3b8', marginTop: 3,
+          display: 'flex', gap: 6,
+          justifyContent: isMe ? 'flex-end' : 'flex-start',
+        }}>
           {new Date(comment.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-          {isMe && <button onClick={() => onDelete(comment.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 0 }}>sil</button>}
+          {isMe && (
+            <button onClick={() => onDelete(comment.id)}
+              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 600 }}>
+              sil
+            </button>
+          )}
         </div>
       </div>
       {isMe && <Avatar name={comment.created_by_name} url={comment.avatar_url} size={28} />}
@@ -375,7 +392,7 @@ function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, o
           {/* Görevler */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 📌 Görevler ({tasks.length})
               </h3>
               {canAssign && (
@@ -441,7 +458,7 @@ function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, o
 
           {/* Gündem Yorumları */}
           <div>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
               💬 Gündem Notları
             </h3>
             {agendaComments.length > 0 && (
