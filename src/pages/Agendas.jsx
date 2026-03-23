@@ -912,6 +912,7 @@ export default function Agendas({ user, profile }) {
   const canCreate      = CREATOR_ROLES.includes(role);
   const isMineTab          = hasPersonalTab && personalTab === 'mine';
   const isAssignedToMeTab  = isKoordinator && personalTab === 'assigned_to_me';
+  const isAssignedByMeTab  = isDirektor && personalTab === 'assigned_by_me';
 
   // Tab başlığı role göre
   const unitTabLabel = isDirektor ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -943,32 +944,37 @@ export default function Agendas({ user, profile }) {
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
-      if (isAssignedToMeTab) {
-        // "Bana Atanan" sekmesi: başkası tarafından atanmış gündemler
+      if (isAssignedByMeTab) {
+        // "Atadığım Gündemler" sekmesi (direktör): koordinatöre atanmış gündemler
+        if (!(a.assigned_to && a.created_by === myId && !a.is_personal)) return false;
+      } else if (isAssignedToMeTab) {
+        // "Bana Atanan" sekmesi (koordinatör): başkası tarafından atanmış gündemler
         if (!(a.assigned_to === myId && a.created_by !== myId)) return false;
       } else if (isMineTab) {
         // "Gündemlerim" sekmesi: sadece kişisel gündemler
         if (!a.is_personal) return false;
       } else {
-        // "Birim/Departman" sekmesi: kişisel ve bana atanan gündemler gizli
+        // "Birim/Departman" sekmesi: kişisel gündemler gizli
         if (a.is_personal) return false;
         // Koordinatör için: direktörden atanan gündemler bu sekmede gizli
         if (isKoordinator && a.assigned_to === myId && a.created_by !== myId) return false;
+        // Direktör için: koordinatöre atanmış gündemler bu sekmede gizli
+        if (isDirektor && a.assigned_to && !a.is_personal) return false;
       }
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-      if (canSeeAllUnits && !isMineTab && !isAssignedToMeTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
+      if (canSeeAllUnits && !isMineTab && !isAssignedToMeTab && !isAssignedByMeTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
       if (searchQ) {
         const q = searchQ.toLowerCase();
         if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, myId, isKoordinator]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, myId, isKoordinator, isDirektor]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
-    if (!canSeeAllUnits || isMineTab || isAssignedToMeTab || filterUnit !== 'all') return null;
+    if (!canSeeAllUnits || isMineTab || isAssignedToMeTab || isAssignedByMeTab || filterUnit !== 'all') return null;
     const groups = {};
     filteredAgendas.forEach(a => {
       const key = a.unit || '—';
@@ -976,7 +982,7 @@ export default function Agendas({ user, profile }) {
       groups[key].push(a);
     });
     return groups;
-  }, [filteredAgendas, canSeeAllUnits, isMineTab, isAssignedToMeTab, filterUnit]);
+  }, [filteredAgendas, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, filterUnit]);
 
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
@@ -1039,13 +1045,15 @@ export default function Agendas({ user, profile }) {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            {isAssignedToMeTab
-              ? `${filteredAgendas.length} gündem · bana atanan`
-              : isMineTab
-                ? `${filteredAgendas.length} gündem · kişisel`
-                : canSeeAllUnits
-                  ? `${agendas.filter(a => !a.is_personal).length} gündem · tüm birimler`
-                  : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
+            {isAssignedByMeTab
+              ? `${filteredAgendas.length} gündem · koordinatöre atanan`
+              : isAssignedToMeTab
+                ? `${filteredAgendas.length} gündem · bana atanan`
+                : isMineTab
+                  ? `${filteredAgendas.length} gündem · kişisel`
+                  : canSeeAllUnits
+                    ? `${agendas.filter(a => !a.is_personal && !a.assigned_to).length} gündem · tüm birimler`
+                    : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -1053,7 +1061,7 @@ export default function Agendas({ user, profile }) {
             )}
           </p>
         </div>
-        {canCreate && !isAssignedToMeTab && (
+        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1065,14 +1073,17 @@ export default function Agendas({ user, profile }) {
         <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
           {[
             { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
-            ...(isKoordinator ? [{ id: 'assigned_to_me', icon: '📥', label: 'Bana Atanan' }] : []),
+            ...(isKoordinator ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
+            ...(isDirektor    ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
             { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
           ].map(tab => {
             const isActive = personalTab === tab.id;
-            // "Bana Atanan" sekmesinde bekleyen gündem sayısını badge olarak göster
+            // Badge: "Bana Atanan" veya "Atadığım" sekmelerinde bekleyen gündem sayısı
             const assignedCount = tab.id === 'assigned_to_me'
               ? agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length
-              : 0;
+              : tab.id === 'assigned_by_me'
+                ? agendas.filter(a => a.assigned_to && a.created_by === myId && !a.is_personal).length
+                : 0;
             return (
               <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
                 style={{
@@ -1097,7 +1108,7 @@ export default function Agendas({ user, profile }) {
       )}
 
       {/* Birim sekmeleri — departman tabında direktör */}
-      {canSeeAllUnits && !isMineTab && !isAssignedToMeTab && availableUnits.length > 1 && (
+      {canSeeAllUnits && !isMineTab && !isAssignedToMeTab && !isAssignedByMeTab && availableUnits.length > 1 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, flexWrap: 'wrap' }}>
           <button
             onClick={() => setFilterUnit('all')}
@@ -1190,6 +1201,35 @@ export default function Agendas({ user, profile }) {
             {canCreate ? '+ Yeni Gündem düğmesiyle ekleyebilirsiniz.' : 'Henüz atanmış bir gündem bulunmuyor.'}
           </div>
         </div>
+      ) : isAssignedByMeTab ? (
+        /* Direktör: koordinatöre göre gruplu "Atadığım Gündemler" görünümü */
+        (() => {
+          const byAssignee = {};
+          filteredAgendas.forEach(a => {
+            const key = a.assigned_to_name || 'Bilinmiyor';
+            if (!byAssignee[key]) byAssignee[key] = [];
+            byAssignee[key].push(a);
+          });
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+              {Object.entries(byAssignee).sort(([a], [b]) => a.localeCompare(b)).map(([assigneeName, items]) => (
+                <div key={assigneeName}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16 }}>👤</span>
+                      {assigneeName}
+                    </div>
+                    <span style={{ background: '#6366f118', color: '#6366f1', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
+                      {items.length} gündem
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                  </div>
+                  <CardGrid items={items} />
+                </div>
+              ))}
+            </div>
+          );
+        })()
       ) : canSeeAllUnits && groupedByUnit && filterUnit === 'all' ? (
         /* Direktör: birime göre gruplu görünüm */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
