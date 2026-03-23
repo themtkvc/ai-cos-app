@@ -119,6 +119,7 @@ export default function App() {
   const [user, setUser]       = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   // URL hash'ten başlangıç sayfasını oku (yenileme sonrası koru)
   const pageFromHash = () => {
     const h = window.location.hash.replace('#', '').trim();
@@ -129,6 +130,18 @@ export default function App() {
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
   const [dailyLogLinkedTask, setDailyLogLinkedTask] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
+
+  // Offline detection
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
 
   // Browser geri/ileri tuşu desteği
   useEffect(() => {
@@ -181,7 +194,7 @@ export default function App() {
       const u = session?.user ?? null;
       setUser(u);
       // Invite veya password recovery linkiyle gelindiyse şifre belirleme ekranı göster
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' && session?.user?.app_metadata?.provider === 'email' && !session?.user?.last_sign_in_at) {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session?.user?.app_metadata?.provider === 'email' && !session?.user?.last_sign_in_at)) {
         setNeedsPassword(true);
       }
       if (u) {
@@ -223,6 +236,14 @@ export default function App() {
   // Invite veya recovery linki ile gelindi → şifre belirleme ekranı
   if (needsPassword) return <SetPasswordScreen onDone={() => setNeedsPassword(false)} />;
 
+  // Profil henüz yüklenmemişse kısa loading göster (yanlış rol ile render'ı engelle)
+  if (!profile) return (
+    <div className="app-loading">
+      <div className="loading-spinner" />
+      <p>Profil bilgileri yükleniyor...</p>
+    </div>
+  );
+
   const pages = {
     dashboard: Dashboard,
     agendas:   Agendas,
@@ -263,6 +284,11 @@ export default function App() {
   return (
     <ProfileContext.Provider value={{ profile, setProfile, reloadProfile: () => loadProfile(user) }}>
       <div className="app">
+        {isOffline && (
+          <div style={{ background: '#dc2626', color: 'white', textAlign: 'center', padding: '8px 16px', fontSize: 13, fontWeight: 500, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999 }}>
+            İnternet bağlantısı kesildi — değişiklikler kaydedilmeyebilir
+          </div>
+        )}
         {/* Mobil üst bar */}
         <header className="mobile-header">
           <button className="mobile-header-menu" onClick={() => setMobileNavOpen(true)} aria-label="Menü">☰</button>

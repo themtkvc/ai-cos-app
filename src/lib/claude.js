@@ -83,17 +83,17 @@ export const sendMessage = async (messages, contextData = null) => {
       if (response.status === 500 && err.error?.includes('not configured')) {
         return getDemoResponse(messages[messages.length - 1]?.content || '');
       }
-      throw new Error(err.error || 'API error');
+      throw new Error(err.error || 'API hatası');
     }
 
     const data = await response.json();
-    return data.content[0]?.text || 'No response received.';
+    return data.content[0]?.text || 'Yanıt alınamadı.';
   } catch (error) {
     // Network error — likely local dev without proxy, use demo mode
     if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
       return getDemoResponse(messages[messages.length - 1]?.content || '');
     }
-    console.error('Claude API error:', error);
+    console.error('Claude API hatası:', error);
     throw error;
   }
 };

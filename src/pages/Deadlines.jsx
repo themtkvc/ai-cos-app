@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { getDeadlines, createDeadline, updateDeadline, deleteDeadline } from '../lib/supabase';
 import { differenceInCalendarDays } from 'date-fns';
+import { UNIT_NAMES, UNIT_CSS_MAP, UNITS as UNIT_LIST } from '../lib/constants';
 
-const UNITS = ['Partnerships','Humanitarian Affairs','Traditional Donors','Grants','Accreditations','Policy & Governance','Director'];
-const OWNERS = ['Director','Hatice','Gülsüm','Murat','Yasir','Yavuz','Sezgin'];
+const UNITS = [...UNIT_NAMES, 'Director'];
+const OWNERS = ['Director', ...UNIT_LIST.map(u => u.coordinator)];
 const PRIORITIES = ['🔴 Critical','🟠 High','🟡 Medium','🟢 Low'];
 const STATUSES = ['⚪ Not Started','🔵 In Progress','✅ Completed','🔴 Overdue'];
 const DONORS = ['WFP','OCHA','Habitat for Humanity','Good Neighbors','—'];
-const UNIT_COLORS = {
-  'Partnerships':'unit-partnerships','Humanitarian Affairs':'unit-humanitarian',
-  'Traditional Donors':'unit-traditional-donors','Grants':'unit-grants',
-  'Accreditations':'unit-accreditations','Policy & Governance':'unit-policy','Director':'unit-director'
-};
+const UNIT_COLORS = { ...UNIT_CSS_MAP, 'Director': 'unit-director' };
 
 function daysLeft(date) { return differenceInCalendarDays(new Date(date), new Date()); }
 function daysClass(d) {
@@ -32,10 +29,21 @@ export default function Deadlines({ user, onNavigate }) {
   const [form, setForm] = useState(EMPTY);
   const [editId, setEditId] = useState(null);
   const [filter, setFilter] = useState({ unit:'', priority:'', status:'', search:'' });
+  const [filterText, setFilterText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = () => getDeadlines(user.id).then(({ data }) => { setDeadlines(data || []); setLoading(false); });
   useEffect(() => { load(); }, [user]);
+
+  // Debounce search filter (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filterText);
+      setFilter(f => ({ ...f, search: filterText }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterText]);
 
   const filtered = deadlines.filter(d => {
     if (filter.unit && d.unit !== filter.unit) return false;
@@ -105,7 +113,7 @@ export default function Deadlines({ user, onNavigate }) {
       {/* Filters */}
       <div className="card" style={{marginBottom:16,padding:'14px 16px'}}>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
-          <input className="form-input" style={{width:220}} placeholder="🔍 Görev ara..." value={filter.search} onChange={e=>setFilter(f=>({...f,search:e.target.value}))} />
+          <input className="form-input" style={{width:220}} placeholder="🔍 Görev ara..." value={filterText} onChange={e=>setFilterText(e.target.value)} />
           <select className="form-select" style={{width:180}} value={filter.unit} onChange={e=>setFilter(f=>({...f,unit:e.target.value}))}>
             <option value="">Tüm Birimler</option>
             {UNITS.map(u=><option key={u}>{u}</option>)}

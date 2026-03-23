@@ -711,8 +711,19 @@ export const inviteStaffMember = async (email, name, role = "personel") => {
 };
 
 
-// ── GÖREV BİLDİRİMİ (notify-task-assigned Edge Function) ──
-export const notifyTaskAssigned = async ({ assignedToUserId, taskTitle, taskDescription, taskPriority, taskDueDate, taskUnit, createdByName }) => {
+// ── GÖREV / GÜNDEM BİLDİRİMİ (notify-task-assigned Edge Function) ──
+// isAgenda: true → "Yeni Gündem Atandı" şablonu, tasks[] → gündem görevleri listelenir
+export const notifyTaskAssigned = async ({
+  assignedToUserId,
+  taskTitle,
+  taskDescription,
+  taskPriority,
+  taskDueDate,
+  taskUnit,
+  createdByName,
+  isAgenda = false,
+  tasks = [],
+}) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: { message: 'Oturum bulunamadı' } };
   try {
@@ -724,7 +735,17 @@ export const notifyTaskAssigned = async ({ assignedToUserId, taskTitle, taskDesc
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ assignedToUserId, taskTitle, taskDescription, taskPriority, taskDueDate, taskUnit, createdByName }),
+        body: JSON.stringify({
+          assignedToUserId,
+          taskTitle,
+          taskDescription,
+          taskPriority,
+          taskDueDate,
+          taskUnit,
+          createdByName,
+          isAgenda,
+          tasks,
+        }),
       }
     );
     const json = await res.json();
@@ -754,10 +775,18 @@ export const getNetworkAll = async () => {
   };
 };
 
+// ── Yardımcı: auth kontrolü ──
+const _getUid = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id || null;
+};
+
 // ── ORGANIZATIONS ──
 export const createNetworkOrg = async (data) => {
+  const uid = await _getUid();
+  if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_organizations')
-    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+    .insert({ ...data, created_by: uid }).select().single();
   return { data: d, error };
 };
 export const updateNetworkOrg = async (id, data) => {
@@ -772,8 +801,10 @@ export const deleteNetworkOrg = async (id) => {
 
 // ── CONTACTS ──
 export const createNetworkContact = async (data) => {
+  const uid = await _getUid();
+  if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_contacts')
-    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+    .insert({ ...data, created_by: uid }).select().single();
   return { data: d, error };
 };
 export const updateNetworkContact = async (id, data) => {
@@ -788,8 +819,10 @@ export const deleteNetworkContact = async (id) => {
 
 // ── EVENTS ──
 export const createNetworkEvent = async (data) => {
+  const uid = await _getUid();
+  if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_events')
-    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id }).select().single();
+    .insert({ ...data, created_by: uid }).select().single();
   return { data: d, error };
 };
 export const updateNetworkEvent = async (id, data) => {
@@ -804,8 +837,10 @@ export const deleteNetworkEvent = async (id) => {
 
 // ── CONNECTIONS ──
 export const createNetworkConnection = async (data) => {
+  const uid = await _getUid();
+  if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_connections')
-    .insert({ ...data, created_by: (await supabase.auth.getUser()).data.user?.id })
+    .insert({ ...data, created_by: uid })
     .select().single();
   return { data: d, error };
 };

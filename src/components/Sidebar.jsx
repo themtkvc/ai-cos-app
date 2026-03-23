@@ -143,8 +143,8 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
           </div>
           <button
             className="sign-out-btn"
-            onClick={e => { e.stopPropagation(); signOut(); }}
-            title="Çıkış"
+            onClick={e => { e.stopPropagation(); if (window.confirm('Oturumu kapatmak istediğinize emin misiniz?')) signOut(); }}
+            title="Çıkış Yap"
           >⎋</button>
         </div>
       </div>

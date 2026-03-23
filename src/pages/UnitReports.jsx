@@ -2,15 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUnitReports, createUnitReport } from '../lib/supabase';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-
-const UNITS = [
-  { name: 'Partnerships', coordinator: 'Hatice', icon: '🤝', color: 'unit-partnerships' },
-  { name: 'Humanitarian Affairs', coordinator: 'Gülsüm', icon: '🌍', color: 'unit-humanitarian' },
-  { name: 'Traditional Donors', coordinator: 'Murat', icon: '💰', color: 'unit-traditional-donors' },
-  { name: 'Grants', coordinator: 'Yasir', icon: '📝', color: 'unit-grants' },
-  { name: 'Accreditations', coordinator: 'Yavuz', icon: '✅', color: 'unit-accreditations' },
-  { name: 'Policy & Governance', coordinator: 'Sezgin', icon: '⚖️', color: 'unit-policy' },
-];
+import { UNITS } from '../lib/constants';
 
 const STATUS_OPTIONS = [
   { value: '🟢 On Track', color: 'var(--green)' },

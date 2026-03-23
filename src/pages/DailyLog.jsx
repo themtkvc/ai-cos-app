@@ -394,7 +394,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
           <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {!isReadOnly && autoSaveState === 'saving' && <><span style={{ color: 'var(--orange)' }}>●</span> Kaydediliyor…</>}
             {!isReadOnly && autoSaveState === 'saved'  && <><span style={{ color: '#16a34a' }}>●</span> Otomatik kaydedildi</>}
-            {!isReadOnly && autoSaveState === 'error'  && <><span style={{ color: 'var(--red)' }}>●</span> Kayıt hatası</>}
+            {!isReadOnly && autoSaveState === 'error'  && <><span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠️ Otomatik kayıt başarısız — lütfen internet bağlantınızı kontrol edin</span></>}
           </div>
         </div>
       </div>

@@ -1081,6 +1081,14 @@ export default function Agendas({ user, profile }) {
   // Gündem düzeyinde mail bildirimi (direktör → koordinatöre atanmış gündem)
   const handleNotifyAgenda = async (agenda) => {
     if (!agenda.assigned_to) return;
+    // agenda_tasks zaten getAgendasV2 join'inden geliyor
+    const tasks = (agenda.agenda_tasks || []).map(t => ({
+      title:          t.title,
+      assignedToName: t.assigned_to_name || '',
+      priority:       t.priority || '',
+      dueDate:        t.due_date || '',
+      status:         t.status || '',
+    }));
     const { error } = await notifyTaskAssigned({
       assignedToUserId: agenda.assigned_to,
       taskTitle:        agenda.title,
@@ -1089,6 +1097,8 @@ export default function Agendas({ user, profile }) {
       taskDueDate:      agenda.date || null,
       taskUnit:         agenda.unit || '',
       createdByName:    myName,
+      isAgenda:         true,
+      tasks,
     });
     if (error) alert('Mail gönderilemedi: ' + error.message);
     else alert('✅ Mail gönderildi → ' + (agenda.assigned_to_name || agenda.assigned_to));

@@ -1,16 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getDeadlines, getDonors, getMeetingActions } from '../lib/supabase';
 import { format, differenceInCalendarDays } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { UNITS as UNIT_LIST, UNIT_CSS_MAP, UNIT_ICON_MAP } from '../lib/constants';
 
-const UNITS = {
-  'Partnerships': { color: 'unit-partnerships', icon: '🤝' },
-  'Humanitarian Affairs': { color: 'unit-humanitarian', icon: '🌍' },
-  'Traditional Donors': { color: 'unit-traditional-donors', icon: '💰' },
-  'Grants': { color: 'unit-grants', icon: '📝' },
-  'Accreditations': { color: 'unit-accreditations', icon: '✅' },
-  'Policy & Governance': { color: 'unit-policy', icon: '⚖️' },
-};
+const UNITS = Object.fromEntries(UNIT_LIST.map(u => [u.name, { color: u.cssClass, icon: u.icon }]));
 
 function daysLeft(date) {
   return differenceInCalendarDays(new Date(date), new Date());
@@ -54,15 +48,15 @@ export default function Dashboard({ user, onNavigate }) {
     });
   }, [user]);
 
-  const active = deadlines.filter(d => d.status !== '✅ Completed');
-  const overdue = active.filter(d => daysLeft(d.due_date) < 0);
-  const urgent = active.filter(d => { const n = daysLeft(d.due_date); return n >= 0 && n <= 7; });
-  const openActions = actions.filter(a => a.status !== '✅ Completed');
-  const todayStr = format(new Date(), "d MMMM yyyy, EEEE", { locale: tr });
+  const active = useMemo(() => deadlines.filter(d => d.status !== '✅ Completed'), [deadlines]);
+  const overdue = useMemo(() => active.filter(d => daysLeft(d.due_date) < 0), [active]);
+  const urgent = useMemo(() => active.filter(d => { const n = daysLeft(d.due_date); return n >= 0 && n <= 7; }), [active]);
+  const openActions = useMemo(() => actions.filter(a => a.status !== '✅ Completed'), [actions]);
+  const todayStr = useMemo(() => format(new Date(), "d MMMM yyyy, EEEE", { locale: tr }), []);
 
-  const topDeadlines = [...overdue, ...urgent]
+  const topDeadlines = useMemo(() => [...overdue, ...urgent]
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-    .slice(0, 8);
+    .slice(0, 8), [overdue, urgent]);
 
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:300,color:'var(--text-muted)'}}>

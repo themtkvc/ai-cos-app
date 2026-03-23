@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, supabase, getAgendaTypes, createAgendaType, updateAgendaType, deleteAgendaType } from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
+import { UNITS as UNIT_LIST } from '../lib/constants';
 import OrgChartAdmin from '../components/OrgChartAdmin';
 import { UserAvatar } from './ProfileSettings';
 
@@ -8,14 +9,7 @@ const DEFAULT_ORG = {
   orgName: 'Uluslararası İnsani Yardım Örgütü',
   directorTitle: 'Direktör',
   staffCount: 50,
-  units: [
-    { name: 'Partnerships', coordinator: 'Hatice', icon: '🤝' },
-    { name: 'Humanitarian Affairs', coordinator: 'Gülsüm', icon: '🌍' },
-    { name: 'Traditional Donors', coordinator: 'Murat', icon: '💰' },
-    { name: 'Grants', coordinator: 'Yasir', icon: '📝' },
-    { name: 'Accreditations', coordinator: 'Yavuz', icon: '✅' },
-    { name: 'Policy & Governance', coordinator: 'Sezgin', icon: '⚖️' },
-  ],
+  units: UNIT_LIST.map(u => ({ name: u.name, coordinator: u.coordinator, icon: u.icon })),
 };
 
 function loadOrgConfig() {
@@ -100,11 +94,24 @@ function UserManagement({ currentUser, notify }) {
   };
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email) return;
+    // Email format doğrulama
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      notify('Geçersiz e-posta formatı. Lütfen kontrol edin.', 'error');
+      return;
+    }
+    // Mevcut kullanıcı kontrolü
+    const alreadyExists = profiles.some(p => p.email?.toLowerCase() === email);
+    if (alreadyExists) {
+      notify('Bu e-posta adresi zaten kayıtlı.', 'error');
+      return;
+    }
     setInviting(true);
     const { data, error } = await inviteStaffMember(
-      inviteEmail.trim(),
-      inviteName.trim() || inviteEmail.split('@')[0],
+      email,
+      inviteName.trim() || email.split('@')[0],
       inviteRole,
     );
     setInviting(false);
@@ -932,6 +939,16 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
     { key: 'interactions', label: 'Donör Etkileşimleri', count: stats?.interactions },
     { key: 'unit_reports', label: 'Birim Raporları', count: stats?.unitReports },
   ];
+
+  // ── İkincil yetki kontrolü: sadece direktör erişebilir ──
+  if (profile?.role !== 'direktor') {
+    return (
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <h2>Erişim Reddedildi</h2>
+        <p style={{ color: '#64748b', marginTop: 8 }}>Bu sayfaya yalnızca direktör erişebilir.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

@@ -14,16 +14,32 @@ const QUICK_ACTIONS = [
 ];
 
 function renderMarkdown(text) {
-  return text
+  let html = text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/^### (.*$)/gm, '<h3>$1</h3>')
     .replace(/^## (.*$)/gm, '<h2>$1</h2>')
     .replace(/^# (.*$)/gm, '<h1>$1</h1>')
     .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0"/>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-    .replace(/\n\n/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>');
+    .replace(/`(.*?)`/g, '<code>$1</code>');
+
+  // Handle unordered lists
+  html = html.replace(/^- (.*)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>)/s, (match) => {
+    return '<ul>' + match + '</ul>';
+  });
+
+  // Handle numbered lists
+  html = html.replace(/^\d+\. (.*)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>)/s, (match) => {
+    if (!match.includes('<ul>')) {
+      return '<ol>' + match + '</ol>';
+    }
+    return match;
+  });
+
+  html = html.replace(/\n\n/g, '<br/><br/>').replace(/\n/g, '<br/>');
+  return html;
 }
 
 export default function Chat({ user, onNavigate, initialMessage, onClearInitialMessage }) {
@@ -104,7 +120,8 @@ export default function Chat({ user, onNavigate, initialMessage, onClearInitialM
     setLoading(true);
 
     // Save to Supabase
-    saveChatMessage(user.id, 'user', content);
+    try { await saveChatMessage(user.id, 'user', content); }
+    catch (e) { console.error('Kullanıcı mesajı kaydedilemedi:', e); }
 
     // Build messages array for API
     const history = [...messages, userMsg]
@@ -116,11 +133,12 @@ export default function Chat({ user, onNavigate, initialMessage, onClearInitialM
       const reply = await sendMessage(history, context);
       const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: reply, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
-      saveChatMessage(user.id, 'assistant', reply);
+      try { await saveChatMessage(user.id, 'assistant', reply); }
+      catch (e) { console.error('Asistan mesajı kaydedilemedi:', e); }
     } catch (err) {
       const errMsg = {
         id: Date.now() + 1, role: 'assistant',
-        content: `⚠️ Hata: ${err.message || 'Bir sorun oluştu. API key\'inizi kontrol edin.'}`,
+        content: `⚠️ Hata: ${err.message || 'Bir sorun oluştu. Lütfen tekrar deneyin.'}`,
         created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, errMsg]);

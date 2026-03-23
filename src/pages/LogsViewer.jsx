@@ -516,12 +516,21 @@ export default function LogsViewer({ user, profile }) {
   const [timePeriod, setTimePeriod]   = useState('week'); // 'today'|'week'|'month'|'custom'
   const [customDate, setCustomDate]   = useState('');
   const [viewMode, setViewMode]       = useState('block'); // 'block'|'liste'|'kart'
+  const [searchText, setSearchText]   = useState('');
   const [searchQ, setSearchQ]         = useState('');
   const [personFilter, setPersonFilter] = useState('');
   const [unitFilter, setUnitFilter]   = useState('');
   const [logs, setLogs]               = useState([]);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
+
+  // Debounce search filter (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQ(searchText);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   const role   = profile?.role;
   const myUnit = profile?.unit;
@@ -677,8 +686,8 @@ export default function LogsViewer({ user, profile }) {
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 16 }}>🔍</span>
             <input
               type="text"
-              value={searchQ}
-              onChange={e => setSearchQ(e.target.value)}
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
               placeholder="Personel, iş veya proje ara..."
               style={{
                 width: '100%', boxSizing: 'border-box',
