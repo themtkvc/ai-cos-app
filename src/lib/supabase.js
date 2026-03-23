@@ -856,6 +856,25 @@ export const deleteNetworkConnection = async (id) => {
   return { error };
 };
 
+// ── CONTACT COMMUNICATIONS (İletişim Geçmişi) ──
+export const getContactComms = async (contactId) => {
+  const { data, error } = await supabase.from('network_contact_comms')
+    .select('*').eq('contact_id', contactId)
+    .order('comm_date', { ascending: false });
+  return { data, error };
+};
+export const createContactComm = async (payload) => {
+  const uid = await _getUid();
+  if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
+  const { data, error } = await supabase.from('network_contact_comms')
+    .insert({ ...payload, created_by: uid }).select().single();
+  return { data, error };
+};
+export const deleteContactComm = async (id) => {
+  const { error } = await supabase.from('network_contact_comms').delete().eq('id', id);
+  return { error };
+};
+
 // ── NETWORK MEDIA UPLOAD ──
 export const uploadNetworkMedia = async (userId, entityType, entityId, file) => {
   const ext  = file.name.split('.').pop().toLowerCase();

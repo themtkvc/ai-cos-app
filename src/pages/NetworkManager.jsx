@@ -6,6 +6,8 @@ import {
   createNetworkEvent,   updateNetworkEvent,   deleteNetworkEvent,
   createNetworkConnection, deleteNetworkConnection,
   uploadNetworkMedia,
+  getContactComms, createContactComm, deleteContactComm,
+  getAllProfiles,
 } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDisplayDate } from '../lib/constants';
 
@@ -36,6 +38,49 @@ const CONNECTION_LABELS = [
 ];
 // fmtDate → fmtDisplayDate (constants.js'den import edildi)
 const fmtDate = fmtDisplayDate;
+
+// ── YENİ KİŞİ KARTI SABİTLERİ ──────────────────────────────────────────────────
+const COUNTRIES = [
+  { value:'Türkiye',    flag:'🇹🇷' }, { value:'ABD',        flag:'🇺🇸' },
+  { value:'Almanya',    flag:'🇩🇪' }, { value:'İngiltere',  flag:'🇬🇧' },
+  { value:'Fransa',     flag:'🇫🇷' }, { value:'Hollanda',   flag:'🇳🇱' },
+  { value:'İsviçre',    flag:'🇨🇭' }, { value:'Belçika',    flag:'🇧🇪' },
+  { value:'İsveç',      flag:'🇸🇪' }, { value:'Norveç',     flag:'🇳🇴' },
+  { value:'Kanada',     flag:'🇨🇦' }, { value:'Japonya',    flag:'🇯🇵' },
+  { value:'Avustralya', flag:'🇦🇺' }, { value:'İtalya',     flag:'🇮🇹' },
+];
+const getFlag = (c) => COUNTRIES.find(x=>x.value===c)?.flag || '🌍';
+
+const PROCESS_STAGES = [
+  { value:'İlk Temas',            color:'#9ca3af', icon:'📞' },
+  { value:'İletişim Geliştirme',  color:'#3b82f6', icon:'💬' },
+  { value:'İşbirliği Görüşmesi',  color:'#f59e0b', icon:'🤝' },
+  { value:'Aktif İşbirliği',      color:'#10b981', icon:'✅' },
+  { value:'Pasif / Beklemede',    color:'#6b7280', icon:'⏸️' },
+];
+
+const COMPLIANCE_STATUSES = [
+  { value:'Değerlendirilmedi', color:'#9ca3af' },
+  { value:'Uyum Sürecinde',   color:'#f59e0b' },
+  { value:'Uyum Sağlandı',    color:'#10b981' },
+  { value:'Uyum Reddedildi',  color:'#ef4444' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value:'Kritik',  emoji:'🔴', color:'#ef4444' },
+  { value:'Yüksek',  emoji:'🟠', color:'#f97316' },
+  { value:'Orta',    emoji:'🟡', color:'#eab308' },
+  { value:'Düşük',   emoji:'🟢', color:'#22c55e' },
+];
+
+const CATEGORY_OPTIONS = [
+  'Eğitim & Kapasite Geliştirme',
+  'Donör',
+  'Network',
+  'Araştırma & Akademik',
+  'Savunuculuk & Politika',
+  'Operasyonel Partner',
+];
 
 // ── KÜÇÜK YARDIMCI BİLEŞENLER ────────────────────────────────────────────────
 function Avatar({ name='', url, size=40, radius='50%' }) {
@@ -185,7 +230,38 @@ function HubView({ center, nodes }) {
 }
 
 // ── DETAY PANEL (slide-over) ──────────────────────────────────────────────────
-function DetailPanel({ item, type, orgs, contacts, events, connections, onClose, onEdit, onDelete, onAddConnection, onRemoveConnection }) {
+function DetailPanel({ item, type, orgs, contacts, events, connections, onClose, onEdit, onDelete, onAddConnection, onRemoveConnection, allProfiles, user }) {
+  // ── İletişim Geçmişi state ──
+  const [comms, setComms] = useState([]);
+  const [commsLoading, setCommsLoading] = useState(false);
+  const [showCommForm, setShowCommForm] = useState(false);
+  const [commDate, setCommDate] = useState(new Date().toISOString().slice(0,10));
+  const [commDesc, setCommDesc] = useState('');
+  const [commSaving, setCommSaving] = useState(false);
+  const [detailTab, setDetailTab] = useState('info'); // 'info' | 'comms'
+
+  useEffect(() => {
+    if (type === 'contact' && item?.id) {
+      setCommsLoading(true);
+      getContactComms(item.id).then(({ data }) => {
+        setComms(data || []);
+        setCommsLoading(false);
+      });
+    }
+  }, [type, item?.id]);
+
+  const saveComm = async () => {
+    if (!commDesc.trim()) return;
+    setCommSaving(true);
+    const { data } = await createContactComm({ contact_id: item.id, comm_date: commDate, description: commDesc.trim() });
+    if (data) setComms(prev => [data, ...prev]);
+    setCommDesc(''); setShowCommForm(false); setCommSaving(false);
+  };
+
+  const removeComm = async (id) => {
+    await deleteContactComm(id);
+    setComms(prev => prev.filter(c => c.id !== id));
+  };
   if (!item) return null;
 
   const contactOrg = type==='contact' && item.organization_id
@@ -280,6 +356,96 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
 
         {/* İçerik */}
         <div style={{ padding:'20px 24px', flex:1 }}>
+
+          {/* ── SEKME BAR (sadece kişi için) ── */}
+          {type === 'contact' && (
+            <div style={{ display:'flex', gap:4, background:'#f3f4f6', borderRadius:10, padding:3, marginBottom:20 }}>
+              {[
+                { id:'info', label:'ℹ️ Bilgiler' },
+                { id:'comms', label:`💬 İletişim Geçmişi (${comms.length})` },
+              ].map(t=>(
+                <button key={t.id} onClick={()=>setDetailTab(t.id)} style={{
+                  flex:1, padding:'8px 12px', borderRadius:8, border:'none', cursor:'pointer',
+                  background: detailTab===t.id ? '#111827' : 'transparent',
+                  color: detailTab===t.id ? 'white' : '#6b7280',
+                  fontWeight:700, fontSize:12.5, fontFamily:'inherit',
+                }}>{t.label}</button>
+              ))}
+            </div>
+          )}
+
+          {/* ═══ İLETİŞİM GEÇMİŞİ SEKMESİ ═══ */}
+          {type === 'contact' && detailTab === 'comms' && (
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#111827' }}>İletişim Geçmişi</div>
+                <button onClick={()=>setShowCommForm(v=>!v)} style={{
+                  padding:'6px 14px', borderRadius:8, border:'1.5px solid #e5e7eb', background:'white',
+                  cursor:'pointer', fontSize:12, fontWeight:700, color:'#374151', fontFamily:'inherit',
+                }}>{showCommForm ? '✕ İptal' : '+ Kayıt Ekle'}</button>
+              </div>
+
+              {showCommForm && (
+                <div style={{ padding:14, borderRadius:10, background:'#f8faff', border:'1.5px solid #bfdbfe', marginBottom:16 }}>
+                  <div style={{ display:'flex', gap:10, marginBottom:10 }}>
+                    <input type="date" value={commDate} onChange={e=>setCommDate(e.target.value)}
+                      style={{ padding:'8px 10px', borderRadius:8, border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none', background:'white' }} />
+                    <input value={commDesc} onChange={e=>setCommDesc(e.target.value)}
+                      placeholder="Açıklama (ör: 2026 raporu gönderme)"
+                      onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); saveComm(); }}}
+                      style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none', background:'white' }} />
+                  </div>
+                  <button onClick={saveComm} disabled={!commDesc.trim()||commSaving}
+                    style={{
+                      padding:'7px 18px', borderRadius:8, border:'none',
+                      background: !commDesc.trim()||commSaving ? '#93c5fd' : '#2563eb',
+                      color:'white', cursor: !commDesc.trim()||commSaving ? 'not-allowed' : 'pointer',
+                      fontSize:12.5, fontWeight:700, fontFamily:'inherit',
+                    }}>{commSaving ? '⏳' : '✓ Kaydet'}</button>
+                </div>
+              )}
+
+              {commsLoading ? (
+                <div style={{ textAlign:'center', padding:20, color:'#9ca3af', fontSize:13 }}>Yükleniyor…</div>
+              ) : comms.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'32px 16px', color:'#9ca3af' }}>
+                  <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>Henüz iletişim kaydı yok</div>
+                  <div style={{ fontSize:12, marginTop:4 }}>Yukarıdaki "Kayıt Ekle" butonu ile başlayın</div>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {comms.map(c=>(
+                    <div key={c.id} style={{
+                      display:'flex', alignItems:'flex-start', gap:12, padding:'12px 14px',
+                      background:'white', borderRadius:10, border:'1px solid #f3f4f6',
+                    }}>
+                      <div style={{
+                        width:42, height:42, borderRadius:10, flexShrink:0,
+                        background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:11, fontWeight:700, color:'#2563eb', lineHeight:1.2, textAlign:'center',
+                      }}>
+                        {new Date(c.comm_date).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}).replace(' ','\n')}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:'#111827' }}>{c.description}</div>
+                        <div style={{ fontSize:11, color:'#9ca3af', marginTop:3 }}>
+                          {new Date(c.comm_date).toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}
+                        </div>
+                      </div>
+                      <button onClick={()=>removeComm(c.id)} title="Sil" style={{
+                        border:'none', background:'none', cursor:'pointer', color:'#d1d5db', fontSize:16, padding:'2px 4px',
+                      }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ BİLGİLER SEKMESİ ═══ */}
+          {(type !== 'contact' || detailTab === 'info') && (<>
+
           {/* Bilgi grid */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px 20px', marginBottom:20 }}>
             {item.email   && <InfoRow icon="📧" label="E-posta"  val={item.email} href={`mailto:${item.email}`} />}
@@ -288,7 +454,67 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             {item.linkedin && <InfoRow icon="🔗" label="LinkedIn" val="Profil" href={item.linkedin} />}
             {item.address && <InfoRow icon="📍" label="Adres"    val={item.address} />}
             {item.location && <InfoRow icon="📍" label="Konum"   val={item.location} />}
+            {type==='contact' && item.country && <InfoRow icon={getFlag(item.country)} label="Ülke" val={item.country} />}
+            {type==='contact' && item.first_contact_date && <InfoRow icon="📅" label="İlk İletişim" val={fmtDate(item.first_contact_date)} />}
+            {type==='contact' && item.assigned_to_name && <InfoRow icon="👤" label="Takip Sorumlusu" val={item.assigned_to_name} />}
+            {type==='contact' && item.referral_info && <InfoRow icon="🔀" label="Aracı Bilgisi" val={item.referral_info} />}
           </div>
+
+          {/* Kişi kart badge'leri */}
+          {type === 'contact' && (
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
+              {item.process_stage && (() => {
+                const ps = PROCESS_STAGES.find(s=>s.value===item.process_stage);
+                return ps ? (
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:20,
+                    background:ps.color+'18', color:ps.color, fontSize:11.5, fontWeight:700 }}>
+                    {ps.icon} {ps.value}
+                  </span>
+                ) : null;
+              })()}
+              {item.compliance_status && item.compliance_status !== 'Değerlendirilmedi' && (() => {
+                const cs = COMPLIANCE_STATUSES.find(s=>s.value===item.compliance_status);
+                return cs ? (
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:20,
+                    background:cs.color+'18', color:cs.color, fontSize:11.5, fontWeight:700 }}>
+                    {item.compliance_status}
+                  </span>
+                ) : null;
+              })()}
+              {item.priority && item.priority !== 'Orta' && (() => {
+                const pr = PRIORITY_OPTIONS.find(p=>p.value===item.priority);
+                return pr ? (
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 10px', borderRadius:20,
+                    background:pr.color+'18', color:pr.color, fontSize:11.5, fontWeight:700 }}>
+                    {pr.emoji} {pr.value}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+          )}
+
+          {/* Kategoriler */}
+          {type === 'contact' && item.categories?.length > 0 && (
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:16 }}>
+              {item.categories.map(cat=>(
+                <span key={cat} style={{
+                  display:'inline-block', padding:'3px 10px', borderRadius:6,
+                  background:'#f3f4f6', fontSize:11.5, fontWeight:600, color:'#374151',
+                }}>📁 {cat}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Sistem Plus butonu */}
+          {type === 'contact' && item.system_plus_url && (
+            <div style={{ marginBottom:16 }}>
+              <a href={item.system_plus_url} target="_blank" rel="noreferrer" style={{
+                display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px',
+                borderRadius:8, background:'#eff6ff', border:'1.5px solid #bfdbfe',
+                color:'#1d4ed8', fontSize:12.5, fontWeight:700, textDecoration:'none',
+              }}>🔗 Sistem Plus'ta Aç</a>
+            </div>
+          )}
 
           {(item.description || item.notes) && (
             <div style={{ marginBottom:20 }}>
@@ -363,6 +589,8 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
           }}>
             {type === 'event' ? '+ Katılımcı / Kurum Ekle' : '+ Etkinliğe Bağla'}
           </button>
+
+          </>)}
         </div>
       </div>
     </>
@@ -383,7 +611,7 @@ function InfoRow({ icon, label, val, href }) {
 }
 
 // ── FORM MODAL ────────────────────────────────────────────────────────────────
-function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
+function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, onClose }) {
   const isEdit   = !!initial?.id;
   const fileRef  = useRef();
   const [saving, setSaving] = useState(false);
@@ -417,6 +645,9 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
     if (type === 'contact') return {
       full_name:'', position:'', email:'', phone:'', linkedin:'', notes:'',
       organization_id:'', tags:[], avatar_url:'',
+      country:'', assigned_to:'', assigned_to_name:'', process_stage:'İlk Temas',
+      compliance_status:'Değerlendirilmedi', priority:'Orta', categories:[],
+      first_contact_date:'', referral_info:'', system_plus_url:'',
     };
     if (type === 'organization') return {
       name:'', org_type:'ngo', website:'', email:'', phone:'',
@@ -432,6 +663,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
     ...initial,
     tags: initial.tags || [],
     organization_id: initial.organization_id || '',
+    categories: Array.isArray(initial.categories) ? initial.categories : (initial.categories ? JSON.parse(initial.categories) : []),
   } : defaultForm());
 
   useEffect(() => {
@@ -465,8 +697,10 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
     // Nested nesneleri ve undefined FK'ları temizle
     let payload = { ...form };
     if (!payload.organization_id) delete payload.organization_id;
+    if (!payload.assigned_to)     delete payload.assigned_to;
     if (!payload.event_date)      delete payload.event_date;
     if (!payload.end_date)        delete payload.end_date;
+    if (!payload.first_contact_date) delete payload.first_contact_date;
     // Supabase join artıkları varsa sil
     delete payload.network_organizations;
     delete payload.network_contacts;
@@ -620,6 +854,105 @@ function FormModal({ type, initial, orgs: orgsProp, user, onSave, onClose }) {
               {inp('E-posta', 'email', 'email', 'ornek@kurum.org')}
               {inp('Telefon', 'phone', 'tel', '+90 5xx xxx xx xx')}
               {inp('LinkedIn URL', 'linkedin', 'url', 'https://linkedin.com/in/...')}
+
+              {/* ── YENİ ALANLAR ────────────────────────── */}
+              <div style={{ borderTop:'1px solid #f3f4f6', marginTop:8, marginBottom:14, paddingTop:14 }}>
+                <div style={{ fontSize:11.5, fontWeight:700, color:'#9ca3af', letterSpacing:'0.05em', marginBottom:10, textTransform:'uppercase' }}>
+                  Detay Bilgileri
+                </div>
+              </div>
+
+              {/* Ülke */}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Ülke</label>
+                <div style={{ display:'flex', gap:8 }}>
+                  <select value={COUNTRIES.find(c=>c.value===form.country) ? form.country : (form.country ? '__custom' : '')}
+                    onChange={e=>{ if(e.target.value==='__custom') set('country',''); else set('country',e.target.value); }}
+                    style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    <option value=''>Seçin…</option>
+                    {COUNTRIES.map(c=><option key={c.value} value={c.value}>{c.flag} {c.value}</option>)}
+                    <option value='__custom'>✏️ Diğer (serbest giriş)</option>
+                  </select>
+                  {(!COUNTRIES.find(c=>c.value===form.country) && form.country !== '') && (
+                    <input value={form.country||''} onChange={e=>set('country',e.target.value)}
+                      placeholder="Ülke adı yazın…"
+                      style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', outline:'none' }} />
+                  )}
+                </div>
+              </div>
+
+              {/* Takip Sorumlusu */}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <select value={form.assigned_to||''} onChange={e=>{
+                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  set('assigned_to', e.target.value || '');
+                  set('assigned_to_name', p ? p.full_name : '');
+                }}
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  <option value=''>Seçin…</option>
+                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+              </div>
+
+              {/* Süreç Aşaması + Uyum Durumu */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Süreç Aşaması</label>
+                  <select value={form.process_stage||'İlk Temas'} onChange={e=>set('process_stage',e.target.value)}
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    {PROCESS_STAGES.map(s=><option key={s.value} value={s.value}>{s.icon} {s.value}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Uyum Durumu</label>
+                  <select value={form.compliance_status||'Değerlendirilmedi'} onChange={e=>set('compliance_status',e.target.value)}
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    {COMPLIANCE_STATUSES.map(s=><option key={s.value} value={s.value}>{s.value}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Öncelik + İlk İletişim Tarihi */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Öncelik Derecesi</label>
+                  <select value={form.priority||'Orta'} onChange={e=>set('priority',e.target.value)}
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    {PRIORITY_OPTIONS.map(p=><option key={p.value} value={p.value}>{p.emoji} {p.value}</option>)}
+                  </select>
+                </div>
+                {inp('İlk İletişim Tarihi', 'first_contact_date', 'date')}
+              </div>
+
+              {/* Kategori (çoklu seçim) */}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kategori</label>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {CATEGORY_OPTIONS.map(cat => {
+                    const selected = (form.categories||[]).includes(cat);
+                    return (
+                      <button key={cat} type="button"
+                        onClick={()=>{
+                          if(selected) set('categories',(form.categories||[]).filter(c=>c!==cat));
+                          else set('categories',[...(form.categories||[]),cat]);
+                        }}
+                        style={{
+                          padding:'5px 12px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:600,
+                          border:`1.5px solid ${selected ? '#111827' : '#e5e7eb'}`,
+                          background: selected ? '#111827' : 'white',
+                          color: selected ? 'white' : '#374151', fontFamily:'inherit',
+                        }}>{cat}</button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Aracı Bilgisi */}
+              {inp('Aracı Bilgisi', 'referral_info', 'text', 'Kim/ne aracılığıyla ulaştık?')}
+
+              {/* Sistem Plus Linki */}
+              {inp('Sistem Plus Linki', 'system_plus_url', 'url', 'https://sistemplus.com/...')}
             </>
           )}
 
@@ -850,6 +1183,11 @@ function ListRow({ item, type, connCount, onClick, orgs=[] }) {
         <div style={{ fontSize:12.5, color:'#9ca3af', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           {type==='contact' && item.position && <span>{item.position}</span>}
           {type==='contact' && orgName && <span>🏢 {orgName}</span>}
+          {type==='contact' && item.country && <span>{getFlag(item.country)} {item.country}</span>}
+          {type==='contact' && item.priority && item.priority !== 'Orta' && (() => {
+            const pr = PRIORITY_OPTIONS.find(p=>p.value===item.priority);
+            return pr ? <span style={{ color:pr.color, fontWeight:700 }}>{pr.emoji}</span> : null;
+          })()}
           {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
           {type==='event' && item.event_date && <span>📅 {fmtDate(item.event_date)}</span>}
           {type==='event' && item.location && <span>📍 {item.location}</span>}
@@ -897,6 +1235,15 @@ function Card({ item, type, connCount, onClick, orgs=[] }) {
           )}
           {type==='contact' && orgName && (
             <div style={{ fontSize:12, color:'#9ca3af' }}>🏢 {orgName}</div>
+          )}
+          {type==='contact' && (item.country || item.process_stage) && (
+            <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4, flexWrap:'wrap' }}>
+              {item.country && <span style={{ fontSize:11 }}>{getFlag(item.country)} {item.country}</span>}
+              {item.process_stage && (() => {
+                const ps = PROCESS_STAGES.find(s=>s.value===item.process_stage);
+                return ps ? <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:ps.color+'18', color:ps.color, fontWeight:700 }}>{ps.icon} {ps.value}</span> : null;
+              })()}
+            </div>
           )}
           {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
           {type==='event' && (
@@ -986,6 +1333,7 @@ function FocusedView({ items, type, connections, contacts, orgs, events, onItemC
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
 export default function NetworkManager({ user, profile }) {
   const [data, setData]             = useState({ organizations:[], contacts:[], events:[], connections:[] });
+  const [allProfiles, setAllProfiles] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [tab, setTab]               = useState('contacts');    // 'contacts'|'organizations'|'events'
   const [viewMode, setViewMode]     = useState('liste');       // 'liste'|'kart'|'odakli'
@@ -1001,13 +1349,17 @@ export default function NetworkManager({ user, profile }) {
   // Veri yükle
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await getNetworkAll();
+    const [result, profiles] = await Promise.all([
+      getNetworkAll(),
+      getAllProfiles(),
+    ]);
     setData({
       organizations: result.organizations,
       contacts:      result.contacts,
       events:        result.events,
       connections:   result.connections,
     });
+    setAllProfiles(profiles.data || []);
     setLoading(false);
   }, []);
 
@@ -1267,6 +1619,7 @@ export default function NetworkManager({ user, profile }) {
           item={selectedItem} type={selectedType}
           orgs={data.organizations} contacts={data.contacts} events={data.events}
           connections={data.connections}
+          allProfiles={allProfiles} user={user}
           onClose={()=>{ setSelectedItem(null); setSelectedType(null); }}
           onEdit={()=>openForm(selectedType, selectedItem)}
           onDelete={()=>setDeleteConfirm({ type:selectedType, id:selectedItem.id })}
@@ -1280,6 +1633,7 @@ export default function NetworkManager({ user, profile }) {
         <FormModal
           type={formType} initial={editItem}
           orgs={data.organizations} user={user}
+          allProfiles={allProfiles}
           onSave={handleFormSave}
           onClose={()=>{ setShowForm(false); setEditItem(null); }}
         />
