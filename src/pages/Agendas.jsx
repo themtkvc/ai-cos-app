@@ -1,30 +1,114 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getAllAgendas, createAgendaItem, updateAgendaItem, deleteAgendaItem, getAllProfiles, markTaskPendingReview, approveTask, requestRevision, notifyTaskAssigned } from '../lib/supabase';
-import { differenceInCalendarDays } from 'date-fns';
+import {
+  getAgendaTypes,
+  getAgendasV2,
+  getAgendaDetail,
+  createAgenda,
+  updateAgenda,
+  deleteAgenda,
+  createAgendaTask,
+  updateAgendaTask,
+  deleteAgendaTask,
+  markAgendaTaskDone,
+  approveAgendaTask,
+  requestAgendaTaskRevision,
+  archiveAgendaTask,
+  addAgendaComment,
+  deleteAgendaComment,
+  getAllProfiles,
+} from '../lib/supabase';
 import { ROLE_LABELS } from '../App';
-import { UserAvatar } from './ProfileSettings';
 
-// ── SABİTLER ─────────────────────────────────────────────────────────────────
+// ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
   { value: 'kritik', label: '🔴 Kritik',  color: '#ef4444', bg: '#fef2f2' },
   { value: 'yuksek', label: '🟠 Yüksek', color: '#f97316', bg: '#fff7ed' },
   { value: 'orta',   label: '🟡 Orta',   color: '#eab308', bg: '#fefce8' },
   { value: 'dusuk',  label: '🟢 Düşük',  color: '#22c55e', bg: '#f0fdf4' },
 ];
-const STATUSES = [
-  { value: 'bekliyor',     label: '⚪ Bekliyor',      color: '#9ca3af' },
-  { value: 'devam_ediyor', label: '🔵 Devam Ediyor', color: '#3b82f6' },
-  { value: 'tamamlandi',   label: '✅ Tamamlandı',   color: '#22c55e' },
+
+const AGENDA_STATUSES = [
+  { value: 'aktif',      label: '🟢 Aktif' },
+  { value: 'devam',      label: '🔵 Devam Ediyor' },
+  { value: 'tamamlandi', label: '✅ Tamamlandı' },
+  { value: 'arsiv',      label: '📦 Arşiv' },
 ];
 
-const COMPLETION_STATUS = {
-  pending_review:     { label: '⏳ Onay Bekliyor', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-  approved:           { label: '✅ Onaylandı',     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-  revision_requested: { label: '🔄 Revize İstendi', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
-};
+const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[2];
 
-const prioMeta  = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[1];
-const statMeta  = (v) => STATUSES.find(s => s.value === v)   || STATUSES[0];
+const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'];
+const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'];
+
+// ── YARDIMCI BİLEŞENLER ───────────────────────────────────────────────────────
+
+function Avatar({ name, url, size = 28 }) {
+  const [err, setErr] = useState(false);
+  const initial = (name?.[0] || '?').toUpperCase();
+  if (url && !err) {
+    return (
+      <img src={url} alt={name} onError={() => setErr(true)}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: 'var(--accent)',
+      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.42, fontWeight: 700, flexShrink: 0,
+    }}>{initial}</div>
+  );
+}
+
+function PriorityBadge({ value }) {
+  const m = prioMeta(value);
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+      color: m.color, background: m.bg,
+    }}>{m.label}</span>
+  );
+}
+
+function TaskStatusBadge({ status, completionStatus }) {
+  if (completionStatus === 'pending_review')
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#f59e0b', background: '#fffbeb' }}>⏳ Onay Bekliyor</span>;
+  if (completionStatus === 'approved')
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#16a34a', background: '#f0fdf4' }}>✅ Onaylandı</span>;
+  if (completionStatus === 'revision_requested')
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#ef4444', background: '#fef2f2' }}>🔄 Revize İstendi</span>;
+  if (status === 'tamamlandi')
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#16a34a', background: '#f0fdf4' }}>✅ Tamamlandı</span>;
+  if (status === 'devam_ediyor')
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#3b82f6', background: '#eff6ff' }}>🔵 Devam Ediyor</span>;
+  return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#9ca3af', background: '#f9fafb' }}>⚪ Bekliyor</span>;
+}
+
+// ── YORUM BALONU ──────────────────────────────────────────────────────────────
+function CommentBubble({ comment, myId, onDelete }) {
+  const isMe = comment.created_by === myId;
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+      {!isMe && <Avatar name={comment.created_by_name} url={comment.avatar_url} size={28} />}
+      <div style={{ maxWidth: '75%' }}>
+        {!isMe && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{comment.created_by_name}</div>}
+        <div style={{
+          background: isMe ? 'var(--accent)' : 'var(--bg-card)',
+          color: isMe ? '#fff' : 'var(--text)',
+          border: isMe ? 'none' : '1px solid var(--border)',
+          borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          padding: '8px 12px', fontSize: 13.5, lineHeight: 1.4,
+        }}>
+          {comment.content}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, textAlign: isMe ? 'right' : 'left', display: 'flex', gap: 6, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+          {new Date(comment.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+          {isMe && <button onClick={() => onDelete(comment.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 0 }}>sil</button>}
+        </div>
+      </div>
+      {isMe && <Avatar name={comment.created_by_name} url={comment.avatar_url} size={28} />}
+    </div>
+  );
+}
 
 // ── REVİZE NOTU MODAL ─────────────────────────────────────────────────────────
 function RevisionModal({ task, onConfirm, onClose }) {
@@ -41,14 +125,13 @@ function RevisionModal({ task, onConfirm, onClose }) {
           <label className="form-label">Revize Notu (isteğe bağlı)</label>
           <textarea className="form-textarea" rows={3}
             placeholder="Neyin düzeltilmesi gerektiğini açıklayın…"
-            value={note} onChange={e => setNote(e.target.value)}
-          />
+            value={note} onChange={e => setNote(e.target.value)} />
         </div>
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={onClose}>İptal</button>
           <button className="btn btn-danger" disabled={saving}
             onClick={async () => { setSaving(true); await onConfirm(note); setSaving(false); }}>
-            {saving ? '⏳…' : '🔄 Revizeye Gönder'}
+            🔄 Revizeye Gönder
           </button>
         </div>
       </div>
@@ -56,1107 +139,904 @@ function RevisionModal({ task, onConfirm, onClose }) {
   );
 }
 
-function daysLeft(date) {
-  if (!date) return null;
-  return differenceInCalendarDays(new Date(date), new Date());
-}
-function daysChip(d) {
-  if (d === null) return null;
-  if (d < 0)  return { label: `${Math.abs(d)}g gecikmiş`, color: '#ef4444', bg: '#fef2f2' };
-  if (d === 0) return { label: 'Bugün!',  color: '#ef4444', bg: '#fef2f2' };
-  if (d <= 3)  return { label: `${d}g kaldı`, color: '#f97316', bg: '#fff7ed' };
-  if (d <= 7)  return { label: `${d}g kaldı`, color: '#eab308', bg: '#fefce8' };
-  return       { label: `${d}g kaldı`, color: '#22c55e', bg: '#f0fdf4' };
-}
+// ── GÖREV KARTI ───────────────────────────────────────────────────────────────
+function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
+  const [revModal, setRevModal] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-const EMPTY_FORM = {
-  title: '', description: '', assigned_to: '', assigned_to_name: '',
-  unit: '', due_date: '', priority: 'yuksek', status: 'bekliyor', notes: '',
-  is_private: false,
-};
+  const isAssigned = task.assigned_to === myId;
+  const isCreator  = task.created_by === myId || agendaCreatedBy === myId;
+  const isKoord    = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role);
+  const canApprove = isKoord && task.completion_status === 'pending_review';
+  const canMarkDone = isAssigned && task.completion_status !== 'approved' && task.completion_status !== 'pending_review';
 
-// ── ANA COMPONENT ─────────────────────────────────────────────────────────────
-export default function Agendas({ user, profile, onNavigate }) {
-  const [agendas,  setAgendas]  = useState([]);
-  const [profiles, setProfiles] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [modal,    setModal]    = useState(false);
-  const [form,     setForm]     = useState(EMPTY_FORM);
-  const [editId,   setEditId]   = useState(null);
-  const [saving,   setSaving]   = useState(false);
-  const [filter,        setFilter]       = useState({ search: '', priority: '', status: '' });
-  const [saveError,     setSaveError]    = useState('');
-  const [revisionModal, setRevisionModal] = useState(null); // agenda item waiting for revision note
+  const assigneeProfile = profiles.find(p => p.user_id === task.assigned_to);
 
-  const role       = profile?.role;
-  const isDirector = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
-  const isKoord    = role === 'koordinator';
-  const myUnit     = profile?.unit;
-  const myId       = user?.id;
-
-  const isAsistan = role === 'asistan';
-  const isDirektor = ['direktor', 'direktor_yardimcisi'].includes(role);
-
-  // useState'i role hesaplandıktan sonra, doğrudan değerle başlatıyoruz
-  const [activeTab, setActiveTab] = useState(() => {
-    const r = profile?.role;
-    if (r === 'koordinator') return 'team';
-    if (['direktor', 'direktor_yardimcisi'].includes(r)) return 'koordinators';
-    if (r === 'asistan') return 'mine';
-    return 'mine';
-  });
-
-  // Profile async geldiğinde tab'ı düzelt (race condition fix)
-  useEffect(() => {
-    if (!profile?.role) return;
-    setActiveTab(curr => {
-      if (curr !== 'mine') return curr;
-      const r = profile.role;
-      if (r === 'koordinator') return 'team';
-      if (['direktor', 'direktor_yardimcisi'].includes(r)) return 'koordinators';
-      if (r === 'asistan') return 'mine';
-      return 'mine';
-    });
-  }, [profile?.role]); // eslint-disable-line
-
-  // ── FETCH ──
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [{ data: ag }, { data: pr }] = await Promise.all([
-      getAllAgendas(myId),   // myId: kendi private gündemlerini görür, başkalarınınkini görmez
-      getAllProfiles(),
-    ]);
-    setAgendas(ag || []);
-    setProfiles(pr || []);
-    setLoading(false);
-  }, [myId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // ── Atanabilecek kişiler (role'e göre) ──
-  const assignableUsers = useMemo(() => {
-    if (!profiles.length) return [];
-    if (isDirector) return profiles.filter(p => p.user_id !== myId);
-    if (isKoord)    return profiles.filter(p => p.unit === myUnit && p.user_id !== myId);
-    return [];
-  }, [profiles, isDirector, isKoord, myUnit, myId]);
-
-  // ── Birim üyeleri (koordinatör için) ──
-  const unitMembers = useMemo(() => {
-    if (!myUnit) return [];
-    return profiles.filter(p => p.unit === myUnit);
-  }, [profiles, myUnit]);
-
-  // Koordinatör user_id seti (direktör tabları için)
-  const koordinatorIds = useMemo(() =>
-    new Set(profiles.filter(p => p.role === 'koordinator').map(p => p.user_id)),
-    [profiles]
-  );
-
-  // ── Filtrelenmiş gündemler (tab + search/öncelik/durum) ──
-  const filtered = useMemo(() => {
-    let base = agendas;
-    if (activeTab === 'mine') {
-      // Bana atananlar: asistan için de çalışır
-      base = agendas.filter(a => a.assigned_to === myId);
-    } else if (activeTab === 'my_items') {
-      base = agendas.filter(a =>
-        a.created_by === myId && (!a.assigned_to || a.assigned_to === myId)
-      );
-    } else if (activeTab === 'koordinators') {
-      base = agendas.filter(a =>
-        a.created_by === myId && a.assigned_to && koordinatorIds.has(a.assigned_to)
-      );
-    } else if (activeTab === 'all') {
-      base = agendas;
-    } else if (activeTab === 'pending_review') {
-      base = agendas.filter(a =>
-        a.completion_status === 'pending_review' &&
-        (a.created_by === myId || (myUnit && a.unit === myUnit))
-      );
-    }
-    // team tab: TeamDashboard kendi filtreler, burası boş geçer
-    if (filter.search)   base = base.filter(a => a.title?.toLowerCase().includes(filter.search.toLowerCase()));
-    if (filter.priority) base = base.filter(a => a.priority === filter.priority);
-    if (filter.status)   base = base.filter(a => a.status   === filter.status);
-    return base.sort((a, b) => {
-      if (!a.due_date) return 1; if (!b.due_date) return -1;
-      return new Date(a.due_date) - new Date(b.due_date);
-    });
-  }, [agendas, activeTab, myId, myUnit, filter, koordinatorIds]);
-
-  // ── KPI ──
-  const kpi = useMemo(() => {
-    let base;
-    if (activeTab === 'mine')         base = agendas.filter(a => a.assigned_to === myId);
-    else if (activeTab === 'my_items') base = agendas.filter(a => a.created_by === myId && (!a.assigned_to || a.assigned_to === myId));
-    else if (activeTab === 'koordinators') base = agendas.filter(a => a.created_by === myId && koordinatorIds.has(a.assigned_to));
-    else if (activeTab === 'team')    base = agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit));
-    else                              base = agendas;
-    const active     = base.filter(a => a.status !== 'tamamlandi');
-    const overdue    = active.filter(a => a.due_date && daysLeft(a.due_date) < 0);
-    const thisWeek   = active.filter(a => { const d = daysLeft(a.due_date); return d !== null && d >= 0 && d <= 7; });
-    const completed  = base.filter(a => a.status === 'tamamlandi');
-    return { total: base.length, overdue: overdue.length, thisWeek: thisWeek.length, completed: completed.length };
-  }, [agendas, activeTab, myId, myUnit, koordinatorIds]);
-
-  // ── MODAL ──
-  const openNew = () => {
-    setForm({ ...EMPTY_FORM, unit: myUnit || '' });
-    setEditId(null);
-    setModal(true);
-  };
-  const openEdit = (a) => {
-    setForm({
-      title: a.title || '', description: a.description || '',
-      assigned_to: a.assigned_to || '', assigned_to_name: a.assigned_to_name || '',
-      unit: a.unit || '', due_date: a.due_date || '',
-      priority: a.priority || 'yuksek', status: a.status || 'bekliyor',
-      notes: a.notes || '',
-    });
-    setEditId(a.id);
-    setModal(true);
-  };
-  const closeModal = () => { setModal(false); setForm(EMPTY_FORM); setEditId(null); setSaveError(''); };
-
-  const save = async () => {
-    if (!form.title.trim()) return;
+  const act = async (fn) => {
     setSaving(true);
-    setSaveError('');
-    // Atanan kişinin adını profile'dan bul
-    const assignedProfile = profiles.find(p => p.user_id === form.assigned_to);
-    const payload = {
-      ...form,
-      assigned_to:      form.assigned_to      || null,
-      assigned_to_name: assignedProfile?.full_name || form.assigned_to_name || null,
-      unit:             form.unit || assignedProfile?.unit || myUnit || null,
-      due_date:         form.due_date          || null,
-      notes:            form.notes             || null,
-      description:      form.description       || null,
-      completed_at:     form.status === 'tamamlandi' ? new Date().toISOString() : null,
-    };
-    let error;
-    if (editId) {
-      ({ error } = await updateAgendaItem(editId, payload));
-    } else {
-      const createdByName = profile?.full_name || user?.email;
-      ({ error } = await createAgendaItem({
-        ...payload,
-        created_by: myId,
-        created_by_name: createdByName,
-      }));
-      // Mail bildirimi şu an devre dışı (Resend günlük limit koruması)
-      // if (!error && payload.assigned_to && payload.assigned_to !== myId) {
-      //   notifyTaskAssigned({
-      //     assignedToUserId: payload.assigned_to,
-      //     taskTitle:        payload.title,
-      //     taskDescription:  payload.description,
-      //     taskPriority:     payload.priority,
-      //     taskDueDate:      payload.due_date,
-      //     taskUnit:         payload.unit,
-      //     createdByName,
-      //   }).catch(() => {});
-      // }
-    }
+    await fn();
+    await onRefresh();
     setSaving(false);
-    if (error) {
-      setSaveError('Kayıt hatası: ' + (error.message || JSON.stringify(error)));
-      return;
-    }
-    await load();
-    closeModal();
   };
-
-  const remove = async (id) => {
-    if (!window.confirm('Bu gündem maddesini silmek istediğinizden emin misiniz?')) return;
-    await deleteAgendaItem(id);
-    load();
-  };
-
-  const quickStatus = async (id, status) => {
-    const updates = { status };
-    if (status === 'tamamlandi') updates.completed_at = new Date().toISOString();
-    await updateAgendaItem(id, updates);
-    setAgendas(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
-  };
-
-  // ── MANUEL MAİL BİLDİRİMİ ──
-  const handleNotify = async (a) => {
-    // assigned_to yoksa direktörün kendi görevi — kendisine gönder
-    const targetUserId = a.assigned_to || myId;
-    const createdByName = profile?.full_name || user?.email;
-    try {
-      await notifyTaskAssigned({
-        assignedToUserId: targetUserId,
-        taskTitle:        a.title,
-        taskDescription:  a.description,
-        taskPriority:     a.priority,
-        taskDueDate:      a.due_date,
-        taskUnit:         a.unit,
-        createdByName,
-      });
-      alert('✅ Mail gönderildi: ' + (a.assigned_to_name || 'Siz'));
-    } catch (err) {
-      alert('Mail gönderilemedi: ' + (err?.message || 'Bilinmeyen hata'));
-    }
-  };
-
-  // ── ONAY AKIŞI ──
-  const handleMarkDone = async (id) => {
-    const { error } = await markTaskPendingReview(id);
-    if (error) { alert('Hata: ' + error.message); return; }
-    setAgendas(prev => prev.map(a => a.id === id ? { ...a, completion_status: 'pending_review' } : a));
-  };
-
-  const handleApprove = async (id) => {
-    const { error } = await approveTask(id, myId);
-    if (error) { alert('Hata: ' + error.message); return; }
-    setAgendas(prev => prev.map(a =>
-      a.id === id ? { ...a, completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString() } : a
-    ));
-  };
-
-  const handleRevisionConfirm = async (note) => {
-    if (!revisionModal) return;
-    const { error } = await requestRevision(revisionModal.id, note, myId);
-    if (error) { alert('Hata: ' + error.message); return; }
-    setAgendas(prev => prev.map(a =>
-      a.id === revisionModal.id ? { ...a, completion_status: 'revision_requested', revision_note: note } : a
-    ));
-    setRevisionModal(null);
-  };
-
-  // ── Onay bekleyen sayısı (koordinatör için badge) ──
-  const pendingReviewCount = useMemo(() => {
-    if (!isKoord) return 0;
-    return agendas.filter(a =>
-      a.completion_status === 'pending_review' &&
-      (a.created_by === myId || (myUnit && a.unit === myUnit))
-    ).length;
-  }, [agendas, isKoord, myId, myUnit]);
-
-  // ── Tab yapılandırması (role'e göre) ──
-  const tabs = useMemo(() => {
-    if (isDirektor) return [
-      { key: 'koordinators', label: '📤 Koordinatörlere Atadığım' },
-      { key: 'all',          label: '🌐 Departman Gündemi' },
-      { key: 'my_items',     label: '📋 Gündemlerim' },
-    ];
-    if (isAsistan) return [
-      { key: 'mine',     label: '📋 Bana Atananlar' },
-      { key: 'my_items', label: '📒 Gündemlerim' },
-    ];
-    if (isKoord) return [
-      { key: 'team',           label: `🏢 ${myUnit || 'Birimim'}` },
-      { key: 'pending_review', label: `⏳ Onay Bekleyenler`, badge: pendingReviewCount },
-      { key: 'mine',           label: '📋 Bana Atananlar' },
-      { key: 'my_items',       label: '📒 Gündemlerim' },
-    ];
-    return [
-      { key: 'mine',     label: '📋 Bana Atananlar' },
-      { key: 'my_items', label: '📒 Gündemlerim' },
-    ];
-  }, [isDirektor, isAsistan, isKoord, myUnit, pendingReviewCount]);
-
-  if (loading) return (
-    <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-      <div className="loading-spinner" style={{ margin: '0 auto 12px' }} />
-      Gündemler yükleniyor…
-    </div>
-  );
-
-  return (
-    <div className="page" style={{ maxWidth: 1100, margin: '0 auto' }}>
-
-      {/* KORDİNATÖR BİRİM UYARISI */}
-      {isKoord && !myUnit && (
-        <div style={{
-          marginBottom: 16, padding: '14px 18px', borderRadius: 10,
-          background: '#fff7ed', border: '1.5px solid #f97316',
-          display: 'flex', alignItems: 'flex-start', gap: 12,
-        }}>
-          <div style={{ fontSize: 20, flexShrink: 0 }}>⚠️</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: '#c2410c', marginBottom: 3 }}>
-              Biriminiz henüz atanmamış
-            </div>
-            <div style={{ fontSize: 12.5, color: '#92400e', lineHeight: 1.6 }}>
-              Personele görev atayabilmek ve birim dashboardını görebilmek için yöneticinizden
-              profilinize birim ataması yapmasını isteyin. (Admin Paneli → Kullanıcı Yönetimi → Birim seç)
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BAŞLIK */}
-      <div className="page-header" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 className="page-title">📋 Gündemler</h1>
-            <p className="page-subtitle">
-              {kpi.total} gündem · {kpi.overdue > 0 ? `${kpi.overdue} gecikmiş · ` : ''}{kpi.thisWeek} bu hafta
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(isDirector || isKoord || activeTab === 'my_items') && (
-              <button className="btn btn-primary" onClick={openNew}>+ Yeni Gündem</button>
-            )}
-          </div>
-        </div>
-
-        {/* KPI Kartlar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginTop: 16 }}>
-          {[
-            { label: 'Toplam', value: kpi.total,     color: 'var(--navy)',   icon: '📋' },
-            { label: 'Gecikmiş', value: kpi.overdue, color: '#ef4444',       icon: '🔴' },
-            { label: 'Bu Hafta', value: kpi.thisWeek, color: '#f97316',      icon: '⏰' },
-            { label: 'Tamamlandı', value: kpi.completed, color: '#22c55e',   icon: '✅' },
-          ].map((k, i) => (
-            <div key={i} className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 22 }}>{k.icon}</div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>{k.label.toUpperCase()}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* TABS */}
-      {tabs.length > 1 && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface)', borderRadius: 10, padding: 4, border: '1px solid var(--border)', width: 'fit-content', flexWrap: 'wrap' }}>
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
-              padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer',
-              background: activeTab === t.key ? 'var(--navy)' : 'transparent',
-              color: activeTab === t.key ? 'white' : 'var(--text-muted)',
-              fontWeight: activeTab === t.key ? 700 : 400, fontSize: 13,
-              fontFamily: 'var(--font-body)', transition: 'all 0.15s',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              {t.label}
-              {t.badge > 0 && (
-                <span style={{
-                  background: activeTab === t.key ? 'rgba(255,255,255,0.3)' : '#ef4444',
-                  color: 'white', borderRadius: 10, fontSize: 11, fontWeight: 700,
-                  padding: '1px 6px', lineHeight: 1.5,
-                }}>{t.badge}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* KORDİNATÖR: BİRİM DASHBOARDI */}
-      {isKoord && activeTab === 'team' && (
-        <TeamDashboard
-          agendas={agendas.filter(a => a.created_by === myId || (myUnit && a.unit === myUnit))}
-          members={unitMembers}
-          myId={myId}
-          myUnit={myUnit}
-          isDirector={false}
-          onStatusChange={quickStatus}
-          onEdit={openEdit}
-          onDelete={remove}
-        />
-      )}
-
-      {/* DİREKTÖR: Koordinatörlere Atadığım — kişi kartları */}
-      {isDirektor && activeTab === 'koordinators' && (
-        <TeamDashboard
-          agendas={agendas.filter(a => a.created_by === myId)}
-          members={profiles.filter(p => p.role === 'koordinator')}
-          myId={myId}
-          myUnit={null}
-          isDirector={true}
-          onStatusChange={quickStatus}
-          onEdit={openEdit}
-          onDelete={remove}
-          onNotify={handleNotify}
-          profiles={profiles}
-          emptyMessage="Henüz koordinatöre atanmış gündem yok. '+ Yeni Gündem' ile başlayın."
-        />
-      )}
-
-      {/* DİREKTÖR: Departman Gündemi — TÜM gündemler listesi */}
-      {isDirektor && activeTab === 'all' && (
-        <DepartmanGundem
-          agendas={agendas}
-          profiles={profiles}
-          myId={myId}
-          onEdit={openEdit}
-          onDelete={remove}
-          onStatusChange={quickStatus}
-          onNotify={handleNotify}
-        />
-      )}
-
-      {/* STANDART LİSTE GÖRÜNÜMÜ (mine / my_items / pending_review) */}
-      {(activeTab === 'mine' || activeTab === 'my_items' || activeTab === 'pending_review') && (
-        <>
-          {/* FİLTRELER */}
-          <div className="card" style={{ marginBottom: 14, padding: '12px 16px' }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input
-                className="form-input" style={{ width: 220 }}
-                placeholder="🔍 Gündem ara..."
-                value={filter.search}
-                onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
-              />
-              <select className="form-select" style={{ width: 150 }} value={filter.priority} onChange={e => setFilter(f => ({ ...f, priority: e.target.value }))}>
-                <option value="">Tüm Öncelikler</option>
-                {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-              <select className="form-select" style={{ width: 160 }} value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
-                <option value="">Tüm Durumlar</option>
-                {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-              {(filter.search || filter.priority || filter.status) && (
-                <button className="btn btn-outline btn-sm" onClick={() => setFilter({ search: '', priority: '', status: '' })}>✕ Temizle</button>
-              )}
-              <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} sonuç</span>
-            </div>
-          </div>
-
-          {/* GÖREV LİSTESİ */}
-          {filtered.length === 0 ? (
-            <div className="card" style={{ padding: 48, textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>
-                {activeTab === 'pending_review' ? '✅' : '📭'}
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)', marginBottom: 6 }}>
-                {activeTab === 'pending_review' ? 'Bekleyen onay yok' : 'Gündem bulunamadı'}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {activeTab === 'pending_review'
-                  ? 'Personelden onay bekleyen görev bulunmuyor.'
-                  : 'Bu sekme için henüz gündem yok.'}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {filtered.map(a => (
-                <AgendaCard
-                  key={a.id}
-                  agenda={a}
-                  canEdit={isDirector || a.created_by === myId}
-                  canUpdateStatus={isDirector || a.created_by === myId || a.assigned_to === myId}
-                  onEdit={openEdit}
-                  onDelete={remove}
-                  onStatusChange={quickStatus}
-                  showAssignee={activeTab !== 'mine'}
-                  showCreator={activeTab === 'pending_review'}
-                  myId={myId}
-                  isKoord={isKoord}
-                  onMarkDone={handleMarkDone}
-                  onApprove={handleApprove}
-                  onRevision={setRevisionModal}
-                  onNavigate={onNavigate}
-                  isDirektor={isDirektor}
-                  onNotify={handleNotify}
-                  profiles={profiles}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* MODAL */}
-      {modal && (
-        <AgendaModal
-          form={form} setForm={setForm} editId={editId}
-          assignableUsers={assignableUsers}
-          allProfiles={profiles}
-          myId={myId}
-          role={role}
-          isDirector={isDirector} isKoord={isKoord}
-          myUnit={myUnit}
-          saving={saving} saveError={saveError}
-          onSave={save} onClose={closeModal}
-        />
-      )}
-
-      {/* REVİZE MODAL */}
-      {revisionModal && (
-        <RevisionModal
-          task={revisionModal}
-          onConfirm={handleRevisionConfirm}
-          onClose={() => setRevisionModal(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── TEAM DASHBOARD (koordinatör + direktör kişi kartları) ─────────────────────
-function TeamDashboard({ agendas, members, myId, onStatusChange, onEdit, onDelete, emptyMessage, onNotify, profiles }) {
-  const byPerson = useMemo(() => {
-    const map = {};
-    members.forEach(m => { map[m.user_id] = { profile: m, tasks: [] }; });
-    agendas.forEach(a => {
-      if (a.assigned_to && map[a.assigned_to]) {
-        map[a.assigned_to].tasks.push(a);
-      }
-    });
-    return Object.values(map);
-  }, [members, agendas]);
-
-  const unassigned = agendas.filter(a => !a.assigned_to);
-
-  if (members.length === 0) return (
-    <div className="card" style={{ padding: 48, textAlign: 'center' }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
-      <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>{emptyMessage || 'Gösterilecek kişi bulunamadı.'}</div>
-    </div>
-  );
-
-  return (
-    <div>
-      {/* Kişi bazlı kartlar */}
-      {byPerson.map(({ profile: p, tasks }) => {
-        const done    = tasks.filter(t => t.status === 'tamamlandi').length;
-        const overdue = tasks.filter(t => t.status !== 'tamamlandi' && t.due_date && differenceInCalendarDays(new Date(t.due_date), new Date()) < 0).length;
-        const pct     = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
-        return (
-          <div key={p.user_id} className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <UserAvatar
-                  profile={{ full_name: p.full_name, avatar_url: p.avatar_url }}
-                  size={38}
-                  fontSize={15}
-                  style={{ border: '2px solid rgba(26,58,92,0.15)' }}
-                />
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>{p.full_name || p.user_id}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                    {ROLE_LABELS[p.role] || p.role}{p.unit ? ` · ${p.unit}` : ''}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                {overdue > 0 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '3px 8px', borderRadius: 6 }}>
-                    {overdue} gecikmiş
-                  </span>
-                )}
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{done}/{tasks.length} tamamlandı</span>
-                <div style={{ width: 80, height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#22c55e' : 'var(--navy)', borderRadius: 3, transition: 'width 0.3s' }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--navy)', minWidth: 32 }}>%{pct}</span>
-              </div>
-            </div>
-            {tasks.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '8px 0', fontStyle: 'italic' }}>Henüz görev atanmamış</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {tasks.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} profiles={profiles} />)}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Kişiye atanmamış görevler */}
-      {unassigned.length > 0 && (
-        <div className="card" style={{ marginBottom: 14, padding: '16px 20px' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Kişiye Atanmamış</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {unassigned.map(t => <AgendaRow key={t.id} agenda={t} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onNotify={onNotify} myId={myId} profiles={profiles} />)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── DEPARTMAN GÜNDEMİ (Direktör — tüm departman, birime göre gruplu) ──────────
-function DepartmanGundem({ agendas, profiles, myId, onEdit, onDelete, onStatusChange, onNotify }) { // eslint-disable-line
-  const koordinatorlar = profiles.filter(p => p.role === 'koordinator');
-
-  // Birim grupları: her koordinatör için kendi biriminin gündemleri
-  const byUnit = useMemo(() => {
-    const groups = koordinatorlar.map(k => ({
-      koordinator: k,
-      agendas: agendas.filter(a => a.unit === k.unit || a.assigned_to === k.user_id ||
-        profiles.find(p => p.user_id === a.assigned_to)?.unit === k.unit
-      ),
-    }));
-    // Birime atanmamış / birim dışı gündemler
-    const assignedUnits = new Set(koordinatorlar.map(k => k.unit).filter(Boolean));
-    const diger = agendas.filter(a => {
-      const assigneeUnit = profiles.find(p => p.user_id === a.assigned_to)?.unit;
-      return !assignedUnits.has(a.unit) && !assignedUnits.has(assigneeUnit);
-    });
-    return { groups, diger };
-  }, [agendas, koordinatorlar, profiles]);
-
-  const [filter, setFilter] = useState({ search: '', status: '' });
-
-  const filterFn = (list) => {
-    let r = list;
-    if (filter.search) r = r.filter(a => a.title?.toLowerCase().includes(filter.search.toLowerCase()));
-    if (filter.status) r = r.filter(a => a.status === filter.status);
-    return r.sort((a, b) => {
-      if (!a.due_date) return 1; if (!b.due_date) return -1;
-      return new Date(a.due_date) - new Date(b.due_date);
-    });
-  };
-
-  return (
-    <div>
-      {/* Filtre */}
-      <div className="card" style={{ marginBottom: 14, padding: '10px 14px' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input className="form-input" style={{ width: 220 }} placeholder="🔍 Gündem ara..."
-            value={filter.search} onChange={e => setFilter(f => ({ ...f, search: e.target.value }))} />
-          <select className="form-select" style={{ width: 160 }} value={filter.status} onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}>
-            <option value="">Tüm Durumlar</option>
-            {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-          {(filter.search || filter.status) && (
-            <button className="btn btn-outline btn-sm" onClick={() => setFilter({ search: '', status: '' })}>✕ Temizle</button>
-          )}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
-            {agendas.length} toplam gündem
-          </span>
-        </div>
-      </div>
-
-      {/* Birim grupları */}
-      {byUnit.groups.map(({ koordinator: k, agendas: unitAgs }) => {
-        const visible = filterFn(unitAgs);
-        const done = unitAgs.filter(a => a.status === 'tamamlandi').length;
-        const pct = unitAgs.length > 0 ? Math.round((done / unitAgs.length) * 100) : 0;
-        return (
-          <div key={k.user_id} className="card" style={{ marginBottom: 14 }}>
-            {/* Birim başlığı */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12, marginBottom: visible.length > 0 ? 12 : 0,
-              paddingBottom: visible.length > 0 ? 12 : 0,
-              borderBottom: visible.length > 0 ? '1px solid var(--border)' : 'none',
-            }}>
-              <span style={{ fontSize: 18 }}>🏢</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--navy)' }}>{k.unit || 'Birim Belirtilmemiş'}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Koordinatör: {k.full_name || k.user_id}</div>
-              </div>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{done}/{unitAgs.length}</span>
-              <div style={{ width: 60, height: 5, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? '#22c55e' : 'var(--navy)', borderRadius: 3 }} />
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: pct === 100 ? '#22c55e' : 'var(--navy)', minWidth: 28 }}>%{pct}</span>
-            </div>
-            {visible.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontStyle: 'italic', paddingTop: 4 }}>
-                {unitAgs.length === 0 ? 'Bu birime atanmış gündem yok.' : 'Filtre sonucu bulunamadı.'}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {visible.map(a => (
-                  <AgendaCard key={a.id} agenda={a}
-                    canEdit={true} canUpdateStatus={true}
-                    onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
-                    showAssignee={true} showCreator={false}
-                    myId={myId} isDirektor={true} onNotify={onNotify}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Birim dışı gündemler */}
-      {byUnit.diger.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>📌 Diğer / Birimi Belirsiz</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {filterFn(byUnit.diger).map(a => (
-              <AgendaCard key={a.id} agenda={a}
-                canEdit={true} canUpdateStatus={true}
-                onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange}
-                showAssignee={true} showCreator={true}
-                myId={myId} isDirektor={true} onNotify={onNotify}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── GÜNDEM KARTI (Liste görünümü) ─────────────────────────────────────────────
-function AgendaCard({
-  agenda: a, canEdit, canUpdateStatus, onEdit, onDelete, onStatusChange,
-  showAssignee, showCreator,
-  myId, isKoord, onMarkDone, onApprove, onRevision, onNavigate,
-  isDirektor, onNotify, profiles,
-}) {
-  const pm   = prioMeta(a.priority);
-  const assignedEmail = profiles?.find(p => p.user_id === (a.assigned_to || a.created_by))?.email || '';
-  const sm   = statMeta(a.status);
-  const days = daysLeft(a.due_date);
-  const dc   = daysChip(days);
-  const cs   = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
-
-  const isMyTask     = a.assigned_to === myId;
-  const canMarkDone  = isMyTask && a.status !== 'tamamlandi' &&
-                       !['pending_review', 'approved'].includes(a.completion_status);
-  const canApproveRevise = isKoord && a.completion_status === 'pending_review';
-  const canNotify    = isDirektor && (!!a.assigned_to || a.created_by === myId);
-
-  return (
-    <div className="card" style={{
-      padding: '14px 18px',
-      borderLeft: `4px solid ${pm.color}`,
-      opacity: a.status === 'tamamlandi' && a.completion_status !== 'pending_review' ? 0.65 : 1,
-    }}>
-      {/* Revize notu banner */}
-      {a.completion_status === 'revision_requested' && a.revision_note && (
-        <div style={{
-          marginBottom: 10, padding: '8px 12px', borderRadius: 7,
-          background: '#fef2f2', border: '1px solid #fecaca', fontSize: 12.5, color: '#dc2626',
-        }}>
-          🔄 <strong>Revize notu:</strong> {a.revision_note}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-        {/* Durum toggle */}
-        <button
-          title="Durumu değiştir"
-          disabled={!canUpdateStatus}
-          onClick={() => {
-            if (!canUpdateStatus) return;
-            const next = a.status === 'bekliyor' ? 'devam_ediyor' : a.status === 'devam_ediyor' ? 'tamamlandi' : 'bekliyor';
-            onStatusChange(a.id, next);
-          }}
-          style={{
-            width: 28, height: 28, borderRadius: '50%', border: `2px solid ${sm.color}`,
-            background: a.status === 'tamamlandi' ? sm.color : 'white',
-            cursor: canUpdateStatus ? 'pointer' : 'default',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, flexShrink: 0, marginTop: 1,
-          }}
-        >
-          {a.status === 'tamamlandi' ? '✓' : a.status === 'devam_ediyor' ? '●' : ''}
-        </button>
-
-        {/* İçerik */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{
-              fontWeight: 700, fontSize: 14, color: 'var(--navy)',
-              textDecoration: a.status === 'tamamlandi' && !a.completion_status ? 'line-through' : 'none',
-            }}>{a.title}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: pm.bg, color: pm.color }}>{pm.label}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6, color: sm.color, background: sm.color + '18' }}>{sm.label}</span>
-            {cs && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, color: cs.color, background: cs.bg, border: `1px solid ${cs.border}` }}>
-                {cs.label}
-              </span>
-            )}
-          </div>
-          {a.description && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 4 }}>{a.description}</div>}
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-muted)' }}>
-            {showAssignee && a.assigned_to_name && <span>👤 {a.assigned_to_name}</span>}
-            {showCreator  && a.created_by_name  && <span>📤 {a.created_by_name}</span>}
-            {a.unit && <span>🏢 {a.unit}</span>}
-            {a.due_date && <span>📅 {a.due_date}</span>}
-          </div>
-
-          {/* Aksiyon butonları */}
-          {(canMarkDone || canApproveRevise || (isMyTask && onNavigate)) && (
-            <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {canMarkDone && onMarkDone && (
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#16a34a', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
-                  onClick={() => onMarkDone(a.id)}
-                >
-                  ✓ Tamamlandım — Onaya Gönder
-                </button>
-              )}
-              {isMyTask && onNavigate && a.status !== 'tamamlandi' && (
-                <button
-                  className="btn btn-sm"
-                  style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
-                  onClick={() => onNavigate('dailylog', { linkedTask: a })}
-                >
-                  📝 İş Kaydı Ekle
-                </button>
-              )}
-              {canApproveRevise && (
-                <>
-                  {onApprove && (
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: '#16a34a', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
-                      onClick={() => onApprove(a.id)}
-                    >
-                      ✅ Onayla
-                    </button>
-                  )}
-                  {onRevision && (
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: '#ef4444', color: 'white', border: 'none', fontSize: 12, padding: '5px 12px', borderRadius: 7 }}
-                      onClick={() => onRevision(a)}
-                    >
-                      🔄 Revize İste
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Sağ: kalan gün + aksiyonlar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {dc && (
-            <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: dc.bg, color: dc.color }}>
-              {dc.label}
-            </span>
-          )}
-          {canNotify && onNotify && (
-            <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${assignedEmail || a.assigned_to_name || 'Atanan kişi'}`}>📧</button>
-          )}
-          {canEdit && (
-            <>
-              <button className="btn btn-outline btn-sm btn-icon" onClick={() => onEdit(a)} title="Düzenle">✏️</button>
-              <button className="btn btn-outline btn-sm btn-icon" onClick={() => onDelete(a.id)} title="Sil" style={{ color: '#ef4444' }}>🗑</button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── GÜNDEM SATIRI (Dashboard için kompakt) ────────────────────────────────────
-function AgendaRow({ agenda: a, onStatusChange, onEdit, onDelete, onNotify, myId, profiles }) {
-  const pm = prioMeta(a.priority);
-  const dc = daysChip(daysLeft(a.due_date));
-  const cs = a.completion_status ? COMPLETION_STATUS[a.completion_status] : null;
-  const canNotify = !!onNotify;
-  const assignedEmail = profiles?.find(p => p.user_id === (a.assigned_to || a.created_by))?.email || '';
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-      background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)',
-      opacity: a.status === 'tamamlandi' && !a.completion_status ? 0.55 : 1,
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      padding: '10px 12px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6,
     }}>
-      <span style={{ width: 8, height: 8, borderRadius: '50%', background: pm.color, flexShrink: 0 }} />
-      <span style={{
-        flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--navy)',
-        textDecoration: a.status === 'tamamlandi' && !a.completion_status ? 'line-through' : 'none',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>{a.title}</span>
-      {cs && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: cs.bg, color: cs.color, border: `1px solid ${cs.border}`, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>{cs.label}</span>}
-      {dc && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 5, background: dc.bg, color: dc.color, fontWeight: 600, whiteSpace: 'nowrap' }}>{dc.label}</span>}
-      <select
-        value={a.status}
-        onChange={e => onStatusChange(a.id, e.target.value)}
-        style={{ border: 'none', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--text-muted)' }}
-      >
-        {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-      </select>
-      {canNotify && (
-        <button className="btn btn-outline btn-sm btn-icon" onClick={() => onNotify(a)} title={`Mail gönder → ${assignedEmail || a.assigned_to_name || 'Atanan kişi'}`} style={{ padding: '2px 6px', fontSize: 12 }}>📧</button>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{task.title}</div>
+          {task.description && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>{task.description}</div>}
+        </div>
+        <PriorityBadge value={task.priority} />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <TaskStatusBadge status={task.status} completionStatus={task.completion_status} />
+        {task.due_date && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            📅 {new Date(task.due_date).toLocaleDateString('tr-TR')}
+          </span>
+        )}
+        {task.assigned_to_name && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Avatar name={task.assigned_to_name} url={assigneeProfile?.avatar_url} size={20} />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{task.assigned_to_name}</span>
+          </div>
+        )}
+      </div>
+
+      {task.completion_status === 'revision_requested' && task.revision_note && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: '#b91c1c' }}>
+          🔄 Revize notu: {task.revision_note}
+        </div>
       )}
-      <button className="btn btn-outline btn-sm btn-icon" onClick={() => onEdit(a)} title="Düzenle" style={{ padding: '2px 6px', fontSize: 12 }}>✏️</button>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {canMarkDone && (
+          <button className="btn btn-sm btn-primary" disabled={saving}
+            onClick={() => act(() => markAgendaTaskDone(task.id))}>
+            ✅ Tamamlandı İşaretle
+          </button>
+        )}
+        {canApprove && (
+          <>
+            <button className="btn btn-sm btn-primary" disabled={saving}
+              onClick={() => act(() => approveAgendaTask(task.id))}>
+              👍 Onayla
+            </button>
+            <button className="btn btn-sm btn-danger" disabled={saving}
+              onClick={() => setRevModal(true)}>
+              🔄 Revize İste
+            </button>
+          </>
+        )}
+      </div>
+
+      {revModal && (
+        <RevisionModal
+          task={task}
+          onConfirm={async (note) => {
+            await requestAgendaTaskRevision(task.id, note);
+            await onRefresh();
+            setRevModal(false);
+          }}
+          onClose={() => setRevModal(false)}
+        />
+      )}
     </div>
   );
 }
 
-// ── MODAL ─────────────────────────────────────────────────────────────────────
-// Direktör/yardımcısı için tam liste (asistan dahil)
-const TARGET_GROUPS_FULL = [
-  { key: 'asistan',     label: '🗂️ Asistana',      desc: 'Yönetici asistanına atanacak' },
-  { key: 'koordinator', label: '📤 Koordinatöre',  desc: 'Koordinatöre atanacak' },
-  { key: 'personel',    label: '👤 Personele',      desc: 'Personele atanacak' },
-  { key: 'self',        label: '📋 Kendime',        desc: 'Kendi gündemim' },
-];
+// ── GÜNDEM KARTININ DETAY GÖRÜNÜMERİ ─────────────────────────────────────────
+function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, onRefresh }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [commentText, setCommentText] = useState('');
+  const [taskCommentTexts, setTaskCommentTexts] = useState({});
+  const [taskModal, setTaskModal] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-function AgendaModal({ form, setForm, editId, assignableUsers, allProfiles, myId, role, isDirector, isKoord, myUnit, saving, saveError, onSave, onClose }) {
-  const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
-  const isDirektor = ['direktor', 'direktor_yardimcisi'].includes(role);
-  const isAsistanRole = role === 'asistan';
+  const canAssign = ASSIGNER_ROLES.includes(role);
+  const myProfile = profiles.find(p => p.user_id === myId);
 
-  const [targetGroup, setTargetGroup] = React.useState(isDirektor ? 'asistan' : 'self');
+  const loadDetail = useCallback(async () => {
+    setLoading(true);
+    const { data } = await getAgendaDetail(agenda.id);
+    setDetail(data);
+    setLoading(false);
+  }, [agenda.id]);
 
-  // targetGroup değişince assigned_to + is_private güncelle
-  const handleTargetChange = (key) => {
-    setTargetGroup(key);
-    f('assigned_to', key === 'self' ? (myId || '') : '');
-    // Asistana atanan görevler + "Kendime" görevler private
-    f('is_private', key === 'self' || key === 'asistan');
+  useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  const handleAddComment = async (taskId = null) => {
+    const text = taskId ? taskCommentTexts[taskId] : commentText;
+    if (!text?.trim()) return;
+    setSaving(true);
+    await addAgendaComment({
+      agenda_id: agenda.id,
+      task_id: taskId || null,
+      content: text.trim(),
+      created_by: myId,
+      created_by_name: myProfile?.full_name || 'Bilinmiyor',
+      avatar_url: myProfile?.avatar_url || null,
+    });
+    if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
+    else setCommentText('');
+    setSaving(false);
+    loadDetail();
   };
 
-  // Direktör için filtrelenmiş atanabilir kişi listesi
-  const filteredAssignees = React.useMemo(() => {
-    if (!isDirector) return assignableUsers;
-    // Düzenleme modunda tüm atanabilir kişileri göster (targetGroup filtresi uygulanmaz)
-    if (editId) return (allProfiles || []).filter(p => p.user_id !== myId);
-    if (targetGroup === 'self') return [];
-    if (targetGroup === 'asistan')     return (allProfiles || []).filter(p => p.role === 'asistan' && p.user_id !== myId);
-    if (targetGroup === 'koordinator') return (allProfiles || []).filter(p => p.role === 'koordinator' && p.user_id !== myId);
-    // personel: yönetici kadro dışındakiler
-    return (allProfiles || []).filter(p =>
-      p.user_id !== myId &&
-      !['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(p.role)
-    );
-  }, [isDirector, editId, targetGroup, assignableUsers, allProfiles, myId]);
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Yorum silinsin mi?')) return;
+    await deleteAgendaComment(commentId);
+    loadDetail();
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Bu görev silinsin mi?')) return;
+    await deleteAgendaTask(taskId);
+    loadDetail();
+    onRefresh();
+  };
+
+  if (loading) return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: 700, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loading-spinner" />
+      </div>
+    </div>
+  );
+
+  const tasks = detail?.tasks || [];
+  const agendaComments = (detail?.comments || []).filter(c => !c.task_id);
+
+  const type = agenda.agenda_types;
+  const typeColor = type?.color || '#6366f1';
+  const typeIcon = type?.icon || '📋';
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" style={{ maxWidth: 520 }}>
-        <h2 className="modal-title">{editId ? '✏️ Gündem Düzenle' : '📋 Yeni Gündem Ekle'}</h2>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 720, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: typeColor + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              {typeIcon}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: typeColor, background: typeColor + '18', padding: '2px 8px', borderRadius: 20 }}>
+                  {typeIcon} {type?.name || 'Gündem'}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  {AGENDA_STATUSES.find(s => s.value === agenda.status)?.label || 'Aktif'}
+                </span>
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: '4px 0 0' }}>{agenda.title}</h2>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0, padding: 4 }}>✕</button>
+          </div>
+          {agenda.description && (
+            <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>{agenda.description}</p>
+          )}
+          {agenda.date && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+              📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+          )}
+        </div>
 
-        {/* Direktör/Yardımcısı: Kime atanacak seçimi */}
-        {isDirektor && !editId && (
+        {/* Body scroll */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+
+          {/* Görevler */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>KİME ATANACAK?</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {TARGET_GROUPS_FULL.map(tg => (
-                <button
-                  key={tg.key}
-                  type="button"
-                  onClick={() => handleTargetChange(tg.key)}
-                  style={{
-                    flex: '1 1 80px', padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: targetGroup === tg.key ? 'var(--primary,#2563eb)' : 'var(--surface)',
-                    color: targetGroup === tg.key ? 'white' : 'var(--text-muted)',
-                    fontWeight: targetGroup === tg.key ? 700 : 500,
-                    fontSize: 12.5, fontFamily: 'var(--font-body)',
-                    outline: targetGroup !== tg.key ? '1px solid var(--border)' : 'none',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {tg.label}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                📌 Görevler ({tasks.length})
+              </h3>
+              {canAssign && (
+                <button className="btn btn-sm btn-primary" onClick={() => { setEditTask(null); setTaskModal(true); }}>
+                  + Görev Ekle
                 </button>
-              ))}
+              )}
+            </div>
+
+            {tasks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: 13.5, background: 'var(--bg)', borderRadius: 10, border: '1px dashed var(--border)' }}>
+                Henüz görev eklenmemiş.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {tasks.map(task => {
+                  const taskComments = (detail?.comments || []).filter(c => c.task_id === task.id);
+                  return (
+                    <div key={task.id} style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                      <div style={{ padding: '10px 12px' }}>
+                        <TaskCard
+                          task={task}
+                          myId={myId}
+                          role={role}
+                          profiles={profiles}
+                          onRefresh={loadDetail}
+                          agendaCreatedBy={agenda.created_by}
+                        />
+                        {canAssign && (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button className="btn btn-sm btn-outline" onClick={() => { setEditTask(task); setTaskModal(true); }}>✏️ Düzenle</button>
+                            <button className="btn btn-sm btn-outline" style={{ color: '#ef4444' }} onClick={() => handleDeleteTask(task.id)}>🗑 Sil</button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Görev yorumları */}
+                      {taskComments.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', background: 'var(--bg-sidebar)' }}>
+                          {taskComments.map(c => (
+                            <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} />
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', display: 'flex', gap: 6 }}>
+                        <input
+                          className="form-input"
+                          style={{ flex: 1, fontSize: 13 }}
+                          placeholder="Göreve yorum ekle…"
+                          value={taskCommentTexts[task.id] || ''}
+                          onChange={e => setTaskCommentTexts(prev => ({ ...prev, [task.id]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddComment(task.id)}
+                        />
+                        <button className="btn btn-sm btn-primary" disabled={saving} onClick={() => handleAddComment(task.id)}>↑</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Gündem Yorumları */}
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+              💬 Gündem Notları
+            </h3>
+            {agendaComments.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {agendaComments.map(c => (
+                  <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} />
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="form-input"
+                style={{ flex: 1, fontSize: 13 }}
+                placeholder="Not ekle…"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddComment()}
+              />
+              <button className="btn btn-primary" disabled={saving} onClick={() => handleAddComment()}>↑</button>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Başlık */}
+      {taskModal && (
+        <TaskModal
+          task={editTask}
+          agendaId={agenda.id}
+          myId={myId}
+          myName={myProfile?.full_name || ''}
+          role={role}
+          allProfiles={allProfiles}
+          onSave={async (data) => {
+            if (editTask) {
+              await updateAgendaTask(editTask.id, data);
+            } else {
+              await createAgendaTask({ ...data, agenda_id: agenda.id, created_by: myId, created_by_name: myProfile?.full_name || '' });
+            }
+            setTaskModal(false);
+            setEditTask(null);
+            loadDetail();
+            onRefresh();
+          }}
+          onClose={() => { setTaskModal(false); setEditTask(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── GÖREV MODALI ──────────────────────────────────────────────────────────────
+function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, onClose }) {
+  const [form, setForm] = useState({
+    title: task?.title || '',
+    description: task?.description || '',
+    assigned_to: task?.assigned_to || '',
+    assigned_to_name: task?.assigned_to_name || '',
+    priority: task?.priority || 'orta',
+    due_date: task?.due_date ? task.due_date.substring(0, 10) : '',
+    status: task?.status || 'bekliyor',
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Koordinatör sadece personellere atayabilir
+  const assignableProfiles = useMemo(() => {
+    if (role === 'koordinator') return allProfiles.filter(p => p.role === 'personel');
+    return allProfiles.filter(p => p.user_id !== myId);
+  }, [allProfiles, myId, role]);
+
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const handleAssignee = (userId) => {
+    const p = allProfiles.find(p => p.user_id === userId);
+    set('assigned_to', userId);
+    set('assigned_to_name', p?.full_name || '');
+  };
+
+  const handleSubmit = async () => {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    await onSave({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      assigned_to: form.assigned_to || null,
+      assigned_to_name: form.assigned_to_name || null,
+      priority: form.priority,
+      due_date: form.due_date || null,
+      status: form.status,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 310 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 520, zIndex: 311 }}>
+        <h2 className="modal-title">{task ? '✏️ Görevi Düzenle' : '+ Yeni Görev'}</h2>
         <div className="form-group">
           <label className="form-label">Başlık *</label>
-          <input className="form-input" placeholder="Gündem başlığı..." value={form.title} onChange={e => f('title', e.target.value)} />
+          <input className="form-input" value={form.title} onChange={e => set('title', e.target.value)} placeholder="Görev başlığı…" />
         </div>
-
-        {/* Açıklama */}
         <div className="form-group">
           <label className="form-label">Açıklama</label>
-          <textarea className="form-textarea" placeholder="Detaylar..." rows={2} value={form.description} onChange={e => f('description', e.target.value)} />
+          <textarea className="form-textarea" rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Detaylar…" />
         </div>
-
-        {/* Atanan kişi + Birim */}
         <div className="form-row">
-          {/* Direktör/Yardımcısı: "Kendime" seçilmediyse kişi seç */}
-          {isDirektor && targetGroup !== 'self' && (
-            <div className="form-group">
-              <label className="form-label">
-                {targetGroup === 'asistan' ? 'Asistan Seç'
-                  : targetGroup === 'koordinator' ? 'Koordinatör Seç'
-                  : 'Personel Seç'}
-              </label>
-              {filteredAssignees.length === 0 ? (
-                <div style={{ padding: '9px 12px', borderRadius: 8, fontSize: 12, background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e' }}>
-                  ⚠️ Bu kategoride atanabilecek kişi bulunamadı.
-                </div>
-              ) : (
-                <select className="form-select" value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)}>
-                  <option value="">— Kişi seçin —</option>
-                  {filteredAssignees.map(p => (
-                    <option key={p.user_id} value={p.user_id}>
-                      {p.full_name || p.user_id}{p.unit ? ` (${p.unit})` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* Koordinatör kendi personeline atıyor */}
-          {isKoord && (
-            <div className="form-group">
-              <label className="form-label">Atanan Kişi</label>
-              {assignableUsers.length === 0 ? (
-                <div style={{ padding: '9px 12px', borderRadius: 8, fontSize: 12, background: '#fff7ed', border: '1px solid #f9731644', color: '#92400e' }}>
-                  ⚠️ Biriminizde atanabilecek personel bulunamadı. Yöneticinize birim ataması için başvurun.
-                </div>
-              ) : (
-                <select className="form-select" value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)}>
-                  <option value="">— Kişi seçin —</option>
-                  {assignableUsers.map(p => (
-                    <option key={p.user_id} value={p.user_id}>
-                      {p.full_name || p.user_id} {p.unit ? `(${p.unit})` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label">Birim</label>
-            <input className="form-input" placeholder="Birim..." value={form.unit} onChange={e => f('unit', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Son Tarih + Öncelik */}
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Son Tarih</label>
-            <input className="form-input" type="date" value={form.due_date} onChange={e => f('due_date', e.target.value)} />
-          </div>
           <div className="form-group">
             <label className="form-label">Öncelik</label>
-            <select className="form-select" value={form.priority} onChange={e => f('priority', e.target.value)}>
+            <select className="form-select" value={form.priority} onChange={e => set('priority', e.target.value)}>
               {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Bitiş Tarihi</label>
+            <input className="form-input" type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Atanan Kişi</label>
+          <select className="form-select" value={form.assigned_to} onChange={e => handleAssignee(e.target.value)}>
+            <option value="">— Seçiniz —</option>
+            {assignableProfiles.map(p => (
+              <option key={p.user_id} value={p.user_id}>
+                {p.full_name} ({ROLE_LABELS[p.role] || p.role})
+              </option>
+            ))}
+          </select>
+          {assignableProfiles.length === 0 && (
+            <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Atanabilecek kullanıcı bulunamadı.</div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>İptal</button>
+          <button className="btn btn-primary" disabled={saving || !form.title.trim()} onClick={handleSubmit}>
+            {saving ? '…' : (task ? 'Güncelle' : 'Ekle')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── GÜNDEM MODALI ─────────────────────────────────────────────────────────────
+function AgendaModal({ agenda, agendaTypes, myId, myName, onSave, onClose }) {
+  const [form, setForm] = useState({
+    title: agenda?.title || '',
+    description: agenda?.description || '',
+    type_id: agenda?.type_id || (agendaTypes[0]?.id || ''),
+    status: agenda?.status || 'aktif',
+    date: agenda?.date ? agenda.date.substring(0, 10) : '',
+    is_private: agenda?.is_private || false,
+    custom_fields: agenda?.custom_fields || {},
+  });
+  const [saving, setSaving] = useState(false);
+
+  const selectedType = agendaTypes.find(t => t.id === form.type_id);
+  const typeFields = selectedType?.fields || [];
+
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+  const setCustom = (k, v) => setForm(prev => ({ ...prev, custom_fields: { ...prev.custom_fields, [k]: v } }));
+
+  const handleSubmit = async () => {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    await onSave({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      type_id: form.type_id || null,
+      status: form.status,
+      date: form.date || null,
+      is_private: form.is_private,
+      custom_fields: form.custom_fields,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 540 }}>
+        <h2 className="modal-title">{agenda ? '✏️ Gündem Düzenle' : '+ Yeni Gündem'}</h2>
+
+        <div className="form-group">
+          <label className="form-label">Gündem Türü</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {agendaTypes.map(t => (
+              <button
+                key={t.id}
+                onClick={() => set('type_id', t.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                  border: `2px solid ${form.type_id === t.id ? t.color : 'var(--border)'}`,
+                  background: form.type_id === t.id ? t.color + '18' : 'var(--bg)',
+                  color: form.type_id === t.id ? t.color : 'var(--text)',
+                  fontWeight: form.type_id === t.id ? 700 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {t.icon} {t.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Başlık *</label>
+          <input className="form-input" value={form.title} onChange={e => set('title', e.target.value)} placeholder="Gündem başlığı…" />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Açıklama</label>
+          <textarea className="form-textarea" rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Detaylar…" />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Tarih</label>
+            <input className="form-input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Durum</label>
+            <select className="form-select" value={form.status} onChange={e => set('status', e.target.value)}>
+              {AGENDA_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Durum */}
-        <div className="form-group">
-          <label className="form-label">Durum</label>
-          <select className="form-select" value={form.status} onChange={e => f('status', e.target.value)}>
-            {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-
-        {/* Notlar */}
-        <div className="form-group">
-          <label className="form-label">Notlar</label>
-          <textarea className="form-textarea" placeholder="Ek notlar..." rows={2} value={form.notes} onChange={e => f('notes', e.target.value)} />
-        </div>
-
-        {saveError && (
-          <div style={{
-            padding: '10px 14px', borderRadius: 8, marginBottom: 12,
-            background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', fontSize: 12.5,
-          }}>
-            ❌ {saveError}
+        {/* Dinamik alanlar */}
+        {typeFields.map(field => (
+          <div className="form-group" key={field.key}>
+            <label className="form-label">{field.label}{field.required ? ' *' : ''}</label>
+            {field.type === 'textarea' ? (
+              <textarea className="form-textarea" rows={3}
+                value={form.custom_fields[field.key] || ''}
+                onChange={e => setCustom(field.key, e.target.value)}
+                placeholder={field.placeholder || ''} />
+            ) : field.type === 'select' ? (
+              <select className="form-select"
+                value={form.custom_fields[field.key] || ''}
+                onChange={e => setCustom(field.key, e.target.value)}>
+                <option value="">— Seçiniz —</option>
+                {(field.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input className="form-input"
+                type={field.type || 'text'}
+                value={form.custom_fields[field.key] || ''}
+                onChange={e => setCustom(field.key, e.target.value)}
+                placeholder={field.placeholder || ''} />
+            )}
           </div>
-        )}
+        ))}
+
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13.5 }}>
+            <input type="checkbox" checked={form.is_private} onChange={e => set('is_private', e.target.checked)} />
+            🔒 Gizli gündem (sadece ben görebilirim)
+          </label>
+        </div>
 
         <div className="modal-footer">
           <button className="btn btn-outline" onClick={onClose}>İptal</button>
-          <button className="btn btn-primary" onClick={onSave} disabled={saving || !form.title.trim()}>
-            {saving ? '⏳ Kaydediliyor...' : editId ? 'Güncelle' : 'Kaydet'}
+          <button className="btn btn-primary" disabled={saving || !form.title.trim()} onClick={handleSubmit}>
+            {saving ? '…' : (agenda ? 'Güncelle' : 'Oluştur')}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── GÜNDEM KARTI ──────────────────────────────────────────────────────────────
+function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen }) {
+  const type = agenda.agenda_types;
+  const typeColor = type?.color || '#6366f1';
+  const typeIcon = type?.icon || '📋';
+  const tasks = agenda.agenda_tasks || [];
+  const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
+  const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
+
+  const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
+
+  const canEdit = CREATOR_ROLES.includes(role) && (agenda.created_by === myId || ['direktor', 'direktor_yardimcisi'].includes(role));
+
+  return (
+    <div
+      className="card"
+      style={{
+        cursor: 'pointer',
+        borderTop: `3px solid ${typeColor}`,
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        padding: 0,
+        overflow: 'hidden',
+      }}
+      onClick={() => onOpen(agenda)}
+    >
+      {/* Kart Başlığı */}
+      <div style={{ padding: '14px 16px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: typeColor + '22',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {typeIcon}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: typeColor, background: typeColor + '18', padding: '2px 7px', borderRadius: 20 }}>
+                {type?.name || 'Gündem'}
+              </span>
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{statusMeta.label}</span>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {agenda.title}
+            </div>
+          </div>
+          {canEdit && (
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              <button className="btn btn-sm btn-outline" onClick={() => onEdit(agenda)} title="Düzenle" style={{ padding: '3px 8px' }}>✏️</button>
+              <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: '#ef4444' }}>🗑</button>
+            </div>
+          )}
+        </div>
+
+        {agenda.description && (
+          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.4,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {agenda.description}
+          </p>
+        )}
+
+        {agenda.date && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </div>
+        )}
+      </div>
+
+      {/* Görevler bölümü */}
+      {tasks.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '10px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>
+              📌 {tasks.length} Görev
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {pendingTasks.length > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, background: '#fffbeb', color: '#f59e0b', padding: '2px 6px', borderRadius: 20 }}>
+                  ⏳ {pendingTasks.length} onay
+                </span>
+              )}
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                {doneTasks.length}/{tasks.length} tamam
+              </span>
+            </div>
+          </div>
+
+          {/* İlerleme çubuğu */}
+          <div style={{ height: 4, background: 'var(--border)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: tasks.length > 0 ? `${(doneTasks.length / tasks.length) * 100}%` : '0%',
+              background: typeColor,
+              borderRadius: 4,
+              transition: 'width 0.3s',
+            }} />
+          </div>
+
+          {/* İlk 3 görevi listele */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {tasks.slice(0, 3).map(task => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12 }}>
+                  {task.completion_status === 'approved' || task.status === 'tamamlandi' ? '✅' :
+                   task.completion_status === 'pending_review' ? '⏳' :
+                   task.completion_status === 'revision_requested' ? '🔄' : '⚪'}
+                </span>
+                <span style={{
+                  fontSize: 12, color: 'var(--text)',
+                  textDecoration: (task.completion_status === 'approved' || task.status === 'tamamlandi') ? 'line-through' : 'none',
+                  opacity: (task.completion_status === 'approved' || task.status === 'tamamlandi') ? 0.5 : 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  {task.title}
+                </span>
+                {task.assigned_to_name && (
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>{task.assigned_to_name.split(' ')[0]}</span>
+                )}
+              </div>
+            ))}
+            {tasks.length > 3 && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 18 }}>+{tasks.length - 3} görev daha…</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tasks.length === 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📌 Henüz görev yok</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ANA BİLEŞEN ───────────────────────────────────────────────────────────────
+export default function Agendas({ user, profile }) {
+  const [agendas, setAgendas] = useState([]);
+  const [agendaTypes, setAgendaTypes] = useState([]);
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [agendaModal, setAgendaModal] = useState(false);
+  const [editAgenda, setEditAgenda] = useState(null);
+  const [detailAgenda, setDetailAgenda] = useState(null);
+  const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [searchQ, setSearchQ] = useState('');
+
+  const myId = user?.id;
+  const role = profile?.role || 'personel';
+  const myName = profile?.full_name || user?.email || '';
+
+  const canCreate = CREATOR_ROLES.includes(role);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const [{ data: types }, { data: ags }, { data: profs }] = await Promise.all([
+      getAgendaTypes(),
+      getAgendasV2(myId),
+      getAllProfiles(),
+    ]);
+    setAgendaTypes(types || []);
+    setAgendas(ags || []);
+    setAllProfiles(profs || []);
+    setLoading(false);
+  }, [myId]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const filteredAgendas = useMemo(() => {
+    return agendas.filter(a => {
+      if (filterType !== 'all' && a.type_id !== filterType) return false;
+      if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+      if (searchQ) {
+        const q = searchQ.toLowerCase();
+        if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [agendas, filterType, filterStatus, searchQ]);
+
+  const handleSaveAgenda = async (data) => {
+    if (editAgenda) {
+      await updateAgenda(editAgenda.id, data);
+    } else {
+      await createAgenda({ ...data, created_by: myId, created_by_name: myName });
+    }
+    setAgendaModal(false);
+    setEditAgenda(null);
+    loadAll();
+  };
+
+  const handleDeleteAgenda = async (id) => {
+    if (!window.confirm('Bu gündem ve içindeki tüm görevler silinecek. Emin misiniz?')) return;
+    await deleteAgenda(id);
+    loadAll();
+  };
+
+  const handleEdit = (agenda) => {
+    setEditAgenda(agenda);
+    setAgendaModal(true);
+  };
+
+  // Onay bekleyen görev sayısı (bildirim badge)
+  const pendingApprovalCount = useMemo(() => {
+    if (!['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role)) return 0;
+    return agendas.reduce((sum, a) => {
+      return sum + (a.agenda_tasks || []).filter(t => t.completion_status === 'pending_review').length;
+    }, 0);
+  }, [agendas, role]);
+
+  return (
+    <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
+      {/* Başlık */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
+          <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            {agendas.length} gündem
+            {pendingApprovalCount > 0 && (
+              <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                ⏳ {pendingApprovalCount} onay bekliyor
+              </span>
+            )}
+          </p>
+        </div>
+        {canCreate && (
+          <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
+            + Yeni Gündem
+          </button>
+        )}
+      </div>
+
+      {/* Filtreler */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          className="form-input"
+          style={{ width: 200, fontSize: 13 }}
+          placeholder="🔍 Ara…"
+          value={searchQ}
+          onChange={e => setSearchQ(e.target.value)}
+        />
+
+        <select className="form-select" style={{ width: 160, fontSize: 13 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <option value="all">Tüm Türler</option>
+          {agendaTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+        </select>
+
+        <select className="form-select" style={{ width: 160, fontSize: 13 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="all">Tüm Durumlar</option>
+          {AGENDA_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+
+        {(filterType !== 'all' || filterStatus !== 'all' || searchQ) && (
+          <button className="btn btn-outline btn-sm" onClick={() => { setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}>
+            ✕ Filtreyi Temizle
+          </button>
+        )}
+      </div>
+
+      {/* Tür sekmeleri */}
+      {agendaTypes.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
+          <button
+            onClick={() => setFilterType('all')}
+            style={{
+              padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+              border: `2px solid ${filterType === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+              background: filterType === 'all' ? 'var(--accent)' : 'var(--bg-card)',
+              color: filterType === 'all' ? '#fff' : 'var(--text)',
+              fontWeight: filterType === 'all' ? 700 : 400,
+            }}
+          >
+            Tümü ({agendas.length})
+          </button>
+          {agendaTypes.map(t => {
+            const count = agendas.filter(a => a.type_id === t.id).length;
+            const isActive = filterType === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setFilterType(isActive ? 'all' : t.id)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+                  border: `2px solid ${isActive ? t.color : 'var(--border)'}`,
+                  background: isActive ? t.color : 'var(--bg-card)',
+                  color: isActive ? '#fff' : 'var(--text)',
+                  fontWeight: isActive ? 700 : 400,
+                }}
+              >
+                {t.icon} {t.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* İçerik */}
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <div className="loading-spinner" />
+        </div>
+      ) : filteredAgendas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
+            {agendas.length === 0 ? 'Henüz gündem yok' : 'Filtre ile eşleşen gündem yok'}
+          </div>
+          <div style={{ fontSize: 13.5 }}>
+            {canCreate ? 'Yeni bir gündem oluşturmak için + Yeni Gündem düğmesine tıklayın.' : 'Henüz size atanmış bir gündem bulunmuyor.'}
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 16,
+        }}>
+          {filteredAgendas.map(agenda => (
+            <AgendaCard
+              key={agenda.id}
+              agenda={agenda}
+              myId={myId}
+              role={role}
+              profiles={allProfiles}
+              onEdit={handleEdit}
+              onDelete={handleDeleteAgenda}
+              onOpen={setDetailAgenda}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Gündem Oluştur/Düzenle Modal */}
+      {agendaModal && (
+        <AgendaModal
+          agenda={editAgenda}
+          agendaTypes={agendaTypes}
+          myId={myId}
+          myName={myName}
+          onSave={handleSaveAgenda}
+          onClose={() => { setAgendaModal(false); setEditAgenda(null); }}
+        />
+      )}
+
+      {/* Gündem Detay */}
+      {detailAgenda && (
+        <AgendaDetailView
+          agenda={detailAgenda}
+          myId={myId}
+          role={role}
+          profiles={allProfiles}
+          allProfiles={allProfiles}
+          onClose={() => setDetailAgenda(null)}
+          onRefresh={loadAll}
+        />
+      )}
     </div>
   );
 }

@@ -496,6 +496,187 @@ export const getMyOpenTasks = async (userId) => {
   return { data, error };
 };
 
+// ── GÜNDEM TÜRLERİ ──────────────────────────────────────────────────────────
+export const getAgendaTypes = async () => {
+  const { data, error } = await supabase
+    .from('agenda_types')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  return { data, error };
+};
+
+export const createAgendaType = async (type) => {
+  const { data, error } = await supabase
+    .from('agenda_types')
+    .insert([type])
+    .select();
+  return { data, error };
+};
+
+export const updateAgendaType = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('agenda_types')
+    .update(updates)
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+export const deleteAgendaType = async (id) => {
+  const { error } = await supabase.from('agenda_types').delete().eq('id', id);
+  return { error };
+};
+
+// ── YENİ GÜNDEM SİSTEMİ ─────────────────────────────────────────────────────
+
+// Gündemleri türleri ve görev sayısıyla getir
+export const getAgendasV2 = async (userId = null) => {
+  let query = supabase
+    .from('agendas')
+    .select(`
+      *,
+      agenda_types ( id, name, icon, color, fields ),
+      agenda_tasks ( id, title, assigned_to, assigned_to_name, priority, status, completion_status, due_date, created_by )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (userId) {
+    query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId},assigned_to.eq.${userId}`);
+  }
+  const { data, error } = await query;
+  return { data, error };
+};
+
+// Tek gündem detayı (yorumlarla)
+export const getAgendaDetail = async (agendaId) => {
+  const { data: agenda, error: ae } = await supabase
+    .from('agendas')
+    .select(`*, agenda_types ( id, name, icon, color, fields )`)
+    .eq('id', agendaId)
+    .single();
+
+  const { data: tasks, error: te } = await supabase
+    .from('agenda_tasks')
+    .select('*')
+    .eq('agenda_id', agendaId)
+    .order('created_at', { ascending: true });
+
+  const { data: comments, error: ce } = await supabase
+    .from('agenda_comments')
+    .select('*')
+    .eq('agenda_id', agendaId)
+    .order('created_at', { ascending: true });
+
+  return {
+    data: { agenda, tasks: tasks || [], comments: comments || [] },
+    error: ae || te || ce,
+  };
+};
+
+// Gündem oluştur
+export const createAgenda = async (agenda) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .insert([{ ...agenda, updated_at: new Date().toISOString() }])
+    .select();
+  return { data, error };
+};
+
+// Gündem güncelle
+export const updateAgenda = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Gündem sil
+export const deleteAgenda = async (id) => {
+  const { error } = await supabase.from('agendas').delete().eq('id', id);
+  return { error };
+};
+
+// ── GÜNDEM GÖREVLERİ ─────────────────────────────────────────────────────────
+
+export const createAgendaTask = async (task) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .insert([{ ...task, updated_at: new Date().toISOString() }])
+    .select();
+  return { data, error };
+};
+
+export const updateAgendaTask = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+export const deleteAgendaTask = async (id) => {
+  const { error } = await supabase.from('agenda_tasks').delete().eq('id', id);
+  return { error };
+};
+
+// Personel: Tamamlandım → onay bekliyor
+export const markAgendaTaskDone = async (id) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ completion_status: 'pending_review', status: 'tamamlandi', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Koordinatör: Onayla
+export const approveAgendaTask = async (id) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Koordinatör: Revize iste
+export const requestAgendaTaskRevision = async (id, note) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ completion_status: 'revision_requested', revision_note: note, status: 'devam_ediyor', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// Koordinatör: Arşivle
+export const archiveAgendaTask = async (id) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ status: 'arsiv', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+// ── GÜNDEM YORUMLARI ──────────────────────────────────────────────────────────
+
+export const addAgendaComment = async (comment) => {
+  const { data, error } = await supabase
+    .from('agenda_comments')
+    .insert([comment])
+    .select();
+  return { data, error };
+};
+
+export const deleteAgendaComment = async (id) => {
+  const { error } = await supabase.from('agenda_comments').delete().eq('id', id);
+  return { error };
+};
+
 // ── INVITE STAFF (Edge Function proxy) ──
 export const inviteStaffMember = async (email, name, role = "personel") => {
   const { data: { session } } = await supabase.auth.getSession();
