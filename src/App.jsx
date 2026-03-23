@@ -194,11 +194,14 @@ export default function App() {
     return () => { clearTimeout(safetyTimer); subscription.unsubscribe(); };
   }, []);
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   const navigate = (page, opts = {}) => {
     // Check role access
     const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
     if (!allowed.includes(page)) return;
     setActivePage(page);
+    setMobileNavOpen(false);
     window.location.hash = page; // URL'ye yaz → yenileme sonrası korunur
     if (opts && opts.initialMessage !== undefined) {
       setChatInitialMessage(opts.initialMessage || null);
@@ -239,10 +242,44 @@ export default function App() {
 
   const PageComponent = pages[activePage];
 
+  const PAGE_TITLES = {
+    dashboard:  '⚡ Dashboard',
+    chat:       '🤖 AI Asistan',
+    agendas:    '📋 Gündemler',
+    donors:     '🤝 Donör CRM',
+    meetings:   '📋 Toplantı Logu',
+    reports:    '📊 Birim Raporları',
+    dailylog:   '🗓 İş Kayıtları',
+    logsviewer: '📂 Kayıt Dashboard',
+    analytics:  '📈 Çalışma Analizi',
+    donations:  '💰 Bağış Takip',
+    orgchart:   '🏢 Org Şeması',
+    network:    '🕸️ Network',
+    profile:    '⚙️ Profil',
+    admin:      '⚙️ Admin',
+    users:      '👥 Kullanıcılar',
+  };
+
   return (
     <ProfileContext.Provider value={{ profile, setProfile, reloadProfile: () => loadProfile(user) }}>
       <div className="app">
-        <Sidebar activePage={activePage} onNavigate={navigate} user={user} profile={profile} />
+        {/* Mobil üst bar */}
+        <header className="mobile-header">
+          <button className="mobile-header-menu" onClick={() => setMobileNavOpen(true)} aria-label="Menü">☰</button>
+          <span className="mobile-header-title">{PAGE_TITLES[activePage] || 'AI Chief of Staff'}</span>
+        </header>
+
+        {/* Sidebar backdrop (mobilde) */}
+        {mobileNavOpen && <div className="mobile-backdrop" onClick={() => setMobileNavOpen(false)} />}
+
+        <Sidebar
+          activePage={activePage}
+          onNavigate={navigate}
+          user={user}
+          profile={profile}
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
         <main className="app-main">
           {activePage === 'chat' ? (
             <Chat

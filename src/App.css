@@ -586,13 +586,140 @@ body {
 /* ── GRID EXTENDED ── */
 .grid-3-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 
-/* ── RESPONSIVE ── */
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — Tablet & Mobile
+   ══════════════════════════════════════════════════════ */
+
+/* ── Mobile header (hidden on desktop) ── */
+.mobile-header { display: none; }
+.mobile-backdrop { display: none; }
+.sidebar-mobile-close { display: none; }
+
+/* ── Tablet (≤1024px) ── */
 @media (max-width: 1024px) {
-  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
-  .donor-grid { grid-template-columns: 1fr; }
+  .kpi-grid          { grid-template-columns: repeat(3, 1fr); }
+  .donor-grid        { grid-template-columns: 1fr; }
+  .grid-3            { grid-template-columns: 1fr 1fr; }
+  .grid-3-col        { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Mobile (≤768px) ── */
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .page { padding: 20px 16px; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* App shell */
+  .app           { flex-direction: column; height: 100dvh; }
+  .app-main      { flex: 1; overflow-y: auto; min-height: 0; }
+
+  /* Mobile top bar */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 150;
+    height: 52px;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .mobile-header-menu {
+    background: none; border: none; cursor: pointer;
+    font-size: 20px; padding: 4px 6px; border-radius: 6px;
+    color: var(--text); line-height: 1; flex-shrink: 0;
+  }
+  .mobile-header-menu:hover { background: var(--gray-light); }
+  .mobile-header-title {
+    font-family: var(--font-display);
+    font-size: 15px; font-weight: 700;
+    color: var(--text); letter-spacing: -0.02em;
+    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Backdrop */
+  .mobile-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 190;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Sidebar — slide-in overlay */
+  .sidebar {
+    position: fixed;
+    top: 0; left: -260px;
+    height: 100dvh;
+    width: 260px;
+    z-index: 200;
+    transition: left 0.25s cubic-bezier(.4,0,.2,1);
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar.sidebar-open { left: 0; }
+
+  /* Close button inside sidebar */
+  .sidebar-mobile-close {
+    display: flex;
+    align-items: center; justify-content: center;
+    position: absolute; top: 14px; right: 12px;
+    width: 30px; height: 30px;
+    background: var(--gray-light); border: none;
+    border-radius: 6px; font-size: 16px;
+    cursor: pointer; color: var(--text-muted);
+    z-index: 1;
+  }
+  .sidebar-mobile-close:hover { background: var(--gray-mid); color: var(--text); }
+
+  /* Page padding */
+  .page { padding: 16px; }
+
+  /* KPI grid */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .kpi-value { font-size: 24px; }
+
+  /* All grids → single column */
+  .grid-2, .grid-3, .grid-3-col { grid-template-columns: 1fr; }
+
+  /* Form rows → single column */
+  .form-row, .form-row-3 { grid-template-columns: 1fr; }
+
+  /* Tables — horizontal scroll */
+  .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .data-table { min-width: 560px; }
+
+  /* Modal — bottom sheet style */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 92dvh;
+    padding: 22px 20px 32px;
+  }
+
+  /* Donor grid */
+  .donor-grid { grid-template-columns: 1fr; }
+
+  /* Chat */
+  .chat-header  { padding: 12px 16px; }
+  .chat-messages { padding: 14px 16px; gap: 12px; }
+  .chat-input-area { padding: 10px 16px 14px; }
+  .chat-quick-actions { gap: 6px; }
+  .quick-action { font-size: 11px; padding: 4px 10px; }
+  .message-bubble { font-size: 13.5px; padding: 10px 14px; }
+
+  /* Buttons — bigger touch targets */
+  .btn { min-height: 38px; }
+  .btn-sm { min-height: 32px; }
+
+  /* Cards */
+  .card { padding: 14px; }
+
+  /* Page title */
+  .page-title { font-size: 18px; }
 }

@@ -50,7 +50,7 @@ function SidebarAvatar({ profile, size = 34 }) {
   );
 }
 
-export default function Sidebar({ activePage, onNavigate, user, profile }) {
+export default function Sidebar({ activePage, onNavigate, user, profile, mobileOpen, onMobileClose }) {
   const [openActionsCount, setOpenActionsCount] = useState(0);
 
   const role = profile?.role || 'personel';
@@ -73,8 +73,16 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
   const visibleNav = ALL_NAV.filter(item => allowed.includes(item.id));
   const visibleAdmin = ADMIN_NAV.filter(item => allowed.includes(item.id));
 
+  const handleNav = (id) => {
+    onNavigate(id);
+    if (onMobileClose) onMobileClose();
+  };
+
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+      {/* Mobilde kapat butonu */}
+      <button className="sidebar-mobile-close" onClick={onMobileClose} aria-label="Menüyü kapat">✕</button>
+
       <div className="sidebar-logo">
         <div className="sidebar-logo-title">🏛 AI Chief of Staff</div>
         <div className="sidebar-logo-sub">Direktör Ofisi</div>
@@ -86,7 +94,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
           <button
             key={item.id}
             className={`nav-item ${activePage === item.id ? 'active' : ''}`}
-            onClick={() => onNavigate(item.id)}
+            onClick={() => handleNav(item.id)}
           >
             <span className="nav-icon">{item.icon}</span>
             {item.label}
@@ -101,7 +109,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
               <button
                 key={item.id}
                 className={`nav-item ${activePage === item.id ? 'active' : ''}`}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => handleNav(item.id)}
               >
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
@@ -115,7 +123,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
         {/* Profil ayarlarına git butonu */}
         <button
           className={`nav-item ${activePage === 'profile' ? 'active' : ''}`}
-          onClick={() => onNavigate('profile')}
+          onClick={() => handleNav('profile')}
           style={{ marginBottom: 6, width: '100%' }}
         >
           <span className="nav-icon">⚙️</span>
@@ -125,7 +133,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile }) {
         <div
           className="sidebar-user"
           style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('profile')}
+          onClick={() => handleNav('profile')}
           title="Profil Ayarları"
         >
           <SidebarAvatar profile={profile} />
