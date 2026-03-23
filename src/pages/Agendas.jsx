@@ -902,8 +902,10 @@ export default function Agendas({ user, profile }) {
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
-      // "Gündemlerim" tabında sadece direktörün kendi oluşturduğu gündemler
-      if (isMineTab && a.created_by !== myId) return false;
+      // "Gündemlerim" tabında sadece kişisel gündemler
+      if (isMineTab && !a.is_personal) return false;
+      // Departman tabında kişisel gündemler gizli
+      if (!isMineTab && a.is_personal) return false;
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
       if (canSeeAllUnits && !isMineTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
@@ -931,8 +933,14 @@ export default function Agendas({ user, profile }) {
     if (editAgenda) {
       await updateAgenda(editAgenda.id, data);
     } else {
-      // Yeni gündemde unit otomatik atanır: kendi birimi
-      await createAgenda({ ...data, created_by: myId, created_by_name: myName, unit: myUnit || data.unit || null });
+      // Yeni gündemde unit otomatik atanır; Gündemlerim tabında is_personal=true
+      await createAgenda({
+        ...data,
+        created_by: myId,
+        created_by_name: myName,
+        unit: isMineTab ? null : (myUnit || data.unit || null),
+        is_personal: isMineTab,
+      });
     }
     setAgendaModal(false);
     setEditAgenda(null);
