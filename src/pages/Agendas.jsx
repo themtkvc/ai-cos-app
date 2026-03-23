@@ -235,7 +235,7 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy }) {
 }
 
 // ── GÜNDEM KARTININ DETAY GÖRÜNÜMERİ ─────────────────────────────────────────
-function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, onRefresh }) {
+function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -438,6 +438,7 @@ function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, 
           myName={myProfile?.full_name || ''}
           role={role}
           allProfiles={allProfiles}
+          allowSelfAssign={isMineTab}
           onSave={async (data) => {
             if (editTask) {
               await updateAgendaTask(editTask.id, data);
@@ -457,23 +458,39 @@ function AgendaDetailView({ agenda, myId, role, profiles, allProfiles, onClose, 
 }
 
 // ── GÖREV MODALI ──────────────────────────────────────────────────────────────
-function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, onClose }) {
+function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, onClose, allowSelfAssign = false }) {
+  // "Gündemlerim" tabında direktör = görevi kendine varsayılan ata
+  const myProfile = allProfiles.find(p => p.user_id === myId);
   const [form, setForm] = useState({
     title: task?.title || '',
     description: task?.description || '',
-    assigned_to: task?.assigned_to || '',
-    assigned_to_name: task?.assigned_to_name || '',
+    assigned_to: task?.assigned_to || (allowSelfAssign ? myId : ''),
+    assigned_to_name: task?.assigned_to_name || (allowSelfAssign ? (myProfile?.full_name || myName) : ''),
     priority: task?.priority || 'orta',
     due_date: task?.due_date ? task.due_date.substring(0, 10) : '',
     status: task?.status || 'bekliyor',
   });
   const [saving, setSaving] = useState(false);
 
-  // Koordinatör sadece personellere atayabilir
+  // Atanabilir profiller:
+  // - Koordinatör → sadece personel
+  // - Direktör "Gündemlerim" tabında → sadece kendisi (self-assign)
+  // - Diğer durumlarda → direktör/direktor_yardimcisi rolleri hariç, kendisi hariç
+  const DIREKTOR_ROLES = ['direktor', 'direktor_yardimcisi'];
   const assignableProfiles = useMemo(() => {
     if (role === 'koordinator') return allProfiles.filter(p => p.role === 'personel');
-    return allProfiles.filter(p => p.user_id !== myId);
-  }, [allProfiles, myId, role]);
+    if (allowSelfAssign) {
+      // Direktör kendi gündemlerinde sadece kendine atayabilir
+      return allProfiles.filter(p => p.user_id === myId);
+    }
+    // Direktörlere (direktor/direktor_yardimcisi) atama yapılamaz, sadece direktörler kendi aralarında atayabilir
+    const isDirektorRole = DIREKTOR_ROLES.includes(role);
+    return allProfiles.filter(p => {
+      if (p.user_id === myId) return false; // kendine atama yok (allowSelfAssign dışında)
+      if (!isDirektorRole && DIREKTOR_ROLES.includes(p.role)) return false; // direktöre atama yasak
+      return true;
+    });
+  }, [allProfiles, myId, role, allowSelfAssign]);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -841,19 +858,23 @@ export default function Agendas({ user, profile }) {
   const [agendaModal, setAgendaModal] = useState(false);
   const [editAgenda, setEditAgenda] = useState(null);
   const [detailAgenda, setDetailAgenda] = useState(null);
+  const [detailIsMine, setDetailIsMine] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterUnit, setFilterUnit] = useState('all'); // sadece direktör kullanır
+  const [filterUnit, setFilterUnit] = useState('all');
   const [searchQ, setSearchQ] = useState('');
+  // Direktör/Yardımcısı için iki tab: 'department' | 'mine'
+  const [directorTab, setDirectorTab] = useState('department');
 
   const myId   = user?.id;
   const role   = profile?.role || 'personel';
   const myName = profile?.full_name || user?.email || '';
   const myUnit = profile?.unit || null;
 
-  // Direktör ve üstü tüm birimleri görebilir
+  const isDirektor     = ['direktor', 'direktor_yardimcisi'].includes(role);
   const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
+  const isMineTab      = isDirektor && directorTab === 'mine';
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -881,20 +902,22 @@ export default function Agendas({ user, profile }) {
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
+      // "Gündemlerim" tabında sadece direktörün kendi oluşturduğu gündemler
+      if (isMineTab && a.created_by !== myId) return false;
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-      if (canSeeAllUnits && filterUnit !== 'all' && a.unit !== filterUnit) return false;
+      if (canSeeAllUnits && !isMineTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
       if (searchQ) {
         const q = searchQ.toLowerCase();
         if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, myId]);
 
-  // Direktör görünümünde gündemleri birime göre grupla
+  // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
-    if (!canSeeAllUnits || filterUnit !== 'all') return null; // gruplamaya gerek yok
+    if (!canSeeAllUnits || isMineTab || filterUnit !== 'all') return null;
     const groups = {};
     filteredAgendas.forEach(a => {
       const key = a.unit || '—';
@@ -902,7 +925,7 @@ export default function Agendas({ user, profile }) {
       groups[key].push(a);
     });
     return groups;
-  }, [filteredAgendas, canSeeAllUnits, filterUnit]);
+  }, [filteredAgendas, canSeeAllUnits, isMineTab, filterUnit]);
 
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
@@ -946,7 +969,7 @@ export default function Agendas({ user, profile }) {
           profiles={allProfiles}
           onEdit={handleEdit}
           onDelete={handleDeleteAgenda}
-          onOpen={setDetailAgenda}
+          onOpen={(a) => { setDetailAgenda(a); setDetailIsMine(isMineTab); }}
         />
       ))}
     </div>
@@ -955,13 +978,15 @@ export default function Agendas({ user, profile }) {
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Başlık */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDirektor ? 0 : 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            {canSeeAllUnits
-              ? `${agendas.length} gündem · tüm birimler`
-              : `${agendas.length} gündem · ${myUnit || 'birimsiz'}`}
+            {isMineTab
+              ? `${filteredAgendas.length} gündem · kişisel`
+              : canSeeAllUnits
+                ? `${agendas.length} gündem · tüm birimler`
+                : `${agendas.length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -976,8 +1001,34 @@ export default function Agendas({ user, profile }) {
         )}
       </div>
 
-      {/* Birim sekmeleri — sadece direktör */}
-      {canSeeAllUnits && availableUnits.length > 1 && (
+      {/* ── Direktör ana tab: Departman / Gündemlerim ── */}
+      {isDirektor && (
+        <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+          {[
+            { id: 'department', icon: '🏢', label: 'Departmanın Gündemleri' },
+            { id: 'mine',       icon: '📋', label: 'Gündemlerim' },
+          ].map(tab => {
+            const isActive = directorTab === tab.id;
+            return (
+              <button key={tab.id} onClick={() => { setDirectorTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontSize: 13.5, fontWeight: isActive ? 700 : 500,
+                  color: isActive ? '#fff' : 'var(--text-muted)',
+                  background: isActive ? 'var(--navy)' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+                  transition: 'all 0.15s',
+                }}>
+                <span>{tab.icon}</span> {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Birim sekmeleri — departman tabında direktör */}
+      {canSeeAllUnits && !isMineTab && availableUnits.length > 1 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, flexWrap: 'wrap' }}>
           <button
             onClick={() => setFilterUnit('all')}
@@ -1124,7 +1175,8 @@ export default function Agendas({ user, profile }) {
           role={role}
           profiles={allProfiles}
           allProfiles={allProfiles}
-          onClose={() => setDetailAgenda(null)}
+          isMineTab={detailIsMine}
+          onClose={() => { setDetailAgenda(null); setDetailIsMine(false); }}
           onRefresh={loadAll}
         />
       )}
