@@ -957,25 +957,37 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate('dashboard')}>← Dashboard</button>
         </div>
         {/* Tabs */}
-        <div style={{display:'flex',gap:4,marginTop:16,borderBottom:'2px solid var(--border)',paddingBottom:0}}>
+        <div style={{
+          display:'flex', gap:6, marginTop:20, flexWrap:'wrap',
+          background:'var(--bg)', borderRadius:14, padding:5,
+          border:'1px solid var(--border)', width:'fit-content',
+        }}>
           {[
-            { id:'system',         icon:'⚙️', label:'Sistem & Veri' },
-            { id:'users',          icon:'👥', label:'Kullanıcı Yönetimi' },
-            { id:'announcements',  icon:'📢', label:'Duyurular' },
-            { id:'orgchart',       icon:'🏢', label:'Org Şeması' },
-            { id:'agendatypes',    icon:'📋', label:'Gündem Türleri' },
-          ].map(tab => (
-            <button key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding:'8px 18px', border:'none', background:'transparent', cursor:'pointer',
-                fontSize:13, fontWeight:500, color: activeTab===tab.id ? 'var(--navy)' : 'var(--text-muted)',
-                borderBottom: activeTab===tab.id ? '2px solid var(--navy)' : '2px solid transparent',
-                marginBottom:-2, transition:'all 0.15s', fontFamily:'var(--font-body)'
-              }}>
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+            { id:'system',        icon:'⚙️', label:'Sistem & Veri' },
+            { id:'users',         icon:'👥', label:'Kullanıcılar' },
+            { id:'announcements', icon:'📢', label:'Duyurular' },
+            { id:'orgchart',      icon:'🏢', label:'Org Şeması' },
+            { id:'agendatypes',   icon:'📋', label:'Gündem Türleri' },
+          ].map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display:'flex', alignItems:'center', gap:6,
+                  padding:'7px 16px', borderRadius:10, border:'none', cursor:'pointer',
+                  fontSize:13, fontWeight: isActive ? 700 : 500,
+                  color: isActive ? '#fff' : 'var(--text-muted)',
+                  background: isActive ? 'var(--navy)' : 'transparent',
+                  boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+                  transition:'all 0.18s', fontFamily:'var(--font-body)',
+                  whiteSpace:'nowrap',
+                }}>
+                <span style={{ fontSize:15 }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
