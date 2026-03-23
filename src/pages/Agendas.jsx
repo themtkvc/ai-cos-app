@@ -548,13 +548,14 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
 }
 
 // ── GÜNDEM MODALI ─────────────────────────────────────────────────────────────
-function AgendaModal({ agenda, agendaTypes, myId, myName, onSave, onClose }) {
+function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits, availableUnits, onSave, onClose }) {
   const [form, setForm] = useState({
     title: agenda?.title || '',
     description: agenda?.description || '',
     type_id: agenda?.type_id || (agendaTypes[0]?.id || ''),
     status: agenda?.status || 'aktif',
     date: agenda?.date ? agenda.date.substring(0, 10) : '',
+    unit: agenda?.unit || myUnit || '',
     is_private: agenda?.is_private || false,
     custom_fields: agenda?.custom_fields || {},
   });
@@ -575,6 +576,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, onSave, onClose }) {
       type_id: form.type_id || null,
       status: form.status,
       date: form.date || null,
+      unit: form.unit || null,
       is_private: form.is_private,
       custom_fields: form.custom_fields,
     });
@@ -656,6 +658,21 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, onSave, onClose }) {
             )}
           </div>
         ))}
+
+        {/* Birim: direktör seçebilir, diğerleri otomatik */}
+        {canSeeAllUnits && availableUnits.length > 0 ? (
+          <div className="form-group">
+            <label className="form-label">🏗 Birim</label>
+            <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
+              <option value="">— Seçiniz —</option>
+              {availableUnits.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+        ) : myUnit ? (
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '4px 0 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🏗</span> Birim: <strong>{myUnit}</strong>
+          </div>
+        ) : null}
 
         <div className="form-group">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13.5 }}>
@@ -826,46 +843,73 @@ export default function Agendas({ user, profile }) {
   const [detailAgenda, setDetailAgenda] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterUnit, setFilterUnit] = useState('all'); // sadece direktör kullanır
   const [searchQ, setSearchQ] = useState('');
 
-  const myId = user?.id;
-  const role = profile?.role || 'personel';
+  const myId   = user?.id;
+  const role   = profile?.role || 'personel';
   const myName = profile?.full_name || user?.email || '';
+  const myUnit = profile?.unit || null;
 
-  const canCreate = CREATOR_ROLES.includes(role);
+  // Direktör ve üstü tüm birimleri görebilir
+  const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
+  const canCreate      = CREATOR_ROLES.includes(role);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    // Direktör değilse sadece kendi birimi gelsin (DB seviyesinde filtrele)
+    const unitFilter = canSeeAllUnits ? null : (myUnit || null);
     const [{ data: types }, { data: ags }, { data: profs }] = await Promise.all([
       getAgendaTypes(),
-      getAgendasV2(myId),
+      getAgendasV2(myId, unitFilter),
       getAllProfiles(),
     ]);
     setAgendaTypes(types || []);
     setAgendas(ags || []);
     setAllProfiles(profs || []);
     setLoading(false);
-  }, [myId]);
+  }, [myId, myUnit, canSeeAllUnits]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Direktör için mevcut birim listesi (profillerdeki + gündemlerdeki)
+  const availableUnits = useMemo(() => {
+    const fromProfiles = allProfiles.map(p => p.unit).filter(Boolean);
+    const fromAgendas  = agendas.map(a => a.unit).filter(Boolean);
+    return [...new Set([...fromProfiles, ...fromAgendas])].sort();
+  }, [allProfiles, agendas]);
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+      if (canSeeAllUnits && filterUnit !== 'all' && a.unit !== filterUnit) return false;
       if (searchQ) {
         const q = searchQ.toLowerCase();
         if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, searchQ]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits]);
+
+  // Direktör görünümünde gündemleri birime göre grupla
+  const groupedByUnit = useMemo(() => {
+    if (!canSeeAllUnits || filterUnit !== 'all') return null; // gruplamaya gerek yok
+    const groups = {};
+    filteredAgendas.forEach(a => {
+      const key = a.unit || '—';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(a);
+    });
+    return groups;
+  }, [filteredAgendas, canSeeAllUnits, filterUnit]);
 
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
       await updateAgenda(editAgenda.id, data);
     } else {
-      await createAgenda({ ...data, created_by: myId, created_by_name: myName });
+      // Yeni gündemde unit otomatik atanır: kendi birimi
+      await createAgenda({ ...data, created_by: myId, created_by_name: myName, unit: myUnit || data.unit || null });
     }
     setAgendaModal(false);
     setEditAgenda(null);
@@ -883,13 +927,30 @@ export default function Agendas({ user, profile }) {
     setAgendaModal(true);
   };
 
-  // Onay bekleyen görev sayısı (bildirim badge)
   const pendingApprovalCount = useMemo(() => {
     if (!['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role)) return 0;
     return agendas.reduce((sum, a) => {
       return sum + (a.agenda_tasks || []).filter(t => t.completion_status === 'pending_review').length;
     }, 0);
   }, [agendas, role]);
+
+  // ── Kart grid yardımcısı ────────────────────────────────────────────────────
+  const CardGrid = ({ items }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+      {items.map(agenda => (
+        <AgendaCard
+          key={agenda.id}
+          agenda={agenda}
+          myId={myId}
+          role={role}
+          profiles={allProfiles}
+          onEdit={handleEdit}
+          onDelete={handleDeleteAgenda}
+          onOpen={setDetailAgenda}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
@@ -898,7 +959,9 @@ export default function Agendas({ user, profile }) {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            {agendas.length} gündem
+            {canSeeAllUnits
+              ? `${agendas.length} gündem · tüm birimler`
+              : `${agendas.length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -913,64 +976,79 @@ export default function Agendas({ user, profile }) {
         )}
       </div>
 
-      {/* Filtreler */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          className="form-input"
-          style={{ width: 200, fontSize: 13 }}
-          placeholder="🔍 Ara…"
-          value={searchQ}
-          onChange={e => setSearchQ(e.target.value)}
-        />
+      {/* Birim sekmeleri — sadece direktör */}
+      {canSeeAllUnits && availableUnits.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setFilterUnit('all')}
+            style={{
+              padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+              border: `2px solid ${filterUnit === 'all' ? 'var(--navy)' : 'var(--border)'}`,
+              background: filterUnit === 'all' ? 'var(--navy)' : 'var(--bg-card)',
+              color: filterUnit === 'all' ? '#fff' : 'var(--text)', fontWeight: filterUnit === 'all' ? 700 : 400,
+            }}>
+            🏢 Tüm Birimler ({agendas.length})
+          </button>
+          {availableUnits.map(u => {
+            const cnt = agendas.filter(a => a.unit === u).length;
+            const isActive = filterUnit === u;
+            return (
+              <button key={u} onClick={() => setFilterUnit(isActive ? 'all' : u)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+                  border: `2px solid ${isActive ? '#6366f1' : 'var(--border)'}`,
+                  background: isActive ? '#6366f1' : 'var(--bg-card)',
+                  color: isActive ? '#fff' : 'var(--text)', fontWeight: isActive ? 700 : 400,
+                }}>
+                🏗 {u} ({cnt})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-        <select className="form-select" style={{ width: 160, fontSize: 13 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+      {/* Tür + durum + arama filtreleri */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input className="form-input" style={{ width: 200, fontSize: 13 }} placeholder="🔍 Ara…"
+          value={searchQ} onChange={e => setSearchQ(e.target.value)} />
+
+        <select className="form-select" style={{ width: 155, fontSize: 13 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
           <option value="all">Tüm Türler</option>
           {agendaTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
         </select>
 
-        <select className="form-select" style={{ width: 160, fontSize: 13 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select className="form-select" style={{ width: 155, fontSize: 13 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="all">Tüm Durumlar</option>
           {AGENDA_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
 
-        {(filterType !== 'all' || filterStatus !== 'all' || searchQ) && (
-          <button className="btn btn-outline btn-sm" onClick={() => { setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}>
-            ✕ Filtreyi Temizle
+        {(filterType !== 'all' || filterStatus !== 'all' || searchQ || filterUnit !== 'all') && (
+          <button className="btn btn-outline btn-sm" onClick={() => { setFilterType('all'); setFilterStatus('all'); setSearchQ(''); setFilterUnit('all'); }}>
+            ✕ Temizle
           </button>
         )}
       </div>
 
-      {/* Tür sekmeleri */}
+      {/* Tür pill filtreleri */}
       {agendaTypes.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-          <button
-            onClick={() => setFilterType('all')}
-            style={{
-              padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+          <button onClick={() => setFilterType('all')}
+            style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
               border: `2px solid ${filterType === 'all' ? 'var(--accent)' : 'var(--border)'}`,
               background: filterType === 'all' ? 'var(--accent)' : 'var(--bg-card)',
-              color: filterType === 'all' ? '#fff' : 'var(--text)',
-              fontWeight: filterType === 'all' ? 700 : 400,
-            }}
-          >
-            Tümü ({agendas.length})
+              color: filterType === 'all' ? '#fff' : 'var(--text)', fontWeight: filterType === 'all' ? 700 : 400 }}>
+            Tümü ({filteredAgendas.length})
           </button>
           {agendaTypes.map(t => {
-            const count = agendas.filter(a => a.type_id === t.id).length;
+            const cnt = filteredAgendas.filter(a => a.type_id === t.id).length;
             const isActive = filterType === t.id;
             return (
-              <button
-                key={t.id}
-                onClick={() => setFilterType(isActive ? 'all' : t.id)}
-                style={{
-                  padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
+              <button key={t.id} onClick={() => setFilterType(isActive ? 'all' : t.id)}
+                style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
                   border: `2px solid ${isActive ? t.color : 'var(--border)'}`,
                   background: isActive ? t.color : 'var(--bg-card)',
-                  color: isActive ? '#fff' : 'var(--text)',
-                  fontWeight: isActive ? 700 : 400,
-                }}
-              >
-                {t.icon} {t.name} ({count})
+                  color: isActive ? '#fff' : 'var(--text)', fontWeight: isActive ? 700 : 400 }}>
+                {t.icon} {t.name} ({cnt})
               </button>
             );
           })}
@@ -989,28 +1067,38 @@ export default function Agendas({ user, profile }) {
             {agendas.length === 0 ? 'Henüz gündem yok' : 'Filtre ile eşleşen gündem yok'}
           </div>
           <div style={{ fontSize: 13.5 }}>
-            {canCreate ? 'Yeni bir gündem oluşturmak için + Yeni Gündem düğmesine tıklayın.' : 'Henüz size atanmış bir gündem bulunmuyor.'}
+            {canCreate ? '+ Yeni Gündem düğmesiyle ekleyebilirsiniz.' : 'Henüz atanmış bir gündem bulunmuyor.'}
           </div>
         </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 16,
-        }}>
-          {filteredAgendas.map(agenda => (
-            <AgendaCard
-              key={agenda.id}
-              agenda={agenda}
-              myId={myId}
-              role={role}
-              profiles={allProfiles}
-              onEdit={handleEdit}
-              onDelete={handleDeleteAgenda}
-              onOpen={setDetailAgenda}
-            />
-          ))}
+      ) : canSeeAllUnits && groupedByUnit && filterUnit === 'all' ? (
+        /* Direktör: birime göre gruplu görünüm */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          {Object.entries(groupedByUnit)
+            .sort(([a], [b]) => (a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b)))
+            .map(([unit, items]) => (
+              <div key={unit}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 16 }}>🏗</span>
+                    {unit === '—' ? 'Birimi Belirtilmemiş' : unit}
+                  </div>
+                  <span style={{ background: '#6366f118', color: '#6366f1', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
+                    {items.length} gündem
+                  </span>
+                  <button
+                    onClick={() => setFilterUnit(unit === '—' ? 'all' : unit)}
+                    style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                    sadece bunu göster
+                  </button>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                </div>
+                <CardGrid items={items} />
+              </div>
+            ))}
         </div>
+      ) : (
+        /* Normal / filtreli görünüm */
+        <CardGrid items={filteredAgendas} />
       )}
 
       {/* Gündem Oluştur/Düzenle Modal */}
@@ -1020,6 +1108,9 @@ export default function Agendas({ user, profile }) {
           agendaTypes={agendaTypes}
           myId={myId}
           myName={myName}
+          myUnit={myUnit}
+          canSeeAllUnits={canSeeAllUnits}
+          availableUnits={availableUnits}
           onSave={handleSaveAgenda}
           onClose={() => { setAgendaModal(false); setEditAgenda(null); }}
         />

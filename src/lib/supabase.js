@@ -530,7 +530,7 @@ export const deleteAgendaType = async (id) => {
 // ── YENİ GÜNDEM SİSTEMİ ─────────────────────────────────────────────────────
 
 // Gündemleri türleri ve görev sayısıyla getir
-export const getAgendasV2 = async (userId = null) => {
+export const getAgendasV2 = async (userId = null, unit = null) => {
   let query = supabase
     .from('agendas')
     .select(`
@@ -542,6 +542,10 @@ export const getAgendasV2 = async (userId = null) => {
 
   if (userId) {
     query = query.or(`is_private.is.null,is_private.eq.false,created_by.eq.${userId},assigned_to.eq.${userId}`);
+  }
+  // Birime göre filtrele (direktör değilse sadece kendi birimi)
+  if (unit) {
+    query = query.eq('unit', unit);
   }
   const { data, error } = await query;
   return { data, error };
