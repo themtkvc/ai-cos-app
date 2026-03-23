@@ -565,7 +565,7 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
 }
 
 // ── GÜNDEM MODALI ─────────────────────────────────────────────────────────────
-function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits, availableUnits, onSave, onClose }) {
+function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits, availableUnits, isDirektor, allProfiles, onSave, onClose }) {
   const [form, setForm] = useState({
     title: agenda?.title || '',
     description: agenda?.description || '',
@@ -575,14 +575,28 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
     unit: agenda?.unit || myUnit || '',
     is_private: agenda?.is_private || false,
     custom_fields: agenda?.custom_fields || {},
+    assigned_to: agenda?.assigned_to || '',
+    assigned_to_name: agenda?.assigned_to_name || '',
   });
   const [saving, setSaving] = useState(false);
 
   const selectedType = agendaTypes.find(t => t.id === form.type_id);
   const typeFields = selectedType?.fields || [];
 
+  // Koordinatör profilleri — direktörler gündem atayabilir
+  const koordinatorProfiles = useMemo(() => {
+    if (!isDirektor || !allProfiles) return [];
+    return allProfiles.filter(p => p.role === 'koordinator');
+  }, [isDirektor, allProfiles]);
+
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
   const setCustom = (k, v) => setForm(prev => ({ ...prev, custom_fields: { ...prev.custom_fields, [k]: v } }));
+
+  const handleAssignCoord = (userId) => {
+    const p = (allProfiles || []).find(pr => pr.user_id === userId);
+    set('assigned_to', userId);
+    set('assigned_to_name', p?.full_name || '');
+  };
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return;
@@ -596,6 +610,8 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
       unit: form.unit || null,
       is_private: form.is_private,
       custom_fields: form.custom_fields,
+      assigned_to: form.assigned_to || null,
+      assigned_to_name: form.assigned_to_name || null,
     });
     setSaving(false);
   };
@@ -690,6 +706,24 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
             <span>🏗</span> Birim: <strong>{myUnit}</strong>
           </div>
         ) : null}
+
+        {/* Koordinatöre Atama — sadece direktör görür */}
+        {isDirektor && koordinatorProfiles.length > 0 && (
+          <div className="form-group">
+            <label className="form-label">👤 Koordinatöre Ata <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(isteğe bağlı)</span></label>
+            <select className="form-select" value={form.assigned_to} onChange={e => handleAssignCoord(e.target.value)}>
+              <option value="">— Koordinatör Seç —</option>
+              {koordinatorProfiles.map(p => (
+                <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+              ))}
+            </select>
+            {form.assigned_to && (
+              <div style={{ fontSize: 12, color: '#6366f1', marginTop: 4 }}>
+                📥 Bu gündem <strong>{form.assigned_to_name}</strong>'a atanacak.
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-group">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13.5 }}>
@@ -876,7 +910,8 @@ export default function Agendas({ user, profile }) {
   const hasPersonalTab = isDirektor || isKoordinator;
   const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
-  const isMineTab      = hasPersonalTab && personalTab === 'mine';
+  const isMineTab          = hasPersonalTab && personalTab === 'mine';
+  const isAssignedToMeTab  = isKoordinator && personalTab === 'assigned_to_me';
 
   // Tab başlığı role göre
   const unitTabLabel = isDirektor ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -908,24 +943,32 @@ export default function Agendas({ user, profile }) {
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
-      // "Gündemlerim" tabında sadece kişisel gündemler
-      if (isMineTab && !a.is_personal) return false;
-      // Departman tabında kişisel gündemler gizli
-      if (!isMineTab && a.is_personal) return false;
+      if (isAssignedToMeTab) {
+        // "Bana Atanan" sekmesi: başkası tarafından atanmış gündemler
+        if (!(a.assigned_to === myId && a.created_by !== myId)) return false;
+      } else if (isMineTab) {
+        // "Gündemlerim" sekmesi: sadece kişisel gündemler
+        if (!a.is_personal) return false;
+      } else {
+        // "Birim/Departman" sekmesi: kişisel ve bana atanan gündemler gizli
+        if (a.is_personal) return false;
+        // Koordinatör için: direktörden atanan gündemler bu sekmede gizli
+        if (isKoordinator && a.assigned_to === myId && a.created_by !== myId) return false;
+      }
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-      if (canSeeAllUnits && !isMineTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
+      if (canSeeAllUnits && !isMineTab && !isAssignedToMeTab && filterUnit !== 'all' && a.unit !== filterUnit) return false;
       if (searchQ) {
         const q = searchQ.toLowerCase();
         if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, myId]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, myId, isKoordinator]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
-    if (!canSeeAllUnits || isMineTab || filterUnit !== 'all') return null;
+    if (!canSeeAllUnits || isMineTab || isAssignedToMeTab || filterUnit !== 'all') return null;
     const groups = {};
     filteredAgendas.forEach(a => {
       const key = a.unit || '—';
@@ -933,7 +976,7 @@ export default function Agendas({ user, profile }) {
       groups[key].push(a);
     });
     return groups;
-  }, [filteredAgendas, canSeeAllUnits, isMineTab, filterUnit]);
+  }, [filteredAgendas, canSeeAllUnits, isMineTab, isAssignedToMeTab, filterUnit]);
 
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
@@ -996,11 +1039,13 @@ export default function Agendas({ user, profile }) {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            {isMineTab
-              ? `${filteredAgendas.length} gündem · kişisel`
-              : canSeeAllUnits
-                ? `${agendas.filter(a => !a.is_personal).length} gündem · tüm birimler`
-                : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
+            {isAssignedToMeTab
+              ? `${filteredAgendas.length} gündem · bana atanan`
+              : isMineTab
+                ? `${filteredAgendas.length} gündem · kişisel`
+                : canSeeAllUnits
+                  ? `${agendas.filter(a => !a.is_personal).length} gündem · tüm birimler`
+                  : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -1008,7 +1053,7 @@ export default function Agendas({ user, profile }) {
             )}
           </p>
         </div>
-        {canCreate && (
+        {canCreate && !isAssignedToMeTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1019,10 +1064,15 @@ export default function Agendas({ user, profile }) {
       {hasPersonalTab && (
         <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
           {[
-            { id: 'unit', icon: unitTabIcon, label: unitTabLabel },
-            { id: 'mine', icon: '📋',        label: 'Gündemlerim' },
+            { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
+            ...(isKoordinator ? [{ id: 'assigned_to_me', icon: '📥', label: 'Bana Atanan' }] : []),
+            { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
           ].map(tab => {
             const isActive = personalTab === tab.id;
+            // "Bana Atanan" sekmesinde bekleyen gündem sayısını badge olarak göster
+            const assignedCount = tab.id === 'assigned_to_me'
+              ? agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length
+              : 0;
             return (
               <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
                 style={{
@@ -1035,6 +1085,11 @@ export default function Agendas({ user, profile }) {
                   transition: 'all 0.15s',
                 }}>
                 <span>{tab.icon}</span> {tab.label}
+                {assignedCount > 0 && (
+                  <span style={{ background: '#6366f1', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '1px 7px', marginLeft: 2 }}>
+                    {assignedCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1042,7 +1097,7 @@ export default function Agendas({ user, profile }) {
       )}
 
       {/* Birim sekmeleri — departman tabında direktör */}
-      {canSeeAllUnits && !isMineTab && availableUnits.length > 1 && (
+      {canSeeAllUnits && !isMineTab && !isAssignedToMeTab && availableUnits.length > 1 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, flexWrap: 'wrap' }}>
           <button
             onClick={() => setFilterUnit('all')}
@@ -1176,6 +1231,8 @@ export default function Agendas({ user, profile }) {
           myUnit={myUnit}
           canSeeAllUnits={canSeeAllUnits}
           availableUnits={availableUnits}
+          isDirektor={isDirektor}
+          allProfiles={allProfiles}
           onSave={handleSaveAgenda}
           onClose={() => { setAgendaModal(false); setEditAgenda(null); }}
         />

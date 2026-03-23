@@ -546,7 +546,10 @@ export const getAgendasV2 = async (userId = null, unit = null) => {
     query = query.or(`is_personal.is.null,is_personal.eq.false,created_by.eq.${userId}`);
   }
   // Birime göre filtrele (direktör değilse sadece kendi birimi)
-  if (unit) {
+  // assigned_to=userId olan gündemler birim filtresini bypass eder (direktörden atama)
+  if (unit && userId) {
+    query = query.or(`unit.eq.${unit},assigned_to.eq.${userId}`);
+  } else if (unit) {
     query = query.eq('unit', unit);
   }
   const { data, error } = await query;
