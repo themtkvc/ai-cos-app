@@ -116,6 +116,63 @@ export const ASSISTANT_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'create_contact',
+    description: 'Network modülüne yeni bir kişi ekler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        full_name: { type: 'string', description: 'Kişinin tam adı' },
+        position: { type: 'string', description: 'Pozisyon/unvan' },
+        email: { type: 'string', description: 'E-posta adresi' },
+        phone: { type: 'string', description: 'Telefon numarası' },
+        organization_name: { type: 'string', description: 'Bağlı olduğu kurum adı (varsa eşleştirilir)' },
+        country: { type: 'string', description: 'Ülke (Türkçe, örn: Türkiye, ABD, Almanya)' },
+        city: { type: 'string', description: 'Şehir' },
+        linkedin: { type: 'string', description: 'LinkedIn profil URL' },
+        notes: { type: 'string', description: 'Notlar' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Etiketler listesi' },
+        priority: { type: 'string', description: 'Öncelik: Kritik, Yüksek, Orta, Düşük (varsayılan Orta)' },
+        process_stage: { type: 'string', description: 'Süreç aşaması: İlk Temas, İletişim Geliştirme, İşbirliği Görüşmesi, Aktif İşbirliği, Pasif / Beklemede' },
+      },
+      required: ['full_name'],
+    },
+  },
+  {
+    name: 'create_organization',
+    description: 'Network modülüne yeni bir kurum/organizasyon ekler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Kurum adı' },
+        org_type: { type: 'string', description: 'Tür: ngo, donor, government, un_agency, private, academic, media, other' },
+        website: { type: 'string', description: 'Web sitesi URL' },
+        email: { type: 'string', description: 'E-posta' },
+        phone: { type: 'string', description: 'Telefon' },
+        address: { type: 'string', description: 'Adres' },
+        description: { type: 'string', description: 'Kurum açıklaması' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Etiketler' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'create_event',
+    description: 'Network modülüne yeni bir etkinlik ekler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Etkinlik adı' },
+        event_type: { type: 'string', description: 'Tür: conference, meeting, workshop, training, forum, visit, other' },
+        event_date: { type: 'string', description: 'Etkinlik tarihi (YYYY-MM-DD)' },
+        end_date: { type: 'string', description: 'Bitiş tarihi (YYYY-MM-DD)' },
+        location: { type: 'string', description: 'Konum (Şehir, Ülke)' },
+        description: { type: 'string', description: 'Açıklama' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Etiketler' },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 // ── Tool executor: Her tool çağrısını Supabase ile çalıştırır ──────────────
@@ -262,6 +319,64 @@ export async function executeTool(toolName, toolInput, context) {
       return { profiles: data, count: data?.length || 0 };
     }
 
+    case 'create_contact': {
+      // Kurum eşleştir
+      let organizationId = null;
+      if (toolInput.organization_name) {
+        const { data: orgs } = await supabase.from('network_organizations').select('id, name').ilike('name', `%${toolInput.organization_name}%`).limit(1);
+        if (orgs?.length) organizationId = orgs[0].id;
+      }
+      const { data, error } = await supabase.from('network_contacts').insert({
+        full_name: toolInput.full_name,
+        position: toolInput.position || null,
+        email: toolInput.email || null,
+        phone: toolInput.phone || null,
+        linkedin: toolInput.linkedin || null,
+        notes: toolInput.notes || null,
+        organization_id: organizationId,
+        country: toolInput.country || null,
+        city: toolInput.city || null,
+        tags: toolInput.tags || [],
+        priority: toolInput.priority || 'Orta',
+        process_stage: toolInput.process_stage || 'İlk Temas',
+        unit: userUnit,
+        created_by: userId,
+      }).select().single();
+      if (error) return { error: error.message };
+      return { success: true, contact: { id: data.id, full_name: data.full_name, organization: toolInput.organization_name || null } };
+    }
+
+    case 'create_organization': {
+      const { data, error } = await supabase.from('network_organizations').insert({
+        name: toolInput.name,
+        org_type: toolInput.org_type || 'other',
+        website: toolInput.website || null,
+        email: toolInput.email || null,
+        phone: toolInput.phone || null,
+        address: toolInput.address || null,
+        description: toolInput.description || null,
+        tags: toolInput.tags || [],
+        unit: userUnit,
+      }).select().single();
+      if (error) return { error: error.message };
+      return { success: true, organization: { id: data.id, name: data.name, org_type: data.org_type } };
+    }
+
+    case 'create_event': {
+      const { data, error } = await supabase.from('network_events').insert({
+        name: toolInput.name,
+        event_type: toolInput.event_type || 'other',
+        event_date: toolInput.event_date || null,
+        end_date: toolInput.end_date || null,
+        location: toolInput.location || null,
+        description: toolInput.description || null,
+        tags: toolInput.tags || [],
+        unit: userUnit,
+      }).select().single();
+      if (error) return { error: error.message };
+      return { success: true, event: { id: data.id, name: data.name, event_date: data.event_date } };
+    }
+
     default:
       return { error: `Bilinmeyen araç: ${toolName}` };
   }
@@ -270,6 +385,12 @@ export async function executeTool(toolName, toolInput, context) {
 // ── System prompt ────────────────────────────────────────────────────────────
 export const ASSISTANT_SYSTEM_PROMPT = `Sen bir STK (sivil toplum kuruluşu) yönetim platformunun AI asistanısın. Adın "COS Asistan".
 Kullanıcılara gündem oluşturma, görev atama, network kişileri arama gibi konularda yardımcı oluyorsun.
+
+Yeteneklerin:
+- Gündem oluşturma, görev ekleme/atama/durum güncelleme
+- Network kişi ekleme, kurum ekleme, etkinlik ekleme
+- Kişi arama, kurum arama, gündem arama
+- Personel listesi, genel özet istatistikler
 
 Kurallar:
 - Türkçe konuş, kısa ve net cevaplar ver.

@@ -54,7 +54,10 @@ function ToolIndicator({ name }) {
     update_task_status: '✏️ Görev güncelliyor…',
     list_tasks: '📋 Görevleri listeliyor…',
     search_contacts: '🧑 Kişi arıyor…',
+    create_contact: '🧑 Kişi ekleniyor…',
     search_organizations: '🏢 Kurum arıyor…',
+    create_organization: '🏢 Kurum ekleniyor…',
+    create_event: '📅 Etkinlik ekleniyor…',
     get_summary: '📊 Özet hazırlıyor…',
     list_profiles: '👥 Personel listeliyor…',
   };
