@@ -14,6 +14,7 @@ import ProfileSettings from './pages/ProfileSettings';
 import DonationTracker from './pages/DonationTracker';
 import OrgChart from './pages/OrgChart';
 import NetworkManager from './pages/NetworkManager';
+import NetworkAnalytics from './pages/NetworkAnalytics';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -25,7 +26,7 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','admin','users','profile'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','admin','users','profile'],
   direktor_yardimcisi:  ['dashboard','chat','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','profile'],
   asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','profile'],
   koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','profile'],
@@ -252,7 +253,8 @@ export default function App() {
     profile:    ProfileSettings,
     donations: DonationTracker,
     orgchart:  OrgChart,
-    network:   NetworkManager,
+    network:          NetworkManager,
+    networkanalytics: NetworkAnalytics,
     admin:     Admin,
     users:     Admin,
   };
@@ -271,7 +273,8 @@ export default function App() {
     analytics:  '📈 Çalışma Analizi',
     donations:  '💰 Bağış Takip',
     orgchart:   '🏢 Org Şeması',
-    network:    '🕸️ Network',
+    network:          '🕸️ Network',
+    networkanalytics: '🔬 Network Analiz',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',
