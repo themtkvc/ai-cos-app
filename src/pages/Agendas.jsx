@@ -985,7 +985,7 @@ export default function Agendas({ user, profile }) {
   const canCreate      = CREATOR_ROLES.includes(role);
   const isMineTab          = hasPersonalTab && personalTab === 'mine';
   const isAssignedToMeTab  = (isKoordinator || isAsistan) && personalTab === 'assigned_to_me';
-  const isAssignedByMeTab  = isDirektor && personalTab === 'assigned_by_me';
+  const isAssignedByMeTab  = (isDirektor || isKoordinator) && personalTab === 'assigned_by_me';
 
   // Tab başlığı role göre
   const unitTabLabel = (isDirektor || isAsistan) ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -1018,10 +1018,10 @@ export default function Agendas({ user, profile }) {
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
       if (isAssignedByMeTab) {
-        // "Atadığım Gündemler" sekmesi (direktör): koordinatöre atanmış gündemler
-        if (!(a.assigned_to && a.created_by === myId && !a.is_personal)) return false;
+        // "Atadığım Gündemler" sekmesi (direktör/koordinatör): başkasına atanmış gündemler
+        if (!(a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal)) return false;
       } else if (isAssignedToMeTab) {
-        // "Bana Atanan" sekmesi (koordinatör): başkası tarafından atanmış gündemler
+        // "Bana Atanan" sekmesi (koordinatör/asistan): başkası tarafından atanmış gündemler
         if (!(a.assigned_to === myId && a.created_by !== myId)) return false;
       } else if (isMineTab) {
         // "Gündemlerim" sekmesi: sadece kişisel gündemler
@@ -1029,12 +1029,13 @@ export default function Agendas({ user, profile }) {
       } else {
         // "Birim/Departman" sekmesi: kişisel gündemler gizli
         if (a.is_personal) return false;
-        // Koordinatör için: direktörden atanan gündemler bu sekmede gizli
+        // Koordinatör için: direktörden atanan gündemler bu sekmede gizli (Bana Atanan'da görünür)
         if (isKoordinator && a.assigned_to === myId && a.created_by !== myId) return false;
+        // Koordinatör için: başkasına (personele) atadığı gündemler bu sekmede gizli (Atadığım'da görünür)
+        if (isKoordinator && a.assigned_to && a.assigned_to !== myId && a.created_by === myId) return false;
         // Direktör için: koordinatöre/asistana atanmış gündemler bu sekmede gizli
         if (isDirektor && a.assigned_to && !a.is_personal) return false;
         // Asistana atanan görevler birim sekmesinde hiç görünmez
-        // (asistanın rolü birim işlerinden bağımsız, sadece direktöre özel)
         const assignedProfile = allProfiles.find(p => p.user_id === a.assigned_to || p.id === a.assigned_to);
         if (assignedProfile?.role === 'asistan' && a.assigned_to !== myId) return false;
       }
@@ -1365,7 +1366,7 @@ export default function Agendas({ user, profile }) {
           {[
             { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
             ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
-            ...(isDirektor                ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
+            ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
             { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
           ].map(tab => {
             const isActive = personalTab === tab.id;
@@ -1373,7 +1374,7 @@ export default function Agendas({ user, profile }) {
             const assignedCount = tab.id === 'assigned_to_me'
               ? agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length
               : tab.id === 'assigned_by_me'
-                ? agendas.filter(a => a.assigned_to && a.created_by === myId && !a.is_personal).length
+                ? agendas.filter(a => a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal).length
                 : 0;
             return (
               <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
@@ -1514,7 +1515,7 @@ export default function Agendas({ user, profile }) {
           </div>
         </div>
       ) : isAssignedByMeTab ? (
-        /* Direktör: koordinatöre göre gruplu "Atadığım Gündemler" görünümü */
+        /* Direktör/Koordinatör: atanan kişiye göre gruplu "Atadığım Gündemler" görünümü */
         (() => {
           const byAssignee = {};
           filteredAgendas.forEach(a => {
