@@ -338,6 +338,7 @@ export async function executeTool(toolName, toolInput, context) {
             org_type: 'other',
             tags: [],
             unit: userUnit,
+            created_by: userId,
           }).select().single();
           if (!orgErr && newOrg) {
             organizationId = newOrg.id;
@@ -377,6 +378,7 @@ export async function executeTool(toolName, toolInput, context) {
         description: toolInput.description || null,
         tags: toolInput.tags || [],
         unit: userUnit,
+        created_by: userId,
       }).select().single();
       if (error) return { error: error.message };
       return { success: true, organization: { id: data.id, name: data.name, org_type: data.org_type } };
@@ -392,6 +394,7 @@ export async function executeTool(toolName, toolInput, context) {
         description: toolInput.description || null,
         tags: toolInput.tags || [],
         unit: userUnit,
+        created_by: userId,
       }).select().single();
       if (error) return { error: error.message };
       return { success: true, event: { id: data.id, name: data.name, event_date: data.event_date } };
