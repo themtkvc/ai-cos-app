@@ -635,10 +635,14 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
   const selectedType = agendaTypes.find(t => t.id === form.type_id);
   const typeFields = selectedType?.fields || [];
 
-  // Koordinatör profilleri — direktörler gündem atayabilir
+  // Atanabilir profiller — direktör koordinatörlere ve asistana gündem atayabilir
   const koordinatorProfiles = useMemo(() => {
     if (!isDirektor || !allProfiles) return [];
-    return allProfiles.filter(p => p.role === 'koordinator' && p.unit);
+    return allProfiles.filter(p =>
+      (p.role === 'koordinator' && p.unit) ||
+      p.role === 'asistan' ||
+      p.role === 'direktor_yardimcisi'
+    );
   }, [isDirektor, allProfiles]);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
