@@ -516,6 +516,17 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             </div>
           )}
 
+          {/* Drive Linki (etkinlik) */}
+          {type === 'event' && item.drive_url && (
+            <div style={{ marginBottom:16 }}>
+              <a href={item.drive_url} target="_blank" rel="noreferrer" style={{
+                display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px',
+                borderRadius:8, background:'#fef9c3', border:'1.5px solid #fde047',
+                color:'#854d0e', fontSize:12.5, fontWeight:700, textDecoration:'none',
+              }}>📁 Drive Klasörünü Aç</a>
+            </div>
+          )}
+
           {(item.description || item.notes) && (
             <div style={{ marginBottom:20 }}>
               <div style={{ fontSize:11.5, fontWeight:700, color:'#9ca3af', letterSpacing:'0.05em', marginBottom:6, textTransform:'uppercase' }}>
@@ -655,7 +666,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
     };
     return {
       name:'', event_type:'conference', event_date:'', end_date:'',
-      location:'', description:'', cover_url:'', tags:[],
+      location:'', description:'', cover_url:'', tags:[], drive_url:'',
     };
   };
   const [form, setForm] = useState(initial ? {
@@ -976,6 +987,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
                 {inp('Bitiş Tarihi', 'end_date', 'date')}
               </div>
               {inp('Konum', 'location', 'text', 'Şehir, Ülke')}
+              {inp('Drive Linki', 'drive_url', 'url', 'https://drive.google.com/...')}
             </>
           )}
 
