@@ -1326,7 +1326,7 @@ export default function Agendas({ user, profile }) {
     if (viewMode === 'list')    return <ListView items={items} />;
     if (viewMode === 'gallery') return <GalleryView items={items} />;
     if (viewMode === 'table')   return <TableView items={items} />;
-    return <RenderItems items={items} />;
+    return <CardGrid items={items} />;
   };
 
   return (
