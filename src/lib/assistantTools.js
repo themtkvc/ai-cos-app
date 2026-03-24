@@ -130,10 +130,12 @@ export const ASSISTANT_TOOLS = [
         country: { type: 'string', description: 'Ülke (Türkçe, örn: Türkiye, ABD, Almanya)' },
         city: { type: 'string', description: 'Şehir' },
         linkedin: { type: 'string', description: 'LinkedIn profil URL' },
+        avatar_url: { type: 'string', description: 'Profil fotoğrafı URL (LinkedIn vb.)' },
         notes: { type: 'string', description: 'Notlar' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Etiketler listesi' },
         priority: { type: 'string', description: 'Öncelik: Kritik, Yüksek, Orta, Düşük (varsayılan Orta)' },
         process_stage: { type: 'string', description: 'Süreç aşaması: İlk Temas, İletişim Geliştirme, İşbirliği Görüşmesi, Aktif İşbirliği, Pasif / Beklemede' },
+        auto_create_org: { type: 'boolean', description: 'Kurum bulunamazsa otomatik oluşturulsun mu? (varsayılan true)' },
       },
       required: ['full_name'],
     },
@@ -320,11 +322,28 @@ export async function executeTool(toolName, toolInput, context) {
     }
 
     case 'create_contact': {
-      // Kurum eşleştir
+      // Kurum eşleştir — bulamazsa otomatik oluştur
       let organizationId = null;
-      if (toolInput.organization_name) {
-        const { data: orgs } = await supabase.from('network_organizations').select('id, name').ilike('name', `%${toolInput.organization_name}%`).limit(1);
-        if (orgs?.length) organizationId = orgs[0].id;
+      let orgCreated = false;
+      let orgName = toolInput.organization_name || null;
+      if (orgName) {
+        const { data: orgs } = await supabase.from('network_organizations').select('id, name').ilike('name', `%${orgName}%`).limit(1);
+        if (orgs?.length) {
+          organizationId = orgs[0].id;
+          orgName = orgs[0].name;
+        } else if (toolInput.auto_create_org !== false) {
+          // Kurum bulunamadı → otomatik oluştur
+          const { data: newOrg, error: orgErr } = await supabase.from('network_organizations').insert({
+            name: orgName,
+            org_type: 'other',
+            tags: [],
+            unit: userUnit,
+          }).select().single();
+          if (!orgErr && newOrg) {
+            organizationId = newOrg.id;
+            orgCreated = true;
+          }
+        }
       }
       const { data, error } = await supabase.from('network_contacts').insert({
         full_name: toolInput.full_name,
@@ -332,6 +351,7 @@ export async function executeTool(toolName, toolInput, context) {
         email: toolInput.email || null,
         phone: toolInput.phone || null,
         linkedin: toolInput.linkedin || null,
+        avatar_url: toolInput.avatar_url || null,
         notes: toolInput.notes || null,
         organization_id: organizationId,
         country: toolInput.country || null,
@@ -343,7 +363,7 @@ export async function executeTool(toolName, toolInput, context) {
         created_by: userId,
       }).select().single();
       if (error) return { error: error.message };
-      return { success: true, contact: { id: data.id, full_name: data.full_name, organization: toolInput.organization_name || null } };
+      return { success: true, contact: { id: data.id, full_name: data.full_name, organization: orgName }, organization_created: orgCreated };
     }
 
     case 'create_organization': {
@@ -407,9 +427,10 @@ Kurallar:
 
 📷 Ekran Görüntüsü / LinkedIn Profili İşleme:
 Kullanıcı bir ekran görüntüsü (özellikle LinkedIn profili) gönderdiğinde:
-1. Görseldeki tüm bilgileri dikkatle oku: isim, unvan/pozisyon, şirket/kurum, konum (şehir/ülke), LinkedIn URL vb.
-2. Çıkardığın bilgileri kullanıcıya kısaca özetle ve onay iste.
-3. Kullanıcı onaylarsa veya "ekle" derse, create_contact tool'unu kullanarak kişiyi ekle.
-4. Eğer bir kurum adı görüyorsan, önce search_organizations ile kontrol et. Yoksa create_organization ile kurumu da oluştur.
+1. Görseldeki tüm bilgileri dikkatle oku: isim, unvan/pozisyon, şirket/kurum, konum (şehir/ülke), profil fotoğrafı URL vb.
+2. Çıkardığın bilgileri kullanıcıya kısaca özetle.
+3. Kullanıcı "ekle" derse veya mesajında "ekle" geçerse, hemen create_contact tool'unu çağır. Eğer kullanıcı görselle birlikte "bu kişiyi ekle" gibi bir mesaj gönderdiyse, onay sormadan direkt ekle.
+4. ÖNEMLİ — Kurum işleme: create_contact'ta organization_name alanını doldur. Tool otomatik olarak kurumu arayacak, bulamazsa yeni kurum oluşturacak. Ayrı bir create_organization çağrısı yapmana gerek yok.
 5. LinkedIn URL'sini linkedin alanına kaydet.
-6. Konum bilgisinden ülke ve şehir ayrıştır (örn: "Istanbul, Turkey" → country: "Türkiye", city: "İstanbul").`;
+6. Konum bilgisinden ülke ve şehir ayrıştır (örn: "Istanbul, Turkey" → country: "Türkiye", city: "İstanbul").
+7. Profil fotoğrafı: LinkedIn ekran görüntüsünde profil fotoğrafı doğrudan URL olarak erişilemez. Ancak görselden fotoğraf URL'si çıkarabilirsen avatar_url alanına kaydet.`;
