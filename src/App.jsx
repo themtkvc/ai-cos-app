@@ -18,6 +18,7 @@ import NetworkAnalytics from './pages/NetworkAnalytics';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
+import AIChatPanel from './components/AIChatPanel';
 import './App.css';
 
 // ── Role Context ──
@@ -127,6 +128,7 @@ export default function App() {
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
   const [dailyLogLinkedTask, setDailyLogLinkedTask] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
 
   // Offline detection
   useEffect(() => {
@@ -327,6 +329,28 @@ export default function App() {
             <Dashboard user={user} profile={profile} onNavigate={navigate} />
           )}
         </main>
+
+        {/* AI Asistan Chat */}
+        <AIChatPanel user={user} profile={profile} isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+        {!aiChatOpen && (
+          <button
+            onClick={() => setAiChatOpen(true)}
+            title="COS Asistan"
+            style={{
+              position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+              width: 56, height: 56, borderRadius: '50%', border: 'none',
+              background: 'var(--navy, #1a3a5c)', color: '#fff',
+              fontSize: 26, cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.25)'; }}
+          >
+            🤖
+          </button>
+        )}
       </div>
     </ProfileContext.Provider>
   );

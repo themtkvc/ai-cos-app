@@ -1,7 +1,6 @@
-// Vercel Serverless Function — Claude API Proxy
+// Vercel Serverless Function — Claude API Proxy (Tool Calling destekli)
 // API key burada kalır, tarayıcıya gitmez
 export default async function handler(req, res) {
-  // Sadece POST isteklerine izin ver
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,7 +11,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, system, max_tokens = 4096 } = req.body;
+    const { messages, system, max_tokens = 4096, tools } = req.body;
+
+    const body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens,
+      system,
+      messages,
+    };
+
+    // Tool tanımları varsa ekle
+    if (tools && tools.length > 0) {
+      body.tools = tools;
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -21,12 +32,7 @@ export default async function handler(req, res) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens,
-        system,
-        messages,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
