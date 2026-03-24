@@ -45,12 +45,12 @@ export default function MeetingLog({ user, profile, onNavigate }) {
   // Role detection
   const isDirektor = useMemo(() => {
     if (!profile) return false;
-    return ['direktor', 'direktor_yardimcisi', 'asistan'].includes(profile.role);
+    return ['direktor', 'asistan'].includes(profile.role);
   }, [profile]);
 
   const isKoordinator = useMemo(() => {
     if (!profile) return false;
-    return profile.role === 'koordinator';
+    return ['koordinator', 'direktor_yardimcisi'].includes(profile.role);
   }, [profile]);
 
   const isPersonel = useMemo(() => {

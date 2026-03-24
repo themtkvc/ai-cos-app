@@ -254,8 +254,8 @@ export default function LogsDashboard({ user, profile }) {
   const [filterType, setFilterType]   = useState(() => {
     // Başlangıç filtresi: profil henüz yüklenmemiş olabilir, useEffect ile düzeltilir
     const r = profile?.role;
-    if (['direktor','direktor_yardimcisi','asistan'].includes(r)) return 'all';
-    if (r === 'koordinator') return 'unit';
+    if (['direktor','asistan'].includes(r)) return 'all';
+    if (['koordinator','direktor_yardimcisi'].includes(r)) return 'unit';
     return 'personal';
   });
   const [selectedPerson, setSelectedPerson] = useState('');   // user_id
@@ -265,18 +265,18 @@ export default function LogsDashboard({ user, profile }) {
   const [error, setError]             = useState(null);
 
   const role = profile?.role;
-  const isDirectorLevel = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
-  const canViewUnit = ['koordinator','direktor','direktor_yardimcisi','asistan'].includes(role) || profile?.can_view_dashboard;
+  const isDirectorLevel = ['direktor', 'asistan'].includes(role);
+  const canViewUnit = ['koordinator','direktor_yardimcisi','direktor','asistan'].includes(role) || profile?.can_view_dashboard;
   const canViewAll  = isDirectorLevel || profile?.can_view_dashboard;
 
   // Profile async yüklenince filterType'ı düzelt (race condition fix)
   useEffect(() => {
     if (!profile?.role) return;
     setFilterType(curr => {
-      if (curr !== 'personal') return curr; // kullanıcı zaten değiştirdi
+      if (curr !== 'personal') return curr;
       const r = profile.role;
-      if (['direktor','direktor_yardimcisi','asistan'].includes(r)) return 'all';
-      if (r === 'koordinator') return 'unit';
+      if (['direktor','asistan'].includes(r)) return 'all';
+      if (['koordinator','direktor_yardimcisi'].includes(r)) return 'unit';
       return 'personal';
     });
   }, [profile?.role]); // eslint-disable-line

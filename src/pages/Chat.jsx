@@ -28,8 +28,8 @@ const QUICK_ACTIONS_PERSONEL = [
   '📧 Koordinatörüme durum güncellemesi yaz',
 ];
 function getQuickActions(role) {
-  if (['direktor','direktor_yardimcisi','asistan'].includes(role)) return QUICK_ACTIONS_DIREKTOR;
-  if (role === 'koordinator') return QUICK_ACTIONS_KOORDINATOR;
+  if (['direktor','asistan'].includes(role)) return QUICK_ACTIONS_DIREKTOR;
+  if (['koordinator','direktor_yardimcisi'].includes(role)) return QUICK_ACTIONS_KOORDINATOR;
   return QUICK_ACTIONS_PERSONEL;
 }
 
@@ -85,7 +85,7 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
           content: (() => {
             const name = profile?.full_name?.split(' ')[0] || '';
             const r = profile?.role;
-            if (['direktor','direktor_yardimcisi','asistan'].includes(r)) {
+            if (['direktor','asistan'].includes(r)) {
               return `Merhaba${name ? ' ' + name : ''}. Ben AI Chief of Staff'ınızım.\n\nSisteminizdeki verilerle çalışıyorum — görevler, donörler, toplantı aksiyonları. Bana herhangi bir konuda sorabilirsiniz:\n\n**Sık kullanılan istekler:**\n- "Bu hafta ne yapmalıyım?" — öncelikli görev listesi\n- "WFP için email yaz" — taslak email\n- "Board meeting brifingini hazırla" — hazır belge\n- "Koordinatörler toplantısı gündemi" — gündem taslağı\n\nNasıl yardımcı olabilirim?`;
             }
             if (r === 'koordinator') {

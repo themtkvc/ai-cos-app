@@ -320,7 +320,7 @@ export default function DonationTracker({ user, profile, onNavigate }) {
     .join(' · ');
 
   // ── Rol guard ────────────────────────────────────────────────────────────
-  const allowedRoles = ['direktor','direktor_yardimcisi','asistan'];
+  const allowedRoles = ['direktor','asistan'];
   if (!allowedRoles.includes(profile?.role)) {
     return (
       <div style={{padding:40, textAlign:'center', color:'#6b7280'}}>

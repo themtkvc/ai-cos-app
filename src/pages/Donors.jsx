@@ -240,7 +240,7 @@ export default function Donors({ user, profile, onNavigate }) {
   }
 
   // Role guard — after all hooks
-  const allowedRoles = ['direktor','direktor_yardimcisi','asistan'];
+  const allowedRoles = ['direktor','asistan'];
   if (!allowedRoles.includes(profile?.role)) {
     return (
       <div style={{padding:40, textAlign:'center', color:'#6b7280'}}>

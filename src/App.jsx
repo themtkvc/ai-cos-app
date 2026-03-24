@@ -26,7 +26,7 @@ export const useProfile = () => useContext(ProfileContext);
 // Role-based page access
 export const ROLE_ACCESS = {
   direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','profile'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','profile'],
   asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','profile'],
   koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','profile'],
   personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','network','profile'],

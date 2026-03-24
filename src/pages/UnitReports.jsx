@@ -204,8 +204,8 @@ function ReportDetail({ report }) {
 // ── MAIN COMPONENT ───────────────────────────────────────────────────────────────
 export default function UnitReports({ user, profile, onNavigate }) {
   // ── ROLE DETECTION ────────────────────────────────────────────────────────
-  const isDirektor = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(profile?.role);
-  const isKoordinator = profile?.role === 'koordinator';
+  const isDirektor = ['direktor', 'asistan'].includes(profile?.role);
+  const isKoordinator = ['koordinator', 'direktor_yardimcisi'].includes(profile?.role);
   const isPersonel = profile?.role === 'personel';
   const userUnit = profile?.unit || '';
 

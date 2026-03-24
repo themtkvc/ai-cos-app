@@ -504,8 +504,8 @@ export default function LogsViewer({ user, profile }) {
 
   const role   = profile?.role;
   const myUnit = profile?.unit;
-  const isKoordinator   = role === 'koordinator';
-  const isDirectorLevel = ['direktor','direktor_yardimcisi','asistan'].includes(role);
+  const isKoordinator   = ['koordinator','direktor_yardimcisi'].includes(role);
+  const isDirectorLevel = ['direktor','asistan'].includes(role);
 
   // Tarih aralığı
   const { startDate, endDate, dateLabel } = useMemo(() => {

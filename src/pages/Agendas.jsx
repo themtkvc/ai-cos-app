@@ -526,26 +526,23 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
   const [saving, setSaving] = useState(false);
 
   // Atanabilir profiller:
-  // - Koordinatör → sadece personel
+  // - Koordinatör/Dir.Yard. → sadece kendi biriminin personeli
   // - Direktör "Gündemlerim" tabında → sadece kendisi (self-assign)
-  // - Diğer durumlarda → direktör/direktor_yardimcisi rolleri hariç, kendisi hariç
-  const DIREKTOR_ROLES = ['direktor', 'direktor_yardimcisi'];
+  // - Diğer durumlarda → direktör rolü hariç, kendisi hariç
+  const TOP_ROLES = ['direktor'];
   const assignableProfiles = useMemo(() => {
-    // Birimi atanmamış kullanıcıları filtrele (direktör hariç — direktörün birim zorunluluğu yok)
-    const withUnit = allProfiles.filter(p => p.unit || DIREKTOR_ROLES.includes(p.role));
-    if (role === 'koordinator') return withUnit.filter(p => p.role === 'personel');
+    const withUnit = allProfiles.filter(p => p.unit || TOP_ROLES.includes(p.role) || p.role === 'asistan');
+    if (role === 'koordinator' || role === 'direktor_yardimcisi') return withUnit.filter(p => p.role === 'personel' && p.unit === myUnit);
     if (allowSelfAssign) {
-      // Direktör kendi gündemlerinde sadece kendine atayabilir
       return allProfiles.filter(p => p.user_id === myId);
     }
-    // Direktörlere (direktor/direktor_yardimcisi) atama yapılamaz, sadece direktörler kendi aralarında atayabilir
-    const isDirektorRole = DIREKTOR_ROLES.includes(role);
+    const isTopRole = TOP_ROLES.includes(role);
     return withUnit.filter(p => {
-      if (p.user_id === myId) return false; // kendine atama yok (allowSelfAssign dışında)
-      if (!isDirektorRole && DIREKTOR_ROLES.includes(p.role)) return false; // direktöre atama yasak
+      if (p.user_id === myId) return false;
+      if (!isTopRole && TOP_ROLES.includes(p.role)) return false;
       return true;
     });
-  }, [allProfiles, myId, role, allowSelfAssign]);
+  }, [allProfiles, myId, role, myUnit, allowSelfAssign]);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -972,11 +969,12 @@ export default function Agendas({ user, profile }) {
   const myName = profile?.full_name || user?.email || '';
   const myUnit = profile?.unit || null;
 
-  const isDirektor     = ['direktor', 'direktor_yardimcisi'].includes(role);
+  const isDirektor     = role === 'direktor';
   const isAsistan      = role === 'asistan';
-  const isKoordinator  = role === 'koordinator';
+  const isDirYardimcisi = role === 'direktor_yardimcisi'; // Grants birimi sorumlusu
+  const isKoordinator  = role === 'koordinator' || isDirYardimcisi; // dir.yard. koordinatör gibi davranır
   const hasPersonalTab = isDirektor || isKoordinator || isAsistan;
-  const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
+  const canSeeAllUnits = ['direktor', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
   const isMineTab          = hasPersonalTab && personalTab === 'mine';
   const isAssignedToMeTab  = (isKoordinator || isAsistan) && personalTab === 'assigned_to_me';

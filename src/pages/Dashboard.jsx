@@ -45,8 +45,8 @@ const QA_PERSONEL = [
   { icon: '📋', text: 'Bana atanan gündemleri listele' },
 ];
 function getQA(role) {
-  if (['direktor','direktor_yardimcisi','asistan'].includes(role)) return QA_DIREKTOR;
-  if (role === 'koordinator') return QA_KOORDINATOR;
+  if (['direktor','asistan'].includes(role)) return QA_DIREKTOR;
+  if (['koordinator','direktor_yardimcisi'].includes(role)) return QA_KOORDINATOR;
   return QA_PERSONEL;
 }
 
@@ -165,8 +165,8 @@ export default function Dashboard({ user, profile, onNavigate }) {
   const role = profile?.role || 'personel';
   const myUnit = profile?.unit;
   const myId = user?.id;
-  const isDirektor = ['direktor','direktor_yardimcisi','asistan'].includes(role);
-  const isKoordinator = role === 'koordinator';
+  const isDirektor = ['direktor','asistan'].includes(role);
+  const isKoordinator = role === 'koordinator' || role === 'direktor_yardimcisi';
 
   const todayDate = useMemo(() => toLocalDateStr(new Date()), []);
   const todayStrF = useMemo(() => format(new Date(), "d MMMM yyyy, EEEE", { locale: tr }), []);

@@ -233,7 +233,7 @@ export const getAllDailyLogs = async (fromDate, toDate) => {
     .select('*, user_profiles!inner(full_name, role, unit)')
     .gte('log_date', fromDate)
     .lte('log_date', toDate)
-    .not('user_profiles.role', 'in', '("direktor","direktor_yardimcisi","asistan")')
+    .not('user_profiles.role', 'in', '("direktor","asistan")')
     .order('log_date', { ascending: false })
     .order('user_id');
   return { data, error };
