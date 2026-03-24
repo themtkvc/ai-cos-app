@@ -456,7 +456,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             {item.location && <InfoRow icon="📍" label="Konum"   val={item.location} />}
             {type==='contact' && item.country && <InfoRow icon={getFlag(item.country)} label="Ülke" val={item.country} />}
             {type==='contact' && item.first_contact_date && <InfoRow icon="📅" label="İlk İletişim" val={fmtDate(item.first_contact_date)} />}
-            {type==='contact' && item.assigned_to_name && <InfoRow icon="👤" label="Takip Sorumlusu" val={item.assigned_to_name} />}
+            {item.assigned_to_name && <InfoRow icon="👤" label="Takip Sorumlusu" val={item.assigned_to_name} />}
             {type==='contact' && item.referral_info && <InfoRow icon="🔀" label="Aracı Bilgisi" val={item.referral_info} />}
           </div>
 
@@ -663,10 +663,12 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
     if (type === 'organization') return {
       name:'', org_type:'ngo', website:'', email:'', phone:'',
       address:'', description:'', logo_url:'', tags:[],
+      assigned_to:'', assigned_to_name:'',
     };
     return {
       name:'', event_type:'conference', event_date:'', end_date:'',
       location:'', description:'', cover_url:'', tags:[], drive_url:'',
+      assigned_to:'', assigned_to_name:'',
     };
   };
   const [form, setForm] = useState(initial ? {
@@ -975,6 +977,19 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {inp('E-posta', 'email', 'email', 'info@kurum.org')}
               {inp('Telefon', 'phone', 'tel', '+90 xxx xxx xx xx')}
               {inp('Adres', 'address', 'text', 'Şehir, Ülke')}
+              {/* Takip Sorumlusu */}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <select value={form.assigned_to||''} onChange={e=>{
+                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  set('assigned_to', e.target.value || '');
+                  set('assigned_to_name', p ? p.full_name : '');
+                }}
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  <option value=''>Seçin…</option>
+                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+              </div>
             </>
           )}
 
@@ -988,6 +1003,19 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               </div>
               {inp('Konum', 'location', 'text', 'Şehir, Ülke')}
               {inp('Drive Linki', 'drive_url', 'url', 'https://drive.google.com/...')}
+              {/* Takip Sorumlusu */}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <select value={form.assigned_to||''} onChange={e=>{
+                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  set('assigned_to', e.target.value || '');
+                  set('assigned_to_name', p ? p.full_name : '');
+                }}
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  <option value=''>Seçin…</option>
+                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+              </div>
             </>
           )}
 
