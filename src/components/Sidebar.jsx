@@ -17,6 +17,7 @@ const ALL_NAV = [
   { id: 'orgchart',  icon: '🏢', label: 'Org Şeması' },
   { id: 'network',          icon: '🕸️', label: 'Network Yönetimi' },
   { id: 'networkanalytics', icon: '🔬', label: 'Network Analiz' },
+  { id: 'notes',            icon: '📝', label: 'Notlarım' },
 ];
 
 const ADMIN_NAV = [
