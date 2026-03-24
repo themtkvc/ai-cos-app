@@ -969,6 +969,7 @@ export default function Agendas({ user, profile }) {
   const [searchQ, setSearchQ] = useState('');
   // Direktör/Yardımcısı/Koordinatör için iki tab: 'unit' | 'mine'
   const [personalTab, setPersonalTab] = useState('unit');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'gallery' | 'table'
 
   const myId   = user?.id;
   const role   = profile?.role || 'personel';
@@ -1122,24 +1123,211 @@ export default function Agendas({ user, profile }) {
     }, 0);
   }, [agendas, role]);
 
-  // ── Kart grid yardımcısı ────────────────────────────────────────────────────
+  // ── Görünüm yardımcıları ────────────────────────────────────────────────────
+  const cardProps = (agenda) => ({
+    key: agenda.id,
+    agenda,
+    myId,
+    role,
+    profiles: allProfiles,
+    onEdit: handleEdit,
+    onDelete: handleDeleteAgenda,
+    onOpen: (a) => { setDetailAgenda(a); setDetailIsMine(isMineTab); },
+    onNotify: handleNotifyAgenda,
+  });
+
+  // GRID (mevcut kart grid)
   const CardGrid = ({ items }) => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-      {items.map(agenda => (
-        <AgendaCard
-          key={agenda.id}
-          agenda={agenda}
-          myId={myId}
-          role={role}
-          profiles={allProfiles}
-          onEdit={handleEdit}
-          onDelete={handleDeleteAgenda}
-          onOpen={(a) => { setDetailAgenda(a); setDetailIsMine(isMineTab); }}
-          onNotify={handleNotifyAgenda}
-        />
-      ))}
+      {items.map(agenda => <AgendaCard {...cardProps(agenda)} />)}
     </div>
   );
+
+  // GALLERY (daha geniş, yatay kartlar - 2 sütun)
+  const GalleryView = ({ items }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 20 }}>
+      {items.map(agenda => {
+        const type = agenda.agenda_types;
+        const typeColor = type?.color || '#6366f1';
+        const typeIcon = type?.icon || '📋';
+        const tasks = agenda.agenda_tasks || [];
+        const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
+        const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
+        return (
+          <div key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
+            className="card" style={{ cursor:'pointer', overflow:'hidden', padding:0, display:'flex', flexDirection:'row', transition:'transform 0.15s, box-shadow 0.15s' }}
+            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)';}}
+            onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='';}}
+          >
+            {/* Sol renk şeridi */}
+            <div style={{ width:6, background:typeColor, flexShrink:0 }} />
+            {/* Sol: ikon */}
+            <div style={{ width:80, display:'flex', alignItems:'center', justifyContent:'center', background:typeColor+'0a', flexShrink:0 }}>
+              <span style={{ fontSize:32 }}>{typeIcon}</span>
+            </div>
+            {/* Orta: bilgi */}
+            <div style={{ flex:1, padding:'16px 20px', minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:10.5, fontWeight:700, color:typeColor, background:typeColor+'18', padding:'2px 7px', borderRadius:20 }}>{type?.name||'Gündem'}</span>
+                <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>{statusMeta.label}</span>
+                {agenda.unit && <span style={{ fontSize:10, color:'var(--text-muted)', background:'var(--bg)', padding:'1px 6px', borderRadius:8 }}>🏗 {agenda.unit}</span>}
+              </div>
+              <div style={{ fontWeight:700, fontSize:15, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{agenda.title}</div>
+              {agenda.description && (
+                <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:'0 0 6px', lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{agenda.description}</p>
+              )}
+              {agenda.date && <div style={{ fontSize:11, color:'var(--text-muted)' }}>📅 {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}</div>}
+            </div>
+            {/* Sağ: görev bilgisi */}
+            <div style={{ width:120, borderLeft:'1px solid var(--border)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:16, gap:8, flexShrink:0 }}>
+              <div style={{ fontSize:24, fontWeight:800, color:typeColor }}>{doneTasks.length}/{tasks.length}</div>
+              <div style={{ fontSize:10.5, color:'var(--text-muted)', textAlign:'center' }}>görev tamamlandı</div>
+              {tasks.length > 0 && (
+                <div style={{ width:'100%', height:4, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${tasks.length>0?(doneTasks.length/tasks.length)*100:0}%`, background:typeColor, borderRadius:4 }} />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // LIST (kompakt liste)
+  const ListView = ({ items }) => (
+    <div className="card" style={{ padding:0, overflow:'hidden' }}>
+      {items.map((agenda, i) => {
+        const type = agenda.agenda_types;
+        const typeColor = type?.color || '#6366f1';
+        const typeIcon = type?.icon || '📋';
+        const tasks = agenda.agenda_tasks || [];
+        const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
+        const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
+        const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
+        const canEdit = CREATOR_ROLES.includes(role) && (agenda.created_by === myId || ['direktor','direktor_yardimcisi'].includes(role));
+        return (
+          <div key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
+            style={{
+              display:'flex', alignItems:'center', gap:14, padding:'12px 20px', cursor:'pointer',
+              borderBottom: i<items.length-1 ? '1px solid var(--border)' : 'none',
+              borderLeft:`3px solid ${typeColor}`, transition:'background 0.1s',
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--bg)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          >
+            <span style={{ fontSize:20, flexShrink:0 }}>{typeIcon}</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                <span style={{ fontWeight:700, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{agenda.title}</span>
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <span style={{ fontSize:10.5, fontWeight:600, color:typeColor, background:typeColor+'18', padding:'1px 6px', borderRadius:12 }}>{type?.name||'Gündem'}</span>
+                <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>{statusMeta.label}</span>
+                {agenda.unit && <span style={{ fontSize:10, color:'var(--text-muted)' }}>🏗 {agenda.unit}</span>}
+                {agenda.date && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>📅 {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span>}
+                {agenda.assigned_to_name && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>👤 {agenda.assigned_to_name}</span>}
+              </div>
+            </div>
+            {/* Görev sayacı */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+              {pendingTasks.length > 0 && (
+                <span style={{ fontSize:10, fontWeight:700, background:'#fffbeb', color:'#f59e0b', padding:'2px 6px', borderRadius:20 }}>⏳ {pendingTasks.length}</span>
+              )}
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>📌 {doneTasks.length}/{tasks.length}</span>
+              {tasks.length > 0 && (
+                <div style={{ width:48, height:4, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${(doneTasks.length/tasks.length)*100}%`, background:typeColor, borderRadius:4 }} />
+                </div>
+              )}
+            </div>
+            {/* Aksiyon butonları */}
+            <div style={{ display:'flex', gap:4, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
+              {canEdit && (
+                <>
+                  <button className="btn btn-sm btn-outline" onClick={()=>handleEdit(agenda)} title="Düzenle" style={{ padding:'3px 8px' }}>✏️</button>
+                  <button className="btn btn-sm btn-outline" onClick={()=>handleDeleteAgenda(agenda.id)} title="Sil" style={{ padding:'3px 8px', color:'#ef4444' }}>🗑</button>
+                </>
+              )}
+            </div>
+            <span style={{ color:'#d1d5db', fontSize:16, flexShrink:0 }}>›</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // TABLE (tablo görünümü)
+  const TableView = ({ items }) => (
+    <div className="card" style={{ padding:0, overflow:'auto' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+        <thead>
+          <tr style={{ background:'var(--bg)', borderBottom:'2px solid var(--border)' }}>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Gündem</th>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tür</th>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Durum</th>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Birim</th>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tarih</th>
+            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Sorumlu</th>
+            <th style={{ textAlign:'center', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Görevler</th>
+            <th style={{ textAlign:'center', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>İlerleme</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((agenda, i) => {
+            const type = agenda.agenda_types;
+            const typeColor = type?.color || '#6366f1';
+            const tasks = agenda.agenda_tasks || [];
+            const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
+            const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
+            const pct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
+            return (
+              <tr key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
+                style={{ cursor:'pointer', borderBottom:'1px solid var(--border)', transition:'background 0.1s' }}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--bg)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+              >
+                <td style={{ padding:'10px 14px', fontWeight:600 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:16 }}>{type?.icon||'📋'}</span>
+                    <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:240 }}>{agenda.title}</span>
+                  </div>
+                </td>
+                <td style={{ padding:'10px 14px' }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:typeColor, background:typeColor+'18', padding:'2px 8px', borderRadius:12 }}>{type?.name||'Gündem'}</span>
+                </td>
+                <td style={{ padding:'10px 14px', fontSize:12 }}>{statusMeta.label}</td>
+                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>{agenda.unit || '—'}</td>
+                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>
+                  {agenda.date ? new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+                </td>
+                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>{agenda.assigned_to_name || '—'}</td>
+                <td style={{ padding:'10px 14px', textAlign:'center', fontSize:12, fontWeight:600 }}>
+                  <span style={{ color:typeColor }}>{doneTasks.length}</span>/{tasks.length}
+                </td>
+                <td style={{ padding:'10px 14px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}>
+                    <div style={{ width:60, height:5, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background:typeColor, borderRadius:4 }} />
+                    </div>
+                    <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>%{pct}</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // Genel render yardımcısı — seçilen viewMode'a göre
+  const RenderItems = ({ items }) => {
+    if (viewMode === 'list')    return <ListView items={items} />;
+    if (viewMode === 'gallery') return <GalleryView items={items} />;
+    if (viewMode === 'table')   return <TableView items={items} />;
+    return <RenderItems items={items} />;
+  };
 
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
@@ -1241,7 +1429,7 @@ export default function Agendas({ user, profile }) {
         </div>
       )}
 
-      {/* Tür + durum + arama filtreleri */}
+      {/* Tür + durum + arama filtreleri + görünüm seçici */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="form-input" style={{ width: 200, fontSize: 13 }} placeholder="🔍 Ara…"
           value={searchQ} onChange={e => setSearchQ(e.target.value)} />
@@ -1255,6 +1443,27 @@ export default function Agendas({ user, profile }) {
           <option value="all">Tüm Durumlar</option>
           {AGENDA_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+
+        {/* Görünüm seçici */}
+        <div style={{ marginLeft:'auto', display:'flex', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:10, padding:2, gap:2 }}>
+          {[
+            { id:'grid',    icon:'▦', tip:'Grid' },
+            { id:'list',    icon:'☰', tip:'Liste' },
+            { id:'gallery', icon:'▬', tip:'Galeri' },
+            { id:'table',   icon:'▤', tip:'Tablo' },
+          ].map(v => (
+            <button key={v.id} title={v.tip} onClick={()=>setViewMode(v.id)}
+              style={{
+                width:32, height:30, display:'flex', alignItems:'center', justifyContent:'center',
+                borderRadius:8, border:'none', cursor:'pointer', fontSize:15,
+                background: viewMode===v.id ? 'var(--navy)' : 'transparent',
+                color: viewMode===v.id ? '#fff' : 'var(--text-muted)',
+                transition:'all 0.15s', fontWeight:700,
+              }}>
+              {v.icon}
+            </button>
+          ))}
+        </div>
 
         {(filterType !== 'all' || filterStatus !== 'all' || searchQ || filterUnit !== 'all') && (
           <button className="btn btn-outline btn-sm" onClick={() => { setFilterType('all'); setFilterStatus('all'); setSearchQ(''); setFilterUnit('all'); }}>
@@ -1327,7 +1536,7 @@ export default function Agendas({ user, profile }) {
                     </span>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
-                  <CardGrid items={items} />
+                  <RenderItems items={items} />
                 </div>
               ))}
             </div>
@@ -1355,13 +1564,13 @@ export default function Agendas({ user, profile }) {
                   </button>
                   <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                 </div>
-                <CardGrid items={items} />
+                <RenderItems items={items} />
               </div>
             ))}
         </div>
       ) : (
         /* Normal / filtreli görünüm */
-        <CardGrid items={filteredAgendas} />
+        <RenderItems items={filteredAgendas} />
       )}
 
       {/* Gündem Oluştur/Düzenle Modal */}
