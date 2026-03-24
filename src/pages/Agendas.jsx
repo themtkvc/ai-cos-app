@@ -973,17 +973,18 @@ export default function Agendas({ user, profile }) {
   const myUnit = profile?.unit || null;
 
   const isDirektor     = ['direktor', 'direktor_yardimcisi'].includes(role);
+  const isAsistan      = role === 'asistan';
   const isKoordinator  = role === 'koordinator';
-  const hasPersonalTab = isDirektor || isKoordinator;
+  const hasPersonalTab = isDirektor || isKoordinator || isAsistan;
   const canSeeAllUnits = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
   const isMineTab          = hasPersonalTab && personalTab === 'mine';
-  const isAssignedToMeTab  = isKoordinator && personalTab === 'assigned_to_me';
+  const isAssignedToMeTab  = (isKoordinator || isAsistan) && personalTab === 'assigned_to_me';
   const isAssignedByMeTab  = isDirektor && personalTab === 'assigned_by_me';
 
   // Tab başlığı role göre
-  const unitTabLabel = isDirektor ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
-  const unitTabIcon  = isDirektor ? '🏢' : '🏗';
+  const unitTabLabel = (isDirektor || isAsistan) ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
+  const unitTabIcon  = (isDirektor || isAsistan) ? '🏢' : '🏗';
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -1025,8 +1026,12 @@ export default function Agendas({ user, profile }) {
         if (a.is_personal) return false;
         // Koordinatör için: direktörden atanan gündemler bu sekmede gizli
         if (isKoordinator && a.assigned_to === myId && a.created_by !== myId) return false;
-        // Direktör için: koordinatöre atanmış gündemler bu sekmede gizli
+        // Direktör için: koordinatöre/asistana atanmış gündemler bu sekmede gizli
         if (isDirektor && a.assigned_to && !a.is_personal) return false;
+        // Asistana atanan görevler birim sekmesinde hiç görünmez
+        // (asistanın rolü birim işlerinden bağımsız, sadece direktöre özel)
+        const assignedProfile = allProfiles.find(p => p.user_id === a.assigned_to || p.id === a.assigned_to);
+        if (assignedProfile?.role === 'asistan' && a.assigned_to !== myId) return false;
       }
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
@@ -1037,7 +1042,7 @@ export default function Agendas({ user, profile }) {
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, myId, isKoordinator, isDirektor]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, myId, isKoordinator, isDirektor, allProfiles]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
@@ -1140,7 +1145,7 @@ export default function Agendas({ user, profile }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
             {isAssignedByMeTab
-              ? `${filteredAgendas.length} gündem · koordinatöre atanan`
+              ? `${filteredAgendas.length} gündem · atadığım`
               : isAssignedToMeTab
                 ? `${filteredAgendas.length} gündem · bana atanan`
                 : isMineTab
@@ -1167,8 +1172,8 @@ export default function Agendas({ user, profile }) {
         <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
           {[
             { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
-            ...(isKoordinator ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
-            ...(isDirektor    ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
+            ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
+            ...(isDirektor                ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
             { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
           ].map(tab => {
             const isActive = personalTab === tab.id;
