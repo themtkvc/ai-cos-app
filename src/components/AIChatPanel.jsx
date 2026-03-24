@@ -130,26 +130,40 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  // ── Görsel yükleme handler ─────────────────────────────────────────────────
-  const handleImageSelect = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Boyut kontrolü (5 MB)
+  // ── Ortak görsel işleme (file picker + paste) ───────────────────────────────
+  const processImageFile = useCallback((file) => {
+    if (!file || !file.type.startsWith('image/')) return;
     if (file.size > 5 * 1024 * 1024) {
       alert('Görsel boyutu 5 MB\'dan küçük olmalıdır.');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result; // data:image/png;base64,...
+      const dataUrl = reader.result;
       const base64 = dataUrl.split(',')[1];
       const mediaType = file.type || 'image/png';
       setPendingImage({ base64, preview: dataUrl, mediaType });
     };
     reader.readAsDataURL(file);
-    // Reset file input
-    e.target.value = '';
   }, []);
+
+  const handleImageSelect = useCallback((e) => {
+    processImageFile(e.target.files?.[0]);
+    e.target.value = '';
+  }, [processImageFile]);
+
+  // ── Yapıştırma (Ctrl+V / Cmd+V) ile görsel ekleme ─────────────────────────
+  const handlePaste = useCallback((e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        processImageFile(item.getAsFile());
+        return;
+      }
+    }
+  }, [processImageFile]);
 
   // ── Mesaj gönder ve tool loop ──────────────────────────────────────────────
   const sendMessage = useCallback(async () => {
@@ -397,6 +411,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={pendingImage ? '"Bu kişiyi ekle" yazıp gönderin…' : 'Mesajınızı yazın…'}
           rows={1}
           style={{
