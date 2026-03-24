@@ -10,6 +10,7 @@ import {
   getAllProfiles,
 } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDisplayDate } from '../lib/constants';
+import { WORLD_COUNTRIES, getCountryFlag, CITIES_BY_COUNTRY } from '../lib/worldData';
 
 // ── SABİTLER ─────────────────────────────────────────────────────────────────
 const ORG_TYPES = [
@@ -40,16 +41,7 @@ const CONNECTION_LABELS = [
 const fmtDate = fmtDisplayDate;
 
 // ── YENİ KİŞİ KARTI SABİTLERİ ──────────────────────────────────────────────────
-const COUNTRIES = [
-  { value:'Türkiye',    flag:'🇹🇷' }, { value:'ABD',        flag:'🇺🇸' },
-  { value:'Almanya',    flag:'🇩🇪' }, { value:'İngiltere',  flag:'🇬🇧' },
-  { value:'Fransa',     flag:'🇫🇷' }, { value:'Hollanda',   flag:'🇳🇱' },
-  { value:'İsviçre',    flag:'🇨🇭' }, { value:'Belçika',    flag:'🇧🇪' },
-  { value:'İsveç',      flag:'🇸🇪' }, { value:'Norveç',     flag:'🇳🇴' },
-  { value:'Kanada',     flag:'🇨🇦' }, { value:'Japonya',    flag:'🇯🇵' },
-  { value:'Avustralya', flag:'🇦🇺' }, { value:'İtalya',     flag:'🇮🇹' },
-];
-const getFlag = (c) => COUNTRIES.find(x=>x.value===c)?.flag || '🌍';
+const getFlag = getCountryFlag;
 
 const PROCESS_STAGES = [
   { value:'İlk Temas',            color:'#9ca3af', icon:'📞' },
@@ -134,6 +126,128 @@ function EmptyState({ icon, title, sub }) {
       <div style={{ fontSize:44, marginBottom:14 }}>{icon}</div>
       <div style={{ fontSize:15, fontWeight:700, color:'#374151', marginBottom:6 }}>{title}</div>
       <div style={{ fontSize:13 }}>{sub}</div>
+    </div>
+  );
+}
+
+// ── AUTOCOMPLETE BİLEŞENİ ───────────────────────────────────────────────────
+function Autocomplete({ value, onChange, options, placeholder, renderOption, label }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const wrapRef = useRef(null);
+  const listRef = useRef(null);
+
+  // Dışarı tıklanınca kapat
+  useEffect(() => {
+    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Input değeri: seçili varsa göster, yoksa arama metnini göster
+  const displayValue = open ? query : (value || '');
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options.slice(0, 30); // boş ise ilk 30
+    const q = query.toLowerCase().replace(/ı/g,'i').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ğ/g,'g');
+    return options.filter(opt => {
+      const v = (typeof opt === 'string' ? opt : opt.value || opt.label || '').toLowerCase()
+        .replace(/ı/g,'i').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ğ/g,'g');
+      return v.includes(q);
+    }).slice(0, 40);
+  }, [query, options]);
+
+  const handleSelect = (opt) => {
+    const val = typeof opt === 'string' ? opt : opt.value;
+    onChange(val);
+    setQuery('');
+    setOpen(false);
+    setHighlightIdx(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx(i => Math.min(i + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); handleSelect(filtered[highlightIdx]); }
+    else if (e.key === 'Escape') { setOpen(false); }
+  };
+
+  // Highlight edilen öğeyi görünür yap
+  useEffect(() => {
+    if (listRef.current && highlightIdx >= 0) {
+      const el = listRef.current.children[highlightIdx];
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIdx]);
+
+  return (
+    <div ref={wrapRef} style={{ position:'relative' }}>
+      {label && (
+        <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+          {label}
+        </label>
+      )}
+      <div style={{ position:'relative' }}>
+        <input
+          value={displayValue}
+          placeholder={placeholder || 'Yazmaya başlayın…'}
+          onFocus={() => { setOpen(true); setQuery(''); setHighlightIdx(-1); }}
+          onChange={e => { setQuery(e.target.value); setOpen(true); setHighlightIdx(-1); if (!e.target.value) onChange(''); }}
+          onKeyDown={handleKeyDown}
+          style={{
+            width:'100%', boxSizing:'border-box', padding:'9px 32px 9px 12px', borderRadius:9,
+            border:'1.5px solid ' + (open ? '#3b82f6' : '#e5e7eb'), fontSize:13.5,
+            fontFamily:'inherit', color:'#111827', outline:'none',
+            transition:'border-color 0.15s',
+          }}
+        />
+        {value && (
+          <button onClick={() => { onChange(''); setQuery(''); }} style={{
+            position:'absolute', right:8, top:'50%', transform:'translateY(-50%)',
+            background:'none', border:'none', cursor:'pointer', color:'#9ca3af', fontSize:16, padding:0, lineHeight:1,
+          }}>×</button>
+        )}
+        {!value && (
+          <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'#d1d5db', fontSize:12, pointerEvents:'none' }}>🔍</span>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div ref={listRef} style={{
+          position:'absolute', top:'100%', left:0, right:0, zIndex:999,
+          background:'white', border:'1px solid #e5e7eb', borderRadius:10,
+          boxShadow:'0 8px 24px rgba(0,0,0,0.12)', maxHeight:220, overflowY:'auto',
+          marginTop:4,
+        }}>
+          {filtered.map((opt, i) => {
+            const val = typeof opt === 'string' ? opt : opt.value;
+            const isHighlight = i === highlightIdx;
+            return (
+              <div key={val + i} onMouseDown={() => handleSelect(opt)}
+                onMouseEnter={() => setHighlightIdx(i)}
+                style={{
+                  padding:'8px 14px', cursor:'pointer', fontSize:13.5,
+                  background: isHighlight ? '#eff6ff' : 'white',
+                  color:'#111827', transition:'background 0.1s',
+                  borderBottom: i < filtered.length - 1 ? '1px solid #f9fafb' : 'none',
+                }}>
+                {renderOption ? renderOption(opt) : val}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {open && query && filtered.length === 0 && (
+        <div style={{
+          position:'absolute', top:'100%', left:0, right:0, zIndex:999,
+          background:'white', border:'1px solid #e5e7eb', borderRadius:10,
+          boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'16px', textAlign:'center',
+          color:'#9ca3af', fontSize:13, marginTop:4,
+        }}>
+          Sonuç bulunamadı
+        </div>
+      )}
     </div>
   );
 }
@@ -454,7 +568,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             {item.linkedin && <InfoRow icon="🔗" label="LinkedIn" val="Profil" href={item.linkedin} />}
             {item.address && <InfoRow icon="📍" label="Adres"    val={item.address} />}
             {item.location && <InfoRow icon="📍" label="Konum"   val={item.location} />}
-            {type==='contact' && item.country && <InfoRow icon={getFlag(item.country)} label="Ülke" val={item.country} />}
+            {type==='contact' && item.country && <InfoRow icon={getFlag(item.country)} label="Ülke" val={item.city ? `${item.country}, ${item.city}` : item.country} />}
             {type==='contact' && item.first_contact_date && <InfoRow icon="📅" label="İlk İletişim" val={fmtDate(item.first_contact_date)} />}
             {item.assigned_to_name && <InfoRow icon="👤" label="Takip Sorumlusu" val={item.assigned_to_name} />}
             {type==='contact' && item.referral_info && <InfoRow icon="🔀" label="Aracı Bilgisi" val={item.referral_info} />}
@@ -656,7 +770,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
     if (type === 'contact') return {
       full_name:'', position:'', email:'', phone:'', linkedin:'', notes:'',
       organization_id:'', tags:[], avatar_url:'',
-      country:'', assigned_to:'', assigned_to_name:'', process_stage:'İlk Temas',
+      country:'', city:'', assigned_to:'', assigned_to_name:'', process_stage:'İlk Temas',
       compliance_status:'Değerlendirilmedi', priority:'Orta', categories:[],
       first_contact_date:'', referral_info:'', system_plus_url:'',
     };
@@ -875,22 +989,29 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
                 </div>
               </div>
 
-              {/* Ülke */}
-              <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Ülke</label>
-                <div style={{ display:'flex', gap:8 }}>
-                  <select value={COUNTRIES.find(c=>c.value===form.country) ? form.country : (form.country ? '__custom' : '')}
-                    onChange={e=>{ if(e.target.value==='__custom') set('country',''); else set('country',e.target.value); }}
-                    style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
-                    <option value=''>Seçin…</option>
-                    {COUNTRIES.map(c=><option key={c.value} value={c.value}>{c.flag} {c.value}</option>)}
-                    <option value='__custom'>✏️ Diğer (serbest giriş)</option>
-                  </select>
-                  {(!COUNTRIES.find(c=>c.value===form.country) && form.country !== '') && (
-                    <input value={form.country||''} onChange={e=>set('country',e.target.value)}
-                      placeholder="Ülke adı yazın…"
-                      style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', outline:'none' }} />
-                  )}
+              {/* Ülke + Şehir (Autocomplete) */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div style={{ marginBottom:14 }}>
+                  <Autocomplete
+                    label="Ülke"
+                    value={form.country}
+                    onChange={v => { set('country', v); if (v !== form.country) set('city', ''); }}
+                    options={WORLD_COUNTRIES}
+                    placeholder="Ülke ara…"
+                    renderOption={opt => <span>{opt.flag} {opt.value}</span>}
+                  />
+                </div>
+                <div style={{ marginBottom:14 }}>
+                  <Autocomplete
+                    label="Şehir"
+                    value={form.city}
+                    onChange={v => set('city', v)}
+                    options={form.country && CITIES_BY_COUNTRY[form.country]
+                      ? CITIES_BY_COUNTRY[form.country].map(c => ({ value: c }))
+                      : []}
+                    placeholder={form.country ? 'Şehir ara…' : 'Önce ülke seçin…'}
+                    renderOption={opt => <span>{opt.value}</span>}
+                  />
                 </div>
               </div>
 
@@ -1223,7 +1344,7 @@ function ListRow({ item, type, connCount, onClick, orgs=[] }) {
         <div style={{ fontSize:12.5, color:'#9ca3af', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           {type==='contact' && item.position && <span>{item.position}</span>}
           {type==='contact' && orgName && <span>🏢 {orgName}</span>}
-          {type==='contact' && item.country && <span>{getFlag(item.country)} {item.country}</span>}
+          {type==='contact' && item.country && <span>{getFlag(item.country)} {item.city ? `${item.city}, ${item.country}` : item.country}</span>}
           {type==='contact' && item.priority && item.priority !== 'Orta' && (() => {
             const pr = PRIORITY_OPTIONS.find(p=>p.value===item.priority);
             return pr ? <span style={{ color:pr.color, fontWeight:700 }}>{pr.emoji}</span> : null;
@@ -1278,7 +1399,7 @@ function Card({ item, type, connCount, onClick, orgs=[] }) {
           )}
           {type==='contact' && (item.country || item.process_stage) && (
             <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4, flexWrap:'wrap' }}>
-              {item.country && <span style={{ fontSize:11 }}>{getFlag(item.country)} {item.country}</span>}
+              {item.country && <span style={{ fontSize:11 }}>{getFlag(item.country)} {item.city ? `${item.city}, ${item.country}` : item.country}</span>}
               {item.process_stage && (() => {
                 const ps = PROCESS_STAGES.find(s=>s.value===item.process_stage);
                 return ps ? <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:ps.color+'18', color:ps.color, fontWeight:700 }}>{ps.icon} {ps.value}</span> : null;
