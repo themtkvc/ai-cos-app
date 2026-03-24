@@ -39,6 +39,12 @@ function MessageBubble({ msg }) {
         fontSize: 13.5, lineHeight: 1.5, whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
+        {msg.image && (
+          <img src={msg.image} alt="uploaded" style={{
+            maxWidth: '100%', maxHeight: 180, borderRadius: 8,
+            marginBottom: msg.content ? 8 : 0, display: 'block',
+          }} />
+        )}
         {msg.content}
       </div>
     </div>
@@ -72,6 +78,26 @@ function ToolIndicator({ name }) {
   );
 }
 
+// ── Görsel önizleme (küçük thumbnail) ────────────────────────────────────────
+function ImagePreview({ src, onRemove }) {
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <img src={src} alt="preview" style={{
+        width: 56, height: 56, borderRadius: 8, objectFit: 'cover',
+        border: '1.5px solid var(--border, #e5e7eb)',
+      }} />
+      {onRemove && (
+        <button onClick={onRemove} style={{
+          position: 'absolute', top: -6, right: -6, width: 18, height: 18,
+          borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none',
+          fontSize: 11, lineHeight: 1, cursor: 'pointer', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+      )}
+    </div>
+  );
+}
+
 // ── Ana Chat Panel Bileşeni ─────────────────────────────────────────────────
 export default function AIChatPanel({ user, profile, isOpen, onClose }) {
   const [messages, setMessages] = useState([]);        // { role, content } — UI mesajları
@@ -79,8 +105,10 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [toolStatus, setToolStatus] = useState(null);
+  const [pendingImage, setPendingImage] = useState(null); // { base64, preview, mediaType }
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const context = {
     userId: user?.id,
@@ -102,19 +130,61 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
     }
   }, [isOpen]);
 
+  // ── Görsel yükleme handler ─────────────────────────────────────────────────
+  const handleImageSelect = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Boyut kontrolü (5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Görsel boyutu 5 MB\'dan küçük olmalıdır.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result; // data:image/png;base64,...
+      const base64 = dataUrl.split(',')[1];
+      const mediaType = file.type || 'image/png';
+      setPendingImage({ base64, preview: dataUrl, mediaType });
+    };
+    reader.readAsDataURL(file);
+    // Reset file input
+    e.target.value = '';
+  }, []);
+
   // ── Mesaj gönder ve tool loop ──────────────────────────────────────────────
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text && !pendingImage) return;
+    if (loading) return;
 
-    // UI'ya kullanıcı mesajı ekle
-    const userMsg = { role: 'user', content: text };
+    // UI'ya kullanıcı mesajı ekle (görsel varsa thumbnail ile göster)
+    const uiContent = pendingImage
+      ? (text || '📷 Ekran görüntüsü gönderildi')
+      : text;
+    const userMsg = { role: 'user', content: uiContent, image: pendingImage?.preview || null };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
+    // API mesajını hazırla (görsel + text content blocks)
+    let apiContent;
+    if (pendingImage) {
+      apiContent = [];
+      apiContent.push({
+        type: 'image',
+        source: { type: 'base64', media_type: pendingImage.mediaType, data: pendingImage.base64 },
+      });
+      apiContent.push({
+        type: 'text',
+        text: text || 'Bu ekran görüntüsündeki kişi bilgilerini çıkar ve kişi olarak ekle.',
+      });
+    } else {
+      apiContent = text;
+    }
+    setPendingImage(null);
+
     // API mesaj geçmişine ekle
-    const newApiMessages = [...apiMessages, { role: 'user', content: text }];
+    const newApiMessages = [...apiMessages, { role: 'user', content: apiContent }];
 
     try {
       let currentMessages = newApiMessages;
@@ -167,7 +237,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
       setLoading(false);
       setToolStatus(null);
     }
-  }, [input, loading, apiMessages, context]);
+  }, [input, loading, apiMessages, context, pendingImage]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -239,8 +309,15 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
                 '📌 Race for Gift\'e görev ekle',
                 '📊 Genel durum özeti ver',
                 '🧑 Ankara\'daki kişileri ara',
+                '📷 LinkedIn ekran görüntüsünden kişi ekle',
               ].map(s => (
-                <button key={s} onClick={() => { setInput(s); setTimeout(() => inputRef.current?.focus(), 50); }}
+                <button key={s} onClick={() => {
+                  if (s.includes('LinkedIn ekran')) {
+                    fileInputRef.current?.click();
+                  } else {
+                    setInput(s); setTimeout(() => inputRef.current?.focus(), 50);
+                  }
+                }}
                   style={{
                     padding: '8px 12px', borderRadius: 10, fontSize: 12,
                     border: '1px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
@@ -272,17 +349,55 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
         )}
       </div>
 
+      {/* Pending image preview */}
+      {pendingImage && (
+        <div style={{
+          padding: '8px 14px 0', borderTop: '1px solid var(--border, #e5e7eb)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <ImagePreview src={pendingImage.preview} onRemove={() => setPendingImage(null)} />
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted, #9ca3af)' }}>
+            Görsel hazır — mesaj yazıp gönderin
+          </span>
+        </div>
+      )}
+
       {/* Input */}
       <div style={{
-        padding: '10px 14px', borderTop: '1px solid var(--border, #e5e7eb)',
+        padding: '10px 14px', borderTop: pendingImage ? 'none' : '1px solid var(--border, #e5e7eb)',
         display: 'flex', gap: 8, alignItems: 'flex-end',
       }}>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          style={{ display: 'none' }}
+        />
+        {/* Image upload button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+          title="Ekran görüntüsü yükle"
+          style={{
+            width: 40, height: 40, borderRadius: 12, border: '1.5px solid var(--border, #e5e7eb)',
+            background: 'var(--bg, #f9fafb)', cursor: loading ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, flexShrink: 0, transition: 'background 0.15s',
+            color: 'var(--text-muted, #6b7280)',
+          }}
+          onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--border, #e5e7eb)'; }}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg, #f9fafb)'}
+        >
+          📷
+        </button>
         <textarea
           ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Mesajınızı yazın…"
+          placeholder={pendingImage ? '"Bu kişiyi ekle" yazıp gönderin…' : 'Mesajınızı yazın…'}
           rows={1}
           style={{
             flex: 1, resize: 'none', border: '1.5px solid var(--border, #e5e7eb)',
@@ -295,11 +410,11 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
         />
         <button
           onClick={sendMessage}
-          disabled={loading || !input.trim()}
+          disabled={loading || (!input.trim() && !pendingImage)}
           style={{
             width: 40, height: 40, borderRadius: 12, border: 'none',
-            background: loading || !input.trim() ? 'var(--border, #e5e7eb)' : 'var(--navy, #1a3a5c)',
-            color: '#fff', cursor: loading || !input.trim() ? 'default' : 'pointer',
+            background: loading || (!input.trim() && !pendingImage) ? 'var(--border, #e5e7eb)' : 'var(--navy, #1a3a5c)',
+            color: '#fff', cursor: loading || (!input.trim() && !pendingImage) ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, flexShrink: 0, transition: 'background 0.15s',
           }}
