@@ -271,7 +271,7 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNo
 }
 
 // ── GÜNDEM KARTININ DETAY GÖRÜNÜMERİ ─────────────────────────────────────────
-function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
+function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -489,6 +489,7 @@ function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, o
           agendaId={agenda.id}
           myId={myId}
           myName={myProfile?.full_name || ''}
+          myUnit={myUnit}
           role={role}
           allProfiles={allProfiles}
           allowSelfAssign={isMineTab}
@@ -511,9 +512,9 @@ function AgendaDetailView({ agenda, myId, myName, role, profiles, allProfiles, o
 }
 
 // ── GÖREV MODALI ──────────────────────────────────────────────────────────────
-function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, onClose, allowSelfAssign = false }) {
+function TaskModal({ task, agendaId, myId, myName, myUnit, role, allProfiles = [], onSave, onClose, allowSelfAssign = false }) {
   // "Gündemlerim" tabında direktör = görevi kendine varsayılan ata
-  const myProfile = allProfiles.find(p => p.user_id === myId);
+  const myProfile = (allProfiles || []).find(p => p.user_id === myId);
   const [form, setForm] = useState({
     title: task?.title || '',
     description: task?.description || '',
@@ -531,6 +532,7 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
   // - Diğer durumlarda → direktör rolü hariç, kendisi hariç
   const TOP_ROLES = ['direktor'];
   const assignableProfiles = useMemo(() => {
+    if (!allProfiles || !allProfiles.length) return [];
     const withUnit = allProfiles.filter(p => p.unit || TOP_ROLES.includes(p.role) || p.role === 'asistan');
     if (role === 'koordinator' || role === 'direktor_yardimcisi') return withUnit.filter(p => p.role === 'personel' && p.unit === myUnit);
     if (allowSelfAssign) {
@@ -547,9 +549,9 @@ function TaskModal({ task, agendaId, myId, myName, role, allProfiles, onSave, on
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
   const handleAssignee = (userId) => {
-    const p = allProfiles.find(p => p.user_id === userId);
+    const prof = allProfiles.find(pr => pr.user_id === userId);
     set('assigned_to', userId);
-    set('assigned_to_name', p?.full_name || '');
+    set('assigned_to_name', prof?.full_name || '');
   };
 
   const handleSubmit = async () => {
@@ -1385,6 +1387,7 @@ export default function Agendas({ user, profile }) {
           agenda={detailAgenda}
           myId={myId}
           myName={myName}
+          myUnit={myUnit}
           role={role}
           profiles={allProfiles}
           allProfiles={allProfiles}
