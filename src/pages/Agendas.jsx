@@ -338,19 +338,27 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
       if (task?.assigned_to && task.assigned_to !== myId) commentTargets.add(task.assigned_to);
       if (task?.created_by && task.created_by !== myId) commentTargets.add(task.created_by);
     }
-    commentTargets.forEach(uid => {
-      createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
-    });
     // @mention bildirimleri — etiketlenen herkese bağımsız bildirim gönder
-    try {
-      const mentionedIds = extractMentions(text.trim(), allProfiles || profiles || []);
-      console.log('[Mention] text:', text.trim(), 'mentionedIds:', mentionedIds);
-      for (const uid of mentionedIds) {
-        if (uid !== myId) {
+    const mentionedIds = extractMentions(text.trim(), allProfiles || profiles || []);
+    console.log('[Mention] text:', text.trim(), 'mentionedIds:', mentionedIds);
+    const alreadyNotified = new Set();
+    // Önce mention bildirimlerini gönder
+    for (const uid of mentionedIds) {
+      if (uid !== myId) {
+        try {
           await createNotification({ userId: uid, type: 'mention', title: `${myProfile?.full_name || 'Birisi'} sizi bir yorumda etiketledi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
-        }
+          alreadyNotified.add(uid);
+        } catch (e) { console.error('[Mention] notification error:', e); }
       }
-    } catch (e) { console.error('[Mention] notification error:', e); }
+    }
+    // Sonra yorum bildirimlerini gönder (mention edilenler hariç, çift bildirim olmasın)
+    for (const uid of commentTargets) {
+      if (!alreadyNotified.has(uid)) {
+        try {
+          await createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+        } catch (e) { console.error('[Comment] notification error:', e); }
+      }
+    }
     if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
     else setCommentText('');
     setSaving(false);
@@ -554,13 +562,13 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
               await updateAgendaTask(editTask.id, data);
               // Görev atanan kişi değiştiyse bildirim gönder
               if (data.assigned_to && data.assigned_to !== myId && data.assigned_to !== editTask.assigned_to) {
-                createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+                try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' }); } catch (e) { console.error('Task assign notif error:', e); }
               }
             } else {
               await createAgendaTask({ ...data, agenda_id: agenda.id, created_by: myId, created_by_name: myProfile?.full_name || '' });
               // Yeni görev atandıysa bildirim gönder
               if (data.assigned_to && data.assigned_to !== myId) {
-                createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+                try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' }); } catch (e) { console.error('Task assign notif error:', e); }
               }
             }
             setTaskModal(false);
