@@ -710,6 +710,16 @@ export const markAgendaTaskDone = async (id) => {
   return { data, error };
 };
 
+// Kişisel görev: Tamamlandım → direkt approved (onay gerekmez)
+export const markAgendaTaskDoneSelf = async (id) => {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .update({ completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
 // Koordinatör: Onayla
 export const approveAgendaTask = async (id) => {
   const { data, error } = await supabase

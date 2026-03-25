@@ -34,12 +34,16 @@ export default function MentionInput({
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Etiketlenebilecek kişiler: aynı birim veya direktör ise herkes
+  // Etiketlenebilecek kişiler:
+  // Direktör/Asistan → herkesi görebilir
+  // Koordinatör/Personel → kendi birimi + direktör + asistan
   const mentionableProfiles = useCallback(() => {
     if (!profiles.length) return [];
     return profiles.filter(p => {
       if (p.user_id === myId) return false;
       if (isDirektor) return true;
+      // Direktör ve asistanı herkes etiketleyebilir
+      if (p.role === 'direktor' || p.role === 'asistan' || p.role === 'direktor_yardimcisi') return true;
       // Aynı birim
       return myUnit && p.unit === myUnit;
     });
