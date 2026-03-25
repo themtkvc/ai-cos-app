@@ -368,6 +368,30 @@ export const saveOrgChart = async (chartData) => {
 };
 
 
+// ── KULLANICI SİLME ──
+export const deleteUser = async (targetUserId) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: { message: "Oturum bulunamadı" } };
+  try {
+    const res = await fetch(
+      `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/delete-user`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ targetUserId }),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) return { error: { message: json.error || "Silme hatası" } };
+    return { data: json, error: null };
+  } catch (err) {
+    return { error: { message: err.message } };
+  }
+};
+
 // ── PROFIL GÜNCELLEME ──
 export const updateUserProfile = async (userId, updates) => {
   const { data, error } = await supabase

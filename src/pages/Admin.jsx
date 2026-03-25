@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, supabase, getAgendaTypes, createAgendaType, updateAgendaType, deleteAgendaType } from '../lib/supabase';
+import { getSystemStats, seedDemoData, clearChatHistory, clearTable, getAllProfiles, updateUserProfile, updateDashboardAccess, getPublicAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, inviteStaffMember, deleteUser, supabase, getAgendaTypes, createAgendaType, updateAgendaType, deleteAgendaType } from '../lib/supabase';
 import { ROLE_LABELS, UNITS as UNIT_LIST } from '../lib/constants';
 import OrgChartAdmin from '../components/OrgChartAdmin';
 import { UserAvatar } from './ProfileSettings';
@@ -58,6 +58,7 @@ function UserManagement({ currentUser, notify }) {
   const [inviteUnit, setInviteUnit]   = useState('');
   const [inviteName, setInviteName]   = useState('');
   const [inviting, setInviting]       = useState(false);
+  const [deletingId, setDeletingId]   = useState(null);
   const [viewMode, setViewMode]       = useState('list'); // 'list' | 'hierarchy'
 
   const loadProfiles = async () => {
@@ -89,6 +90,17 @@ function UserManagement({ currentUser, notify }) {
     const { error } = await updateDashboardAccess(p.user_id, newVal);
     if (error) { notify('Hata: ' + error.message, 'error'); return; }
     notify(newVal ? `✅ ${p.full_name || 'Kullanıcı'} dashboard erişimi verildi.` : `ℹ️ Dashboard erişimi kaldırıldı.`);
+    loadProfiles();
+  };
+
+  const handleDelete = async (p) => {
+    const confirmMsg = `"${p.full_name || p.email || 'Bu kullanıcı'}" kalıcı olarak silinecek.\n\nBu işlem geri alınamaz. Devam etmek istiyor musunuz?`;
+    if (!window.confirm(confirmMsg)) return;
+    setDeletingId(p.user_id);
+    const { error } = await deleteUser(p.user_id);
+    setDeletingId(null);
+    if (error) { notify('Hata: ' + error.message, 'error'); return; }
+    notify(`🗑 ${p.full_name || 'Kullanıcı'} başarıyla silindi.`);
     loadProfiles();
   };
 
@@ -243,7 +255,21 @@ function UserManagement({ currentUser, notify }) {
             </button>
           </>
         ) : (
-          <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
+          <>
+            <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
+            {p.user_id !== currentUser.id && p.role !== 'direktor' && (
+              <button className="btn btn-outline btn-sm"
+                title="Kullanıcıyı sil"
+                onClick={() => handleDelete(p)}
+                disabled={deletingId === p.user_id}
+                style={{
+                  color: '#ef4444', borderColor: '#ef444444',
+                  opacity: deletingId === p.user_id ? 0.5 : 1,
+                }}>
+                {deletingId === p.user_id ? '⏳' : '🗑'}
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
