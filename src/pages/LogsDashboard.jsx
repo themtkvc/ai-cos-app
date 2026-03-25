@@ -100,10 +100,10 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'white', border: '1px solid #e5e7eb', borderRadius: 10,
+      background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10,
       padding: '10px 14px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
     }}>
-      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, color: '#374151' }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, color: 'var(--text-secondary)' }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} style={{ fontSize: 12, color: p.color, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, display: 'inline-block' }} />
@@ -485,8 +485,8 @@ export default function LogsDashboard({ user, profile }) {
               <ResponsiveContainer width="100%" height={220}>
                 <ComposedChart data={stats.dailyData} margin={{ top: 8, right: 8, bottom: 0, left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: '#6b7280' }} />
-                  <YAxis tick={{ fontSize: 10.5, fill: '#6b7280' }} unit="s" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10.5, fill: 'var(--text-muted)' }} />
+                  <YAxis tick={{ fontSize: 10.5, fill: 'var(--text-muted)' }} unit="s" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <ReferenceLine y={8} stroke="#16a34a" strokeDasharray="4 4" label={{ value: '8s', fontSize: 10, fill: '#16a34a', position: 'right' }} />
@@ -547,7 +547,7 @@ export default function LogsDashboard({ user, profile }) {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 10.5 }} unit="s" />
-                    <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: '#374151' }} width={130} />
+                    <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={130} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="hours" name="Süre" radius={[0,4,4,0]}>
                       {stats.categoryData.map((entry, i) => (
@@ -613,10 +613,10 @@ export default function LogsDashboard({ user, profile }) {
                             {ROLE_LABELS[p.role] || p.role}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 10px', fontWeight: 700, color: p.hours >= (period === 'week' ? 40 : 160) ? '#16a34a' : 'var(--navy)' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: p.hours >= (period === 'week' ? 40 : 160) ? 'var(--green)' : 'var(--navy)' }}>
                           {fmtH(p.hours * 60)}
                         </td>
-                        <td style={{ padding: '8px 10px', color: p.otHours > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                        <td style={{ padding: '8px 10px', color: p.otHours > 0 ? 'var(--gold)' : 'var(--text-muted)' }}>
                           {p.otHours > 0 ? fmtH(p.otHours * 60) : '—'}
                         </td>
                         <td style={{ padding: '8px 10px' }}>{fmtH(p.avgHours * 60)}</td>
@@ -760,7 +760,7 @@ function SectionTitle({ children }) {
 function PersonAxisTick({ x, y, payload }) {
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={16} textAnchor="end" fill="#6b7280" fontSize={10.5}
+      <text x={0} y={0} dy={16} textAnchor="end" fill="var(--text-muted)" fontSize={10.5}
         transform="rotate(-35)">{payload.value}</text>
     </g>
   );

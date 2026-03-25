@@ -26,10 +26,10 @@ import MentionInput, { extractMentions, renderMentionText } from '../components/
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
-  { value: 'kritik', label: '🔴 Kritik',  color: '#ef4444', bg: '#fef2f2' },
-  { value: 'yuksek', label: '🟠 Yüksek', color: '#f97316', bg: '#fff7ed' },
-  { value: 'orta',   label: '🟡 Orta',   color: '#eab308', bg: '#fefce8' },
-  { value: 'dusuk',  label: '🟢 Düşük',  color: '#22c55e', bg: '#f0fdf4' },
+  { value: 'kritik', label: '🔴 Kritik',  color: 'var(--red)', bg: 'var(--red-pale)' },
+  { value: 'yuksek', label: '🟠 Yüksek', color: 'var(--orange)', bg: 'var(--orange-pale)' },
+  { value: 'orta',   label: '🟡 Orta',   color: 'var(--gold)', bg: 'var(--orange-pale)' },
+  { value: 'dusuk',  label: '🟢 Düşük',  color: 'var(--green)', bg: 'var(--green-pale)' },
 ];
 
 const AGENDA_STATUSES = [
@@ -76,16 +76,16 @@ function PriorityBadge({ value }) {
 
 function TaskStatusBadge({ status, completionStatus }) {
   if (completionStatus === 'pending_review')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#f59e0b', background: '#fffbeb' }}>⏳ Onay Bekliyor</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--gold)', background: 'var(--orange-pale)' }}>⏳ Onay Bekliyor</span>;
   if (completionStatus === 'approved')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#16a34a', background: '#f0fdf4' }}>✅ Onaylandı</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--green)', background: 'var(--green-pale)' }}>✅ Onaylandı</span>;
   if (completionStatus === 'revision_requested')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#ef4444', background: '#fef2f2' }}>🔄 Revize İstendi</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--red)', background: 'var(--red-pale)' }}>🔄 Revize İstendi</span>;
   if (status === 'tamamlandi')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#16a34a', background: '#f0fdf4' }}>✅ Tamamlandı</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--green)', background: 'var(--green-pale)' }}>✅ Tamamlandı</span>;
   if (status === 'devam_ediyor')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#3b82f6', background: '#eff6ff' }}>🔵 Devam Ediyor</span>;
-  return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: '#9ca3af', background: '#f9fafb' }}>⚪ Bekliyor</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--primary)', background: 'var(--primary-light)' }}>🔵 Devam Ediyor</span>;
+  return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--text-light)', background: 'var(--bg-hover)' }}>⚪ Bekliyor</span>;
 }
 
 // ── YORUM BALONU ──────────────────────────────────────────────────────────────
@@ -96,14 +96,14 @@ function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
       {!isMe && <Avatar name={comment.created_by_name} url={comment.avatar_url} size={28} />}
       <div style={{ maxWidth: '75%' }}>
         {!isMe && (
-          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 3 }}>
             {comment.created_by_name}
           </div>
         )}
         <div style={{
-          background: isMe ? '#1e40af' : '#f1f5f9',
-          color: isMe ? '#ffffff' : '#1e293b',
-          border: isMe ? 'none' : '1px solid #e2e8f0',
+          background: isMe ? 'var(--primary)' : 'var(--bg-hover)',
+          color: isMe ? '#ffffff' : 'var(--text)',  // keep #ffffff for contrast in dark primary bg
+          border: isMe ? 'none' : '1px solid var(--border)',
           borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
           padding: '9px 14px',
           fontSize: 13.5,
@@ -113,7 +113,7 @@ function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
         }}>
           {renderMentionText(comment.content, profiles).map((part, i) =>
             part.isMention ? (
-              <span key={i} style={{ fontWeight: 700, color: isMe ? '#93c5fd' : '#6366f1' }}>
+              <span key={i} style={{ fontWeight: 700, color: isMe ? 'var(--primary-light)' : 'var(--primary)' }}>
                 {part.text}
               </span>
             ) : (
@@ -122,14 +122,14 @@ function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
           )}
         </div>
         <div style={{
-          fontSize: 11, color: '#94a3b8', marginTop: 3,
+          fontSize: 11, color: 'var(--text-light)', marginTop: 3,
           display: 'flex', gap: 6,
           justifyContent: isMe ? 'flex-end' : 'flex-start',
         }}>
           {new Date(comment.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
           {isMe && (
             <button onClick={() => onDelete(comment.id)}
-              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 600 }}>
+              style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 600 }}>
               sil
             </button>
           )}
@@ -239,7 +239,7 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
       </div>
 
       {task.completion_status === 'revision_requested' && task.revision_note && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: '#b91c1c' }}>
+        <div style={{ background: 'var(--red-pale)', border: '1px solid var(--red)', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: 'var(--red)' }}>
           🔄 Revize notu: {task.revision_note}
         </div>
       )}
@@ -314,7 +314,7 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
             disabled={notifying}
             onClick={handleNotify}
             title={`${task.assigned_to_name || ''} adresine mail gönder`}
-            style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: 12, padding: '4px 10px', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}>
+            style={{ background: 'var(--green-pale)', color: 'var(--green)', border: '1px solid var(--green)', fontSize: 12, padding: '4px 10px', borderRadius: 7, cursor: 'pointer', fontWeight: 600 }}>
             {notifying ? '…' : '📧 Mail Gönder'}
           </button>
         )}
@@ -500,7 +500,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           {/* Görevler */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 📌 Görevler ({tasks.length})
               </h3>
               {canAssign && (
@@ -537,7 +537,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
                         {canAssign && (
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                             <button className="btn btn-sm btn-outline" onClick={() => { setEditTask(task); setTaskModal(true); }}>✏️ Düzenle</button>
-                            <button className="btn btn-sm btn-outline" style={{ color: '#ef4444' }} onClick={() => handleDeleteTask(task.id)}>🗑 Sil</button>
+                            <button className="btn btn-sm btn-outline" style={{ color: 'var(--red)' }} onClick={() => handleDeleteTask(task.id)}>🗑 Sil</button>
                           </div>
                         )}
                       </div>
@@ -573,7 +573,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
 
           {/* Gündem Yorumları */}
           <div>
-            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
               💬 Gündem Notları
             </h3>
             {agendaComments.length > 0 && (
@@ -738,7 +738,7 @@ function TaskModal({ task, agendaId, myId, myName, myUnit, role, allProfiles = [
             ))}
           </select>
           {assignableProfiles.length === 0 && (
-            <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Atanabilecek kullanıcı bulunamadı.</div>
+            <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>Atanabilecek kullanıcı bulunamadı.</div>
           )}
         </div>
         <div className="modal-footer">
@@ -922,7 +922,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
               ))}
             </select>
             {form.assigned_to && (
-              <div style={{ fontSize: 12, color: '#6366f1', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4 }}>
                 📥 Bu gündem <strong>{form.assigned_to_name}</strong>'a atanacak.
               </div>
             )}
@@ -1005,14 +1005,14 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
                 className="btn btn-sm"
                 onClick={() => onNotify(agenda)}
                 title={`${agenda.assigned_to_name || ''} adresine mail gönder`}
-                style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '3px 8px', fontSize: 12 }}>
+                style={{ background: 'var(--green-pale)', color: 'var(--green)', border: '1px solid var(--green)', padding: '3px 8px', fontSize: 12 }}>
                 📧
               </button>
             )}
             {canEdit && (
               <>
                 <button className="btn btn-sm btn-outline" onClick={() => onEdit(agenda)} title="Düzenle" style={{ padding: '3px 8px' }}>✏️</button>
-                <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: '#ef4444' }}>🗑</button>
+                <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: 'var(--red)' }}>🗑</button>
               </>
             )}
           </div>
@@ -1033,8 +1033,8 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
           )}
           {agenda.assigned_to_name && (
             <span style={{
-              fontSize: 11, fontWeight: 600, color: '#6366f1',
-              background: '#6366f110', padding: '2px 8px', borderRadius: 12,
+              fontSize: 11, fontWeight: 600, color: 'var(--primary)',
+              background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: 12,
               display: 'flex', alignItems: 'center', gap: 4,
             }}>
               👤 {agenda.assigned_to_name}
@@ -1057,7 +1057,7 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
               {pendingTasks.length > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 700, background: '#fffbeb', color: '#f59e0b', padding: '2px 6px', borderRadius: 20 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '2px 6px', borderRadius: 20 }}>
                   ⏳ {pendingTasks.length} onay
                 </span>
               )}
@@ -1457,7 +1457,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
             {/* Görev sayacı */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
               {pendingTasks.length > 0 && (
-                <span style={{ fontSize:10, fontWeight:700, background:'#fffbeb', color:'#f59e0b', padding:'2px 6px', borderRadius:20 }}>⏳ {pendingTasks.length}</span>
+                <span style={{ fontSize:10, fontWeight:700, background:'var(--orange-pale)', color:'var(--gold)', padding:'2px 6px', borderRadius:20 }}>⏳ {pendingTasks.length}</span>
               )}
               <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>📌 {doneTasks.length}/{tasks.length}</span>
               {tasks.length > 0 && (
@@ -1471,11 +1471,11 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               {canEdit && (
                 <>
                   <button className="btn btn-sm btn-outline" onClick={()=>handleEdit(agenda)} title="Düzenle" style={{ padding:'3px 8px' }}>✏️</button>
-                  <button className="btn btn-sm btn-outline" onClick={()=>handleDeleteAgenda(agenda.id)} title="Sil" style={{ padding:'3px 8px', color:'#ef4444' }}>🗑</button>
+                  <button className="btn btn-sm btn-outline" onClick={()=>handleDeleteAgenda(agenda.id)} title="Sil" style={{ padding:'3px 8px', color:'var(--red)' }}>🗑</button>
                 </>
               )}
             </div>
-            <span style={{ color:'#d1d5db', fontSize:16, flexShrink:0 }}>›</span>
+            <span style={{ color:'var(--gray-mid)', fontSize:16, flexShrink:0 }}>›</span>
           </div>
         );
       })}
@@ -1630,7 +1630,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                 }}>
                 <span>{tab.icon}</span> {tab.label}
                 {assignedCount > 0 && (
-                  <span style={{ background: '#6366f1', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '1px 7px', marginLeft: 2 }}>
+                  <span style={{ background: 'var(--primary)', color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '1px 7px', marginLeft: 2 }}>
                     {assignedCount}
                   </span>
                 )}
@@ -1660,8 +1660,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               <button key={u} onClick={() => setFilterUnit(isActive ? 'all' : u)}
                 style={{
                   padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', flexShrink: 0,
-                  border: `2px solid ${isActive ? '#6366f1' : 'var(--border)'}`,
-                  background: isActive ? '#6366f1' : 'var(--bg-card)',
+                  border: `2px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                  background: isActive ? 'var(--primary)' : 'var(--bg-card)',
                   color: isActive ? '#fff' : 'var(--text)', fontWeight: isActive ? 700 : 400,
                 }}>
                 🏗 {u} ({cnt})
@@ -1860,7 +1860,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                       <span style={{ fontSize: 16 }}>👤</span>
                       {assigneeName}
                     </div>
-                    <span style={{ background: '#6366f118', color: '#6366f1', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
+                    <span style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
                       {items.length} gündem
                     </span>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
@@ -1883,12 +1883,12 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                     <span style={{ fontSize: 16 }}>🏗</span>
                     {unit === '—' ? 'Birimi Belirtilmemiş' : unit}
                   </div>
-                  <span style={{ background: '#6366f118', color: '#6366f1', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
+                  <span style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', borderRadius: 20, padding: '2px 10px', fontSize: 11.5, fontWeight: 600 }}>
                     {items.length} gündem
                   </span>
                   <button
                     onClick={() => setFilterUnit(unit === '—' ? 'all' : unit)}
-                    style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                    style={{ fontSize: 11, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
                     sadece bunu göster
                   </button>
                   <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />

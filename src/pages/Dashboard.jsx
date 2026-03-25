@@ -364,7 +364,7 @@ export default function Dashboard({ user, profile, onNavigate }) {
                 <span style={{fontWeight:700, fontSize:14, color:'var(--text)'}}>{u.name}</span>
               </div>
               {/* Progress bar */}
-              <div style={{height:6, background:'#e5e7eb', borderRadius:3, marginBottom:8, overflow:'hidden'}}>
+              <div style={{height:6, background:'var(--border)', borderRadius:3, marginBottom:8, overflow:'hidden'}}>
                 <div style={{height:'100%', width:`${u.pct}%`, background: u.pct >= 80 ? 'var(--green)' : u.pct >= 50 ? 'var(--blue)' : 'var(--orange)', borderRadius:3, transition:'width 0.3s'}} />
               </div>
               <div style={{display:'flex', justifyContent:'space-between', fontSize:11.5, color:'var(--text-muted)'}}>

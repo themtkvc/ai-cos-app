@@ -82,7 +82,7 @@ function CustomTooltip({ active, payload, label, currency }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'white', border: '1px solid var(--border)', borderRadius: 8,
+      background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8,
       padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,.1)', fontSize: 12.5,
     }}>
       <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--navy)' }}>{label}</div>
@@ -114,7 +114,7 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
 function StatCard({ icon, label, value, sub, color }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 12, padding: '18px 20px',
+      background: 'var(--bg-card)', borderRadius: 12, padding: '18px 20px',
       border: '1px solid var(--border)',
       borderLeft: `4px solid ${color || 'var(--navy)'}`,
       boxShadow: '0 2px 8px rgba(0,0,0,.06)',
@@ -323,7 +323,7 @@ export default function DonationTracker({ user, profile, onNavigate }) {
   const allowedRoles = ['direktor','asistan'];
   if (!allowedRoles.includes(profile?.role)) {
     return (
-      <div style={{padding:40, textAlign:'center', color:'#6b7280'}}>
+      <div style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>
         <p style={{fontSize:18, fontWeight:600}}>Erişim Yetkiniz Yok</p>
         <p style={{fontSize:14, marginTop:8}}>Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p>
       </div>

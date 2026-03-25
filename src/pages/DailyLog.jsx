@@ -137,7 +137,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
               style={{
                 border: '1px solid var(--border)', borderRadius: 8,
                 padding: '6px 8px', fontSize: 12.5, fontFamily: 'var(--font-body)',
-                background: disabled ? 'var(--surface)' : 'white',
+                background: disabled ? 'var(--surface)' : 'var(--bg-card)',
                 color: 'var(--text)', width: 90,
               }}
             />
@@ -150,7 +150,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
               style={{
                 border: '1px solid var(--border)', borderRadius: 8,
                 padding: '6px 8px', fontSize: 12.5, fontFamily: 'var(--font-body)',
-                background: disabled ? 'var(--surface)' : 'white',
+                background: disabled ? 'var(--surface)' : 'var(--bg-card)',
                 color: 'var(--text)', width: 90,
               }}
             />
@@ -208,7 +208,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
           linkedTask ? (
             <span style={{
               fontSize: 11.5, padding: '2px 8px', borderRadius: 6,
-              background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontWeight: 600,
+              background: 'var(--primary-light)', color: 'var(--primary)', border: '1px solid var(--blue-pale)', fontWeight: 600,
             }}>
               {linkedTask._type === 'task' ? '📌' : '📋'} {linkedTask.title}
               {linkedTask._agendaTitle ? ` (${linkedTask._agendaTitle})` : ''}
@@ -450,7 +450,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {!isReadOnly && autoSaveState === 'saving' && <><span style={{ color: 'var(--orange)' }}>●</span> Kaydediliyor…</>}
-            {!isReadOnly && autoSaveState === 'saved'  && <><span style={{ color: '#16a34a' }}>●</span> Otomatik kaydedildi</>}
+            {!isReadOnly && autoSaveState === 'saved'  && <><span style={{ color: 'var(--green)' }}>●</span> Otomatik kaydedildi</>}
             {!isReadOnly && autoSaveState === 'error'  && <><span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠️ Otomatik kayıt başarısız — lütfen internet bağlantınızı kontrol edin</span></>}
           </div>
         </div>
@@ -480,27 +480,27 @@ export default function DailyLog({ user, profile, linkedTask }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 20px', borderRadius: 12, marginBottom: 16,
           background: editing
-            ? 'linear-gradient(135deg, #fff8ee 0%, #fffdf5 100%)'
-            : 'linear-gradient(135deg, #edfaf4 0%, #f0fdf8 100%)',
-          border: `1.5px solid ${editing ? '#f59e0b' : '#16a34a'}44`,
+            ? 'linear-gradient(135deg, var(--orange-pale) 0%, var(--orange-pale) 100%)'
+            : 'linear-gradient(135deg, var(--green-pale) 0%, var(--green-pale) 100%)',
+          border: `1.5px solid ${editing ? 'var(--gold)' : 'var(--green)'}44`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 26 }}>{editing ? '✏️' : '✅'}</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: editing ? '#b45309' : '#15803d' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: editing ? 'var(--orange)' : 'var(--green)' }}>
                 {editing
                   ? `${dayName} logu düzenleniyor…`
                   : `${dayName} çalışma kaydı gönderildi ve kaydedildi`}
               </div>
               {!editing && totalMin > 0 && (
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   Toplam çalışma: <strong>{fmtMins(totalMin)}</strong>
                   {otMin > 0 && <> · Mesai: <strong>{fmtMins(otMin)}</strong></>}
                   {' · '}<StatusBadge status={status} />
                 </div>
               )}
               {editing && (
-                <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--orange)', marginTop: 2 }}>
                   Değişikliklerinizi kaydetmek için "Güncelle" butonuna basın
                 </div>
               )}
@@ -511,7 +511,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
               onClick={() => setEditing(true)}
               style={{
                 padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                border: '1.5px solid #1a3a5c44', background: 'white',
+                border: '1.5px solid var(--navy)44', background: 'var(--bg-card)',
                 cursor: 'pointer', color: 'var(--navy)', fontFamily: 'var(--font-body)',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
@@ -523,8 +523,8 @@ export default function DailyLog({ user, profile, linkedTask }) {
               onClick={() => { setEditing(false); loadLog(selectedDate); }}
               style={{
                 padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                border: '1.5px solid #f59e0b44', background: 'white',
-                cursor: 'pointer', color: '#b45309', fontFamily: 'var(--font-body)',
+                border: '1.5px solid var(--orange)44', background: 'var(--bg-card)',
+                cursor: 'pointer', color: 'var(--orange)', fontFamily: 'var(--font-body)',
               }}
             >
               İptal
@@ -657,7 +657,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
                 İŞ KALEMLERİ &nbsp;·&nbsp; {formattedDate}
               </div>
               {isReadOnly && (
-                <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, background: '#dcfce7', borderRadius: 6, padding: '3px 8px' }}>
+                <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600, background: 'var(--green-pale)', borderRadius: 6, padding: '3px 8px' }}>
                   🔒 Gönderildi
                 </span>
               )}
@@ -678,8 +678,8 @@ export default function DailyLog({ user, profile, linkedTask }) {
             {linkedTask && (
               <div style={{
                 marginBottom: 12, padding: '8px 12px', borderRadius: 8,
-                background: '#eff6ff', border: '1px solid #bfdbfe',
-                fontSize: 12.5, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--primary-light)', border: '1px solid var(--blue-pale)',
+                fontSize: 12.5, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 🔗 <strong>{linkedTask.title}</strong> görevine bağlanarak açıldı — ilk iş kaleminde göreve bağlı
               </div>
@@ -727,7 +727,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Toplam:</span>
               <span style={{
                 fontSize: 17, fontWeight: 700,
-                color: totalMin >= 480 ? '#16a34a' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
+                color: totalMin >= 480 ? 'var(--green)' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
                 fontFamily: 'var(--font-display)',
               }}>
                 {totalMin > 0 ? fmtMins(totalMin) : '—'}

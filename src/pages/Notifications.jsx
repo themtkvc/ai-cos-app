@@ -5,12 +5,12 @@ import { supabase, getNotifications, markNotificationRead, markAllNotificationsR
 const TYPE_META = {
   task_assigned:   { icon: '📌', label: 'Görev Ataması',       color: '#6366f1', bg: '#eef2ff' },
   agenda_assigned: { icon: '📋', label: 'Gündem Ataması',      color: '#0891b2', bg: '#ecfeff' },
-  task_status:     { icon: '🔄', label: 'Görev Durumu',        color: '#f59e0b', bg: '#fffbeb' },
+  task_status:     { icon: '🔄', label: 'Görev Durumu',        color: 'var(--gold)', bg: 'var(--orange-pale)' },
   comment_added:   { icon: '💬', label: 'Yeni Yorum',          color: '#10b981', bg: '#ecfdf5' },
   mention:         { icon: '@',  label: 'Bahsedilenler',       color: '#8b5cf6', bg: '#f5f3ff' },
 };
 
-const getTypeMeta = (type) => TYPE_META[type] || { icon: '🔔', label: 'Bildirim', color: '#6b7280', bg: '#f9fafb' };
+const getTypeMeta = (type) => TYPE_META[type] || { icon: '🔔', label: 'Bildirim', color: 'var(--text-muted)', bg: 'var(--bg-hover)' };
 
 function timeAgo(dateStr) {
   const now = new Date();
@@ -43,8 +43,8 @@ function NotificationCard({ notification, onRead, onNavigate }) {
       onClick={handleClick}
       style={{
         display: 'flex', gap: 12, padding: '14px 18px', cursor: 'pointer',
-        background: isUnread ? meta.bg : 'var(--bg-card, #fff)',
-        border: `1px solid ${isUnread ? meta.color + '30' : 'var(--border, #e5e7eb)'}`,
+        background: isUnread ? meta.bg : 'var(--bg-card)',
+        border: `1px solid ${isUnread ? meta.color + '30' : 'var(--border)'}`,
         borderRadius: 12, transition: 'all 0.15s',
         borderLeft: `3px solid ${isUnread ? meta.color : 'transparent'}`,
         opacity: isUnread ? 1 : 0.7,
@@ -70,7 +70,7 @@ function NotificationCard({ notification, onRead, onNavigate }) {
           }}>
             {meta.label}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted, #9ca3af)' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             {timeAgo(notification.created_at)}
           </span>
           {isUnread && (
@@ -81,21 +81,21 @@ function NotificationCard({ notification, onRead, onNavigate }) {
         </div>
         <div style={{
           fontWeight: isUnread ? 700 : 500, fontSize: 14,
-          color: 'var(--text, #111827)', lineHeight: 1.35,
+          color: 'var(--text)', lineHeight: 1.35,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {notification.title}
         </div>
         {notification.body && (
           <div style={{
-            fontSize: 12.5, color: 'var(--text-muted, #6b7280)', marginTop: 3, lineHeight: 1.4,
+            fontSize: 12.5, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {notification.body}
           </div>
         )}
         {notification.created_by_name && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted, #9ca3af)', marginTop: 4 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
             👤 {notification.created_by_name}
           </div>
         )}
@@ -105,7 +105,7 @@ function NotificationCard({ notification, onRead, onNavigate }) {
       {notification.link_type && notification.link_id && (
         <div style={{
           display: 'flex', alignItems: 'center', flexShrink: 0,
-          color: 'var(--text-muted, #9ca3af)', fontSize: 16,
+          color: 'var(--text-muted)', fontSize: 16,
         }}>
           →
         </div>
@@ -196,10 +196,10 @@ export default function Notifications({ user, onNavigate }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text, #111827)' }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>
             🔔 Bildirimler
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted, #9ca3af)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
             {unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : 'Tüm bildirimler okundu'}
           </p>
         </div>
@@ -208,8 +208,8 @@ export default function Notifications({ user, onNavigate }) {
             onClick={handleMarkAllRead}
             style={{
               padding: '8px 16px', borderRadius: 10, fontSize: 12.5, fontWeight: 600,
-              border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-              color: 'var(--text, #374151)', cursor: 'pointer',
+              border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
             }}
           >
             ✓ Tümünü Okundu Yap
@@ -235,9 +235,9 @@ export default function Notifications({ user, onNavigate }) {
             <button key={f.id} onClick={() => setFilter(f.id)}
               style={{
                 padding: '6px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
-                border: `1.5px solid ${isActive ? 'var(--navy, #1a3a5c)' : 'var(--border, #e5e7eb)'}`,
-                background: isActive ? 'var(--navy, #1a3a5c)' : 'var(--bg-card, #fff)',
-                color: isActive ? '#fff' : 'var(--text, #374151)',
+                border: `1.5px solid ${isActive ? 'var(--navy, #1a3a5c)' : 'var(--border)'}`,
+                background: isActive ? 'var(--navy, #1a3a5c)' : 'var(--bg-card)',
+                color: isActive ? '#fff' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 400,
               }}>
               {f.label} {cnt > 0 ? `(${cnt})` : ''}
@@ -248,9 +248,9 @@ export default function Notifications({ user, onNavigate }) {
 
       {/* Bildirim listesi */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted, #9ca3af)' }}>
+        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔔</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text, #6b7280)' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>
             {filter === 'unread' ? 'Okunmamış bildirim yok' : filter !== 'all' ? 'Bu türde bildirim yok' : 'Henüz bildirim yok'}
           </div>
           <div style={{ fontSize: 13 }}>
@@ -262,7 +262,7 @@ export default function Notifications({ user, onNavigate }) {
           {Object.entries(grouped).map(([dateLabel, items]) => (
             <div key={dateLabel}>
               <div style={{
-                fontSize: 12, fontWeight: 700, color: 'var(--text-muted, #9ca3af)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text-muted)',
                 textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10,
                 paddingLeft: 4,
               }}>

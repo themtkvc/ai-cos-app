@@ -143,12 +143,12 @@ function StatCard({ label, value, iconBg, icon }) {
   return (
     <div style={{
       flex: 1, background: 'white', borderRadius: 12,
-      border: '1px solid #e5e7eb', padding: '20px 22px',
+      border: '1px solid var(--border)', padding: '20px 22px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
       <div>
-        <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 6, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 28, fontWeight: 800, color: '#111827', lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 6, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{value}</div>
       </div>
       <div style={{
         width: 48, height: 48, borderRadius: '50%',
@@ -163,14 +163,14 @@ function StatCard({ label, value, iconBg, icon }) {
 
 // ── PROJE/KONU BADGE ─────────────────────────────────────────────────────────
 function CategoryBadge({ label }) {
-  if (!label) return <span style={{ color: '#d1d5db', fontSize: 12 }}>—</span>;
+  if (!label) return <span style={{ color: 'var(--gray-mid)', fontSize: 12 }}>—</span>;
   return (
     <span style={{
       display: 'inline-block',
       padding: '3px 10px', borderRadius: 6,
-      border: '1px solid #e5e7eb',
-      background: 'white',
-      fontSize: 12.5, fontWeight: 500, color: '#374151',
+      border: '1px solid var(--border)',
+      background: 'var(--bg-card)',
+      fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)',
       whiteSpace: 'nowrap',
     }}>
       {label}
@@ -184,7 +184,7 @@ function OtBadge() {
     <span style={{
       display: 'inline-block', marginLeft: 8,
       padding: '1px 7px', borderRadius: 20,
-      background: '#fef3c7', border: '1px solid #fcd34d',
+      background: 'var(--orange-pale)', border: '1px solid var(--gold)99',
       fontSize: 10.5, fontWeight: 700, color: '#92400e',
     }}>Mesai</span>
   );
@@ -192,9 +192,9 @@ function OtBadge() {
 
 // ── İZİN BADGE ───────────────────────────────────────────────────────────────
 const LEAVE_META = {
-  saglik_izni: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b', label: 'Sağlık İzni' },
+  saglik_izni: { bg: 'var(--red-pale)', border: '#fecaca', color: '#991b1b', label: 'Sağlık İzni' },
   egitim_izni: { bg: '#f5f3ff', border: '#ddd6fe', color: '#5b21b6', label: 'Eğitim İzni' },
-  yillik_izin: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', label: 'Yıllık İzin' },
+  yillik_izin: { bg: 'var(--orange-pale)', border: '#fde68a', color: '#92400e', label: 'Yıllık İzin' },
   calismiyor:  { bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280', label: 'Çalışmıyor'  },
 };
 function LeaveBadge({ status }) {
@@ -229,8 +229,8 @@ function PersonBlock({ person, rows, searchQ }) {
 
   return (
     <div style={{
-      background: 'white', borderRadius: 14,
-      border: '1px solid #e5e7eb',
+      background: 'var(--bg-card)', borderRadius: 14,
+      border: '1px solid var(--border)',
       overflow: 'hidden',
       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
     }}>
@@ -238,22 +238,22 @@ function PersonBlock({ person, rows, searchQ }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '18px 24px',
-        borderBottom: '1px solid #f3f4f6',
+        borderBottom: '1px solid var(--bg-badge)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Avatar name={person.full_name} avatarUrl={person.avatar_url} size={44} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>{person.full_name}</div>
-            <div style={{ fontSize: 12.5, color: '#9ca3af', marginTop: 2 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{person.full_name}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-light)', marginTop: 2 }}>
               {ROLE_LABELS[person.role] || person.role}
               {person.unit ? ` · ${person.unit}` : ''}
             </div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 3 }}>Toplam Saat</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#111827', lineHeight: 1 }}>{fmtH(totalMins)}</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{totalEntries} kayıt</div>
+          <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>Toplam Saat</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{fmtH(totalMins)}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>{totalEntries} kayıt</div>
         </div>
       </div>
 
@@ -261,11 +261,11 @@ function PersonBlock({ person, rows, searchQ }) {
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+            <tr style={{ borderBottom: '1px solid var(--bg-badge)' }}>
               {['Tarih','Yapılan İş','Proje/Konu','Süre'].map((col, i) => (
                 <th key={col} style={{
                   padding: '10px 24px', textAlign: i === 3 ? 'right' : 'left',
-                  fontSize: 12.5, fontWeight: 600, color: '#9ca3af',
+                  fontSize: 12.5, fontWeight: 600, color: 'var(--text-light)',
                   background: '#fafafa',
                   width: i === 0 ? '18%' : i === 1 ? '42%' : i === 2 ? '28%' : '12%',
                 }}>{col}</th>
@@ -275,14 +275,14 @@ function PersonBlock({ person, rows, searchQ }) {
           <tbody>
             {visibleRows.map((row, idx) => (
               <tr key={idx} style={{
-                borderBottom: idx < visibleRows.length - 1 ? '1px solid #f9fafb' : 'none',
+                borderBottom: idx < visibleRows.length - 1 ? '1px solid var(--bg)' : 'none',
               }}>
-                <td style={{ padding: '12px 24px', fontSize: 13.5, color: '#6b7280', whiteSpace: 'nowrap' }}>
+                <td style={{ padding: '12px 24px', fontSize: 13.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                   <span style={{ fontWeight: 600 }}>{fmtDayShort(row.log_date)}</span>
                   {' '}
                   <span>{fmtDateShort(row.log_date)}</span>
                 </td>
-                <td style={{ padding: '12px 24px', fontSize: 13.5, color: '#111827' }}>
+                <td style={{ padding: '12px 24px', fontSize: 13.5, color: 'var(--text)' }}>
                   {row.isLeave ? <LeaveBadge status={row.status} /> : (
                     <>
                       {row.title}
@@ -293,7 +293,7 @@ function PersonBlock({ person, rows, searchQ }) {
                 <td style={{ padding: '12px 24px' }}>
                   {!row.isLeave && <CategoryBadge label={row.category} />}
                 </td>
-                <td style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 700, fontSize: 13.5, color: '#111827', whiteSpace: 'nowrap' }}>
+                <td style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 700, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap' }}>
                   {row.isLeave ? '—' : fmtH(row.mins)}
                 </td>
               </tr>
@@ -325,36 +325,36 @@ function ListView({ persons, searchQ }) {
 
   return (
     <div style={{
-      background: 'white', borderRadius: 14, border: '1px solid #e5e7eb',
+      background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border)',
       overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
     }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ background: '#fafafa', borderBottom: '1px solid #f3f4f6' }}>
+          <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--bg-badge)' }}>
             {['Personel','Tarih','Yapılan İş','Proje/Konu','Süre'].map((col, i) => (
               <th key={col} style={{
                 padding: '12px 20px', textAlign: i === 4 ? 'right' : 'left',
-                fontSize: 12.5, fontWeight: 600, color: '#9ca3af',
+                fontSize: 12.5, fontWeight: 600, color: 'var(--text-light)',
               }}>{col}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {visible.map((row, idx) => (
-            <tr key={idx} style={{ borderBottom: '1px solid #f9fafb' }}>
+            <tr key={idx} style={{ borderBottom: '1px solid var(--bg)' }}>
               <td style={{ padding: '11px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={30} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{row.person.full_name}</div>
-                    <div style={{ fontSize: 11.5, color: '#9ca3af' }}>{row.person.unit}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.person.full_name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
                   </div>
                 </div>
               </td>
-              <td style={{ padding: '11px 20px', fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' }}>
+              <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                 <span style={{ fontWeight: 600 }}>{fmtDayShort(row.log_date)}</span>{' '}{fmtDateShort(row.log_date)}
               </td>
-              <td style={{ padding: '11px 20px', fontSize: 13, color: '#111827' }}>
+              <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--text)' }}>
                 {row.isLeave ? <LeaveBadge status={row.status} /> : (
                   <>{row.title}{row.isOt && <OtBadge />}</>
                 )}
@@ -362,7 +362,7 @@ function ListView({ persons, searchQ }) {
               <td style={{ padding: '11px 20px' }}>
                 {!row.isLeave && <CategoryBadge label={row.category} />}
               </td>
-              <td style={{ padding: '11px 20px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#111827' }}>
+              <td style={{ padding: '11px 20px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
                 {row.isLeave ? '—' : fmtH(row.mins)}
               </td>
             </tr>
@@ -395,27 +395,27 @@ function KartView({ persons, searchQ }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
       {visible.map((row, idx) => (
         <div key={idx} style={{
-          background: 'white', borderRadius: 12, border: '1px solid #e5e7eb',
+          background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
           padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={32} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{row.person.full_name}</div>
-              <div style={{ fontSize: 11.5, color: '#9ca3af' }}>{row.person.unit}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{row.person.full_name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
             </div>
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+            <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
               {fmtDayShort(row.log_date)} {fmtDateShort(row.log_date)}
             </div>
           </div>
-          <div style={{ fontWeight: 600, fontSize: 13.5, color: '#111827', marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)', marginBottom: 8 }}>
             {row.isLeave ? <LeaveBadge status={row.status} /> : (
               <>{row.title}{row.isOt && <OtBadge />}</>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <CategoryBadge label={row.isLeave ? null : row.category} />
-            <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>
+            <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
               {row.isLeave ? '—' : fmtH(row.mins)}
             </span>
           </div>
@@ -430,11 +430,11 @@ function EmptyState() {
   return (
     <div style={{
       textAlign: 'center', padding: '64px 24px',
-      background: 'white', borderRadius: 14, border: '1px solid #e5e7eb',
+      background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border)',
     }}>
       <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Kayıt bulunamadı</div>
-      <div style={{ fontSize: 13, color: '#9ca3af' }}>Seçilen tarih aralığında giriş yapılmamış.</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Kayıt bulunamadı</div>
+      <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Seçilen tarih aralığında giriş yapılmamış.</div>
     </div>
   );
 }
@@ -469,8 +469,8 @@ function ViewBtn({ id, label, icon, active, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '7px 14px', borderRadius: 8, border: 'none',
-        background: active ? '#111827' : 'transparent',
-        color: active ? 'white' : '#6b7280',
+        background: active ? 'var(--text)' : 'transparent',
+        color: active ? 'white' : 'var(--text-muted)',
         fontWeight: 600, fontSize: 13, cursor: 'pointer',
         fontFamily: 'inherit',
         transition: 'all 0.15s',
@@ -614,10 +614,10 @@ export default function LogsViewer({ user, profile }) {
       {/* ── Başlık ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#111827', margin: 0, lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>
             Çalışma Kayıtları
           </h1>
-          <p style={{ fontSize: 13.5, color: '#9ca3af', margin: '6px 0 0', fontWeight: 500 }}>
+          <p style={{ fontSize: 13.5, color: 'var(--text-light)', margin: '6px 0 0', fontWeight: 500 }}>
             {isKoordinator && myUnit ? `${myUnit} birimi personel aktivite kayıtları` : 'Personel günlük aktivite kayıtları'}
           </p>
         </div>
@@ -626,7 +626,7 @@ export default function LogsViewer({ user, profile }) {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 20px', borderRadius: 10, border: 'none',
-            background: '#111827', color: 'white',
+            background: 'var(--text)', color: 'white',
             fontWeight: 700, fontSize: 13.5, cursor: 'pointer',
             fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}
@@ -645,7 +645,7 @@ export default function LogsViewer({ user, profile }) {
 
       {/* ── Filtre Çubuğu ── */}
       <div style={{
-        background: 'white', borderRadius: 12, border: '1px solid #e5e7eb',
+        background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
         padding: '14px 18px', marginBottom: 20,
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       }}>
@@ -653,7 +653,7 @@ export default function LogsViewer({ user, profile }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Arama */}
           <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 16 }}>🔍</span>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 16 }}>🔍</span>
             <input
               type="text"
               value={searchText}
@@ -662,9 +662,9 @@ export default function LogsViewer({ user, profile }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '9px 12px 9px 36px',
-                borderRadius: 8, border: '1.5px solid #e5e7eb',
-                fontSize: 13, fontFamily: 'inherit', color: '#374151',
-                outline: 'none', background: '#fafafa',
+                borderRadius: 8, border: '1.5px solid var(--border)',
+                fontSize: 13, fontFamily: 'inherit', color: 'var(--text-secondary)',
+                outline: 'none', background: 'var(--bg-hover)',
               }}
             />
           </div>

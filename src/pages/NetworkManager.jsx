@@ -103,7 +103,7 @@ function Tag({ label, onRemove }) {
     }}>
       {label}
       {onRemove && <button onClick={onRemove} style={{
-        border:'none', background:'none', cursor:'pointer', color:'#9ca3af',
+        border:'none', background:'none', cursor:'pointer', color:'var(--text-light)',
         fontSize:13, padding:0, lineHeight:1, marginTop:1,
       }}>×</button>}
     </span>
@@ -115,17 +115,17 @@ function TypeBadge({ value, types }) {
   return t ? (
     <span style={{
       display:'inline-block', padding:'2px 9px', borderRadius:6,
-      border:'1px solid #e5e7eb', background:'white',
-      fontSize:11.5, fontWeight:600, color:'#374151',
+      border:'1px solid var(--border)', background:'var(--bg-card)',
+      fontSize:11.5, fontWeight:600, color:'var(--text-secondary)',
     }}>{t.label}</span>
   ) : null;
 }
 
 function EmptyState({ icon, title, sub }) {
   return (
-    <div style={{ textAlign:'center', padding:'64px 24px', color:'#9ca3af' }}>
+    <div style={{ textAlign:'center', padding:'64px 24px', color:'var(--text-light)' }}>
       <div style={{ fontSize:44, marginBottom:14 }}>{icon}</div>
-      <div style={{ fontSize:15, fontWeight:700, color:'#374151', marginBottom:6 }}>{title}</div>
+      <div style={{ fontSize:15, fontWeight:700, color:'var(--text-secondary)', marginBottom:6 }}>{title}</div>
       <div style={{ fontSize:13 }}>{sub}</div>
     </div>
   );
@@ -186,7 +186,7 @@ function Autocomplete({ value, onChange, options, placeholder, renderOption, lab
   return (
     <div ref={wrapRef} style={{ position:'relative' }}>
       {label && (
-        <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+        <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
           {label}
         </label>
       )}
@@ -199,25 +199,25 @@ function Autocomplete({ value, onChange, options, placeholder, renderOption, lab
           onKeyDown={handleKeyDown}
           style={{
             width:'100%', boxSizing:'border-box', padding:'9px 32px 9px 12px', borderRadius:9,
-            border:'1.5px solid ' + (open ? '#3b82f6' : '#e5e7eb'), fontSize:13.5,
-            fontFamily:'inherit', color:'#111827', outline:'none',
+            border:'1.5px solid ' + (open ? 'var(--primary)' : 'var(--border)'), fontSize:13.5,
+            fontFamily:'inherit', color:'var(--text)', outline:'none',
             transition:'border-color 0.15s',
           }}
         />
         {value && (
           <button onClick={() => { onChange(''); setQuery(''); }} style={{
             position:'absolute', right:8, top:'50%', transform:'translateY(-50%)',
-            background:'none', border:'none', cursor:'pointer', color:'#9ca3af', fontSize:16, padding:0, lineHeight:1,
+            background:'none', border:'none', cursor:'pointer', color:'var(--text-light)', fontSize:16, padding:0, lineHeight:1,
           }}>×</button>
         )}
         {!value && (
-          <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'#d1d5db', fontSize:12, pointerEvents:'none' }}>🔍</span>
+          <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'var(--gray-mid)', fontSize:12, pointerEvents:'none' }}>🔍</span>
         )}
       </div>
       {open && filtered.length > 0 && (
         <div ref={listRef} style={{
           position:'absolute', top:'100%', left:0, right:0, zIndex:999,
-          background:'white', border:'1px solid #e5e7eb', borderRadius:10,
+          background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:10,
           boxShadow:'0 8px 24px rgba(0,0,0,0.12)', maxHeight:220, overflowY:'auto',
           marginTop:4,
         }}>
@@ -229,9 +229,9 @@ function Autocomplete({ value, onChange, options, placeholder, renderOption, lab
                 onMouseEnter={() => setHighlightIdx(i)}
                 style={{
                   padding:'8px 14px', cursor:'pointer', fontSize:13.5,
-                  background: isHighlight ? '#eff6ff' : 'white',
-                  color:'#111827', transition:'background 0.1s',
-                  borderBottom: i < filtered.length - 1 ? '1px solid #f9fafb' : 'none',
+                  background: isHighlight ? 'var(--primary-light)' : 'var(--bg-card)',
+                  color:'var(--text)', transition:'background 0.1s',
+                  borderBottom: i < filtered.length - 1 ? '1px solid var(--bg-hover)' : 'none',
                 }}>
                 {renderOption ? renderOption(opt) : val}
               </div>
@@ -242,9 +242,9 @@ function Autocomplete({ value, onChange, options, placeholder, renderOption, lab
       {open && query && filtered.length === 0 && (
         <div style={{
           position:'absolute', top:'100%', left:0, right:0, zIndex:999,
-          background:'white', border:'1px solid #e5e7eb', borderRadius:10,
+          background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:10,
           boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'16px', textAlign:'center',
-          color:'#9ca3af', fontSize:13, marginTop:4,
+          color:'var(--text-light)', fontSize:13, marginTop:4,
         }}>
           Sonuç bulunamadı
         </div>
@@ -256,7 +256,7 @@ function Autocomplete({ value, onChange, options, placeholder, renderOption, lab
 // ── GÖRSEL HUB BİLEŞENİ (dairesel ağ) ────────────────────────────────────────
 function HubView({ center, nodes }) {
   if (!nodes.length) return (
-    <div style={{ textAlign:'center', padding:'32px', color:'#9ca3af', fontSize:13 }}>
+    <div style={{ textAlign:'center', padding:'32px', color:'var(--text-light)', fontSize:13 }}>
       Henüz bağlantı yok.
     </div>
   );
@@ -277,7 +277,7 @@ function HubView({ center, nodes }) {
           const ny = cy + R * Math.sin(angle);
           return (
             <line key={i} x1={cx} y1={cy} x2={nx} y2={ny}
-              stroke="#e5e7eb" strokeWidth={1.5} strokeDasharray="4 3" />
+              stroke="var(--border)" strokeWidth={1.5} strokeDasharray="4 3" />
           );
         })}
 
@@ -299,7 +299,7 @@ function HubView({ center, nodes }) {
             )}
           </div>
         </foreignObject>
-        <text x={cx} y={cy+52} textAnchor="middle" style={{ fontSize:11, fill:'#374151', fontWeight:600 }}>
+        <text x={cx} y={cy+52} textAnchor="middle" style={{ fontSize:11, fill:'var(--text-secondary)', fontWeight:600 }}>
           {center.name?.length > 16 ? center.name.slice(0,14)+'…' : center.name}
         </text>
 
@@ -328,11 +328,11 @@ function HubView({ center, nodes }) {
                   )}
                 </div>
               </foreignObject>
-              <text x={nx} y={ny+34} textAnchor="middle" style={{ fontSize:10, fill:'#6b7280' }}>
+              <text x={nx} y={ny+34} textAnchor="middle" style={{ fontSize:10, fill:'var(--text-muted)' }}>
                 {n.name?.length > 14 ? n.name.slice(0,12)+'…' : n.name}
               </text>
               {n.label && (
-                <text x={nx} y={ny+45} textAnchor="middle" style={{ fontSize:9, fill:'#9ca3af' }}>
+                <text x={nx} y={ny+45} textAnchor="middle" style={{ fontSize:9, fill:'var(--text-light)' }}>
                   {n.label}
                 </text>
               )}
@@ -417,12 +417,12 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
       {/* Panel */}
       <div style={{
         position:'fixed', right:0, top:0, bottom:0, width:'min(520px, 100vw)',
-        background:'white', zIndex:1000, overflowY:'auto',
+        background:'var(--bg-card)', zIndex:1000, overflowY:'auto',
         boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
         display:'flex', flexDirection:'column',
       }}>
         {/* Başlık */}
-        <div style={{ padding:'20px 24px', borderBottom:'1px solid #f3f4f6', flexShrink:0 }}>
+        <div style={{ padding:'20px 24px', borderBottom:'1px solid var(--bg-badge)', flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
             <div style={{ display:'flex', alignItems:'center', gap:14 }}>
               <Avatar
@@ -432,14 +432,14 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
                 radius={type === 'organization' ? '10px' : '50%'}
               />
               <div>
-                <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:'#111827' }}>
+                <h2 style={{ margin:0, fontSize:18, fontWeight:800, color:'var(--text)' }}>
                   {item.full_name || item.name}
                 </h2>
                 {type === 'contact' && item.position && (
-                  <div style={{ fontSize:13, color:'#6b7280', marginTop:3 }}>{item.position}</div>
+                  <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>{item.position}</div>
                 )}
                 {type === 'contact' && contactOrg && (
-                  <div style={{ fontSize:12.5, color:'#9ca3af', marginTop:2 }}>
+                  <div style={{ fontSize:12.5, color:'var(--text-light)', marginTop:2 }}>
                     🏢 {contactOrg.name}
                   </div>
                 )}
@@ -449,7 +449,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
                 {type === 'event' && (
                   <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:4 }}>
                     <TypeBadge value={item.event_type} types={EVENT_TYPES} />
-                    {item.event_date && <span style={{ fontSize:12, color:'#9ca3af' }}>📅 {fmtDate(item.event_date)}</span>}
+                    {item.event_date && <span style={{ fontSize:12, color:'var(--text-light)' }}>📅 {fmtDate(item.event_date)}</span>}
                   </div>
                 )}
               </div>
@@ -457,13 +457,13 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             <div style={{ display:'flex', gap:8, flexShrink:0 }}>
               <button onClick={onEdit} style={{
                 padding:'7px 14px', borderRadius:8,
-                border:'1.5px solid #e5e7eb', background:'white',
-                fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', color:'#374151',
+                border:'1.5px solid var(--border)', background:'var(--bg-card)',
+                fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', color:'var(--text-secondary)',
               }}>✏️ Düzenle</button>
               <button onClick={onClose} style={{
                 padding:'7px 12px', borderRadius:8,
-                border:'1.5px solid #e5e7eb', background:'white',
-                fontSize:16, cursor:'pointer', color:'#9ca3af',
+                border:'1.5px solid var(--border)', background:'var(--bg-card)',
+                fontSize:16, cursor:'pointer', color:'var(--text-light)',
               }}>✕</button>
             </div>
           </div>
@@ -474,15 +474,15 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
 
           {/* ── SEKME BAR (sadece kişi için) ── */}
           {type === 'contact' && (
-            <div style={{ display:'flex', gap:4, background:'#f3f4f6', borderRadius:10, padding:3, marginBottom:20 }}>
+            <div style={{ display:'flex', gap:4, background:'var(--bg-badge)', borderRadius:10, padding:3, marginBottom:20 }}>
               {[
                 { id:'info', label:'ℹ️ Bilgiler' },
                 { id:'comms', label:`💬 İletişim Geçmişi (${comms.length})` },
               ].map(t=>(
                 <button key={t.id} onClick={()=>setDetailTab(t.id)} style={{
                   flex:1, padding:'8px 12px', borderRadius:8, border:'none', cursor:'pointer',
-                  background: detailTab===t.id ? '#111827' : 'transparent',
-                  color: detailTab===t.id ? 'white' : '#6b7280',
+                  background: detailTab===t.id ? 'var(--text)' : 'transparent',
+                  color: detailTab===t.id ? 'white' : 'var(--text-muted)',
                   fontWeight:700, fontSize:12.5, fontFamily:'inherit',
                 }}>{t.label}</button>
               ))}
@@ -493,27 +493,27 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
           {type === 'contact' && detailTab === 'comms' && (
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#111827' }}>İletişim Geçmişi</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>İletişim Geçmişi</div>
                 <button onClick={()=>setShowCommForm(v=>!v)} style={{
-                  padding:'6px 14px', borderRadius:8, border:'1.5px solid #e5e7eb', background:'white',
-                  cursor:'pointer', fontSize:12, fontWeight:700, color:'#374151', fontFamily:'inherit',
+                  padding:'6px 14px', borderRadius:8, border:'1.5px solid var(--border)', background:'var(--bg-card)',
+                  cursor:'pointer', fontSize:12, fontWeight:700, color:'var(--text-secondary)', fontFamily:'inherit',
                 }}>{showCommForm ? '✕ İptal' : '+ Kayıt Ekle'}</button>
               </div>
 
               {showCommForm && (
-                <div style={{ padding:14, borderRadius:10, background:'#f8faff', border:'1.5px solid #bfdbfe', marginBottom:16 }}>
+                <div style={{ padding:14, borderRadius:10, background:'var(--primary-light)', border:'1.5px solid var(--blue-pale)', marginBottom:16 }}>
                   <div style={{ display:'flex', gap:10, marginBottom:10 }}>
                     <input type="date" value={commDate} onChange={e=>setCommDate(e.target.value)}
-                      style={{ padding:'8px 10px', borderRadius:8, border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none', background:'white' }} />
+                      style={{ padding:'8px 10px', borderRadius:8, border:'1.5px solid var(--blue-pale)', fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--bg-card)' }} />
                     <input value={commDesc} onChange={e=>setCommDesc(e.target.value)}
                       placeholder="Açıklama (ör: 2026 raporu gönderme)"
                       onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); saveComm(); }}}
-                      style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none', background:'white' }} />
+                      style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1.5px solid var(--blue-pale)', fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--bg-card)' }} />
                   </div>
                   <button onClick={saveComm} disabled={!commDesc.trim()||commSaving}
                     style={{
                       padding:'7px 18px', borderRadius:8, border:'none',
-                      background: !commDesc.trim()||commSaving ? '#93c5fd' : '#2563eb',
+                      background: !commDesc.trim()||commSaving ? 'var(--primary-light)' : 'var(--primary)',
                       color:'white', cursor: !commDesc.trim()||commSaving ? 'not-allowed' : 'pointer',
                       fontSize:12.5, fontWeight:700, fontFamily:'inherit',
                     }}>{commSaving ? '⏳' : '✓ Kaydet'}</button>
@@ -521,9 +521,9 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
               )}
 
               {commsLoading ? (
-                <div style={{ textAlign:'center', padding:20, color:'#9ca3af', fontSize:13 }}>Yükleniyor…</div>
+                <div style={{ textAlign:'center', padding:20, color:'var(--text-light)', fontSize:13 }}>Yükleniyor…</div>
               ) : comms.length === 0 ? (
-                <div style={{ textAlign:'center', padding:'32px 16px', color:'#9ca3af' }}>
+                <div style={{ textAlign:'center', padding:'32px 16px', color:'var(--text-light)' }}>
                   <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
                   <div style={{ fontSize:13, fontWeight:600 }}>Henüz iletişim kaydı yok</div>
                   <div style={{ fontSize:12, marginTop:4 }}>Yukarıdaki "Kayıt Ekle" butonu ile başlayın</div>
@@ -533,23 +533,23 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
                   {comms.map(c=>(
                     <div key={c.id} style={{
                       display:'flex', alignItems:'flex-start', gap:12, padding:'12px 14px',
-                      background:'white', borderRadius:10, border:'1px solid #f3f4f6',
+                      background:'var(--bg-card)', borderRadius:10, border:'1px solid var(--bg-badge)',
                     }}>
                       <div style={{
                         width:42, height:42, borderRadius:10, flexShrink:0,
-                        background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:11, fontWeight:700, color:'#2563eb', lineHeight:1.2, textAlign:'center',
+                        background:'var(--primary-light)', display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:11, fontWeight:700, color:'var(--primary)', lineHeight:1.2, textAlign:'center',
                       }}>
                         {new Date(c.comm_date).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}).replace(' ','\n')}
                       </div>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:'#111827' }}>{c.description}</div>
-                        <div style={{ fontSize:11, color:'#9ca3af', marginTop:3 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{c.description}</div>
+                        <div style={{ fontSize:11, color:'var(--text-light)', marginTop:3 }}>
                           {new Date(c.comm_date).toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}
                         </div>
                       </div>
                       <button onClick={()=>removeComm(c.id)} title="Sil" style={{
-                        border:'none', background:'none', cursor:'pointer', color:'#d1d5db', fontSize:16, padding:'2px 4px',
+                        border:'none', background:'none', cursor:'pointer', color:'var(--gray-mid)', fontSize:16, padding:'2px 4px',
                       }}>×</button>
                     </div>
                   ))}
@@ -614,7 +614,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
               {item.categories.map(cat=>(
                 <span key={cat} style={{
                   display:'inline-block', padding:'3px 10px', borderRadius:6,
-                  background:'#f3f4f6', fontSize:11.5, fontWeight:600, color:'#374151',
+                  background:'var(--bg-badge)', fontSize:11.5, fontWeight:600, color:'var(--text-secondary)',
                 }}>📁 {cat}</span>
               ))}
             </div>
@@ -625,8 +625,8 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             <div style={{ marginBottom:16 }}>
               <a href={item.system_plus_url} target="_blank" rel="noreferrer" style={{
                 display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px',
-                borderRadius:8, background:'#eff6ff', border:'1.5px solid #bfdbfe',
-                color:'#1d4ed8', fontSize:12.5, fontWeight:700, textDecoration:'none',
+                borderRadius:8, background:'var(--primary-light)', border:'1.5px solid var(--blue-pale)',
+                color:'var(--primary)', fontSize:12.5, fontWeight:700, textDecoration:'none',
               }}>🔗 Sistem Plus'ta Aç</a>
             </div>
           )}
@@ -636,18 +636,18 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             <div style={{ marginBottom:16 }}>
               <a href={item.drive_url} target="_blank" rel="noreferrer" style={{
                 display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px',
-                borderRadius:8, background:'#fef9c3', border:'1.5px solid #fde047',
-                color:'#854d0e', fontSize:12.5, fontWeight:700, textDecoration:'none',
+                borderRadius:8, background:'var(--orange-pale)', border:'1.5px solid var(--orange)',
+                color:'var(--orange)', fontSize:12.5, fontWeight:700, textDecoration:'none',
               }}>📁 Drive Klasörünü Aç</a>
             </div>
           )}
 
           {(item.description || item.notes) && (
             <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11.5, fontWeight:700, color:'#9ca3af', letterSpacing:'0.05em', marginBottom:6, textTransform:'uppercase' }}>
+              <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text-light)', letterSpacing:'0.05em', marginBottom:6, textTransform:'uppercase' }}>
                 Notlar
               </div>
-              <div style={{ fontSize:13.5, color:'#374151', lineHeight:1.6, padding:'12px', background:'#f9fafb', borderRadius:8 }}>
+              <div style={{ fontSize:13.5, color:'var(--text-secondary)', lineHeight:1.6, padding:'12px', background:'var(--bg-hover)', borderRadius:8 }}>
                 {item.description || item.notes}
               </div>
             </div>
@@ -661,10 +661,10 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
 
           {/* Ağ Haritası */}
           <div style={{ marginBottom:8 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'#111827', marginBottom:4 }}>
-              🕸 Ağ Haritası <span style={{ fontWeight:400, color:'#9ca3af', fontSize:12 }}>({hubNodes.length} bağlantı)</span>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
+              🕸 Ağ Haritası <span style={{ fontWeight:400, color:'var(--text-light)', fontSize:12 }}>({hubNodes.length} bağlantı)</span>
             </div>
-            <div style={{ background:'#f9fafb', borderRadius:12, border:'1px solid #f3f4f6' }}>
+            <div style={{ background:'var(--bg-hover)', borderRadius:12, border:'1px solid var(--bg-badge)' }}>
               <HubView
                 center={{ name: item.full_name || item.name, imageUrl: item.avatar_url || item.logo_url, color: centerColor }}
                 nodes={hubNodes}
@@ -675,28 +675,28 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
           {/* Bağlantı listesi */}
           {myConnections.length > 0 && (
             <div style={{ marginTop:16 }}>
-              <div style={{ fontSize:11.5, fontWeight:700, color:'#9ca3af', letterSpacing:'0.05em', marginBottom:8, textTransform:'uppercase' }}>
+              <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text-light)', letterSpacing:'0.05em', marginBottom:8, textTransform:'uppercase' }}>
                 Bağlantılar
               </div>
               {hubNodes.map(n => (
                 <div key={n.connId} style={{
                   display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
-                  background:'white', border:'1px solid #f3f4f6', borderRadius:10, marginBottom:6,
+                  background:'var(--bg-card)', border:'1px solid var(--bg-badge)', borderRadius:10, marginBottom:6,
                 }}>
                   <Avatar name={n.name} url={n.imageUrl} size={34}
                     radius={n.entityType === 'organization' ? '7px' : '50%'} />
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#111827' }}>{n.name}</div>
-                    {n.label && <div style={{ fontSize:12, color:'#9ca3af' }}>{n.label}</div>}
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{n.name}</div>
+                    {n.label && <div style={{ fontSize:12, color:'var(--text-light)' }}>{n.label}</div>}
                   </div>
                   <span style={{
                     fontSize:11, padding:'2px 8px', borderRadius:20,
-                    background:'#f3f4f6', color:'#6b7280', fontWeight:600,
+                    background:'var(--bg-badge)', color:'var(--text-muted)', fontWeight:600,
                   }}>
                     {n.entityType === 'contact' ? '🧑 Kişi' : n.entityType === 'organization' ? '🏢 Kurum' : '📅 Etkinlik'}
                   </span>
                   <button onClick={() => onRemoveConnection(n.connId)} style={{
-                    border:'none', background:'none', cursor:'pointer', color:'#e5e7eb',
+                    border:'none', background:'none', cursor:'pointer', color:'var(--border)',
                     fontSize:18, padding:'2px 4px', lineHeight:1,
                   }} title="Bağlantıyı kaldır">×</button>
                 </div>
@@ -707,9 +707,9 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
           {/* Bağlantı Ekle butonu */}
           <button onClick={onAddConnection} style={{
             width:'100%', marginTop:12, padding:'11px',
-            borderRadius:10, border:'2px dashed #e5e7eb',
+            borderRadius:10, border:'2px dashed var(--border)',
             background:'transparent', cursor:'pointer',
-            fontSize:13, fontWeight:700, color:'#9ca3af',
+            fontSize:13, fontWeight:700, color:'var(--text-light)',
             fontFamily:'inherit',
             transition:'all 0.15s',
           }}>
@@ -726,11 +726,11 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
 function InfoRow({ icon, label, val, href }) {
   return (
     <div>
-      <div style={{ fontSize:11, color:'#9ca3af', fontWeight:600, marginBottom:2 }}>{icon} {label}</div>
+      <div style={{ fontSize:11, color:'var(--text-light)', fontWeight:600, marginBottom:2 }}>{icon} {label}</div>
       {href ? (
-        <a href={href} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'#2563eb', fontWeight:500 }}>{val}</a>
+        <a href={href} target="_blank" rel="noreferrer" style={{ fontSize:13, color:'var(--primary)', fontWeight:500 }}>{val}</a>
       ) : (
-        <div style={{ fontSize:13, color:'#374151' }}>{val}</div>
+        <div style={{ fontSize:13, color:'var(--text-secondary)' }}>{val}</div>
       )}
     </div>
   );
@@ -858,21 +858,21 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
 
   const inp = (label, key, type_='text', placeholder='', required=false) => (
     <div style={{ marginBottom:14 }}>
-      <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
-        {label}{required && <span style={{ color:'#ef4444' }}> *</span>}
+      <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+        {label}{required && <span style={{ color:'var(--red)' }}> *</span>}
       </label>
       <input type={type_} value={form[key]||''} onChange={e=>set(key,e.target.value)}
         placeholder={placeholder} required={required}
         style={{ width:'100%', boxSizing:'border-box', padding:'9px 12px', borderRadius:9,
-          border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', color:'#111827', outline:'none' }} />
+          border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', color:'var(--text)', outline:'none' }} />
     </div>
   );
 
   const sel = (label, key, opts) => (
     <div style={{ marginBottom:14 }}>
-      <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>{label}</label>
+      <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>{label}</label>
       <select value={form[key]||''} onChange={e=>set(key,e.target.value)}
-        style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+        style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
         <option value=''>Seçin…</option>
         {opts.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -887,34 +887,34 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
       <div style={{
         position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
         width:'min(560px, 95vw)', maxHeight:'90vh', overflowY:'auto',
-        background:'white', borderRadius:16, zIndex:1101,
+        background:'var(--bg-card)', borderRadius:16, zIndex:1101,
         boxShadow:'0 20px 60px rgba(0,0,0,0.2)',
       }}>
-        <div style={{ padding:'20px 24px', borderBottom:'1px solid #f3f4f6', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ margin:0, fontSize:17, fontWeight:800, color:'#111827' }}>{title}</h3>
-          <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20, color:'#9ca3af' }}>✕</button>
+        <div style={{ padding:'20px 24px', borderBottom:'1px solid var(--bg-badge)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ margin:0, fontSize:17, fontWeight:800, color:'var(--text)' }}>{title}</h3>
+          <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20, color:'var(--text-light)' }}>✕</button>
         </div>
         <form onSubmit={handleSave} style={{ padding:'20px 24px' }}>
           {/* Resim yükleme */}
           <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
             <div style={{
               width:72, height:72, borderRadius:imgRadius,
-              background:'#f3f4f6', overflow:'hidden', flexShrink:0,
-              display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid #e5e7eb',
+              background:'var(--bg-badge)', overflow:'hidden', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid var(--border)',
             }}>
               {imgPreview ? (
                 <img src={imgPreview} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
               ) : (
-                <span style={{ fontSize:28, color:'#d1d5db' }}>📷</span>
+                <span style={{ fontSize:28, color:'var(--gray-mid)' }}>📷</span>
               )}
             </div>
             <div>
               <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleImgChange} />
               <button type="button" onClick={()=>fileRef.current?.click()} style={{
-                padding:'8px 16px', borderRadius:8, border:'1.5px solid #e5e7eb',
-                background:'white', cursor:'pointer', fontSize:13, fontWeight:600, color:'#374151', fontFamily:'inherit',
+                padding:'8px 16px', borderRadius:8, border:'1.5px solid var(--border)',
+                background:'var(--bg-card)', cursor:'pointer', fontSize:13, fontWeight:600, color:'var(--text-secondary)', fontFamily:'inherit',
               }}>📁 {imgLabel} Seç</button>
-              <div style={{ fontSize:11, color:'#9ca3af', marginTop:5 }}>JPG, PNG, WebP · Maks 5 MB</div>
+              <div style={{ fontSize:11, color:'var(--text-light)', marginTop:5 }}>JPG, PNG, WebP · Maks 5 MB</div>
             </div>
           </div>
 
@@ -924,18 +924,18 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {inp('Ad Soyad', 'full_name', 'text', 'Ad Soyad', true)}
               {inp('Pozisyon / Unvan', 'position', 'text', 'Örn: Program Müdürü')}
               <div style={{ marginBottom: showNewOrg ? 6 : 14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kurum</label>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kurum</label>
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <select value={form.organization_id||''} onChange={e=>set('organization_id',e.target.value)}
-                    style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    style={{ flex:1, padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                     <option value=''>Kurum seçin (isteğe bağlı)</option>
                     {orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                   <button type="button" onClick={()=>setShowNewOrg(v=>!v)} title="Yeni kurum oluştur"
                     style={{
-                      width:36, height:36, borderRadius:9, border:'1.5px solid #e5e7eb',
-                      background: showNewOrg ? '#eff6ff' : 'white',
-                      color: showNewOrg ? '#2563eb' : '#6b7280',
+                      width:36, height:36, borderRadius:9, border:'1.5px solid var(--border)',
+                      background: showNewOrg ? 'var(--primary-light)' : 'var(--bg-card)',
+                      color: showNewOrg ? 'var(--primary)' : 'var(--text-muted)',
                       cursor:'pointer', fontSize:20, lineHeight:1,
                       display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                     }}>
@@ -947,9 +947,9 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
                 {showNewOrg && (
                   <div style={{
                     marginTop:8, padding:'12px 14px', borderRadius:10,
-                    background:'#f8faff', border:'1.5px solid #bfdbfe',
+                    background:'var(--primary-light)', border:'1.5px solid var(--blue-pale)',
                   }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#1d4ed8', marginBottom:8 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'var(--primary)', marginBottom:8 }}>
                       ➕ Yeni Kurum Oluştur
                     </div>
                     <input
@@ -957,19 +957,19 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
                       onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); handleCreateOrg(); }}}
                       placeholder="Kurum adı…" autoFocus
                       style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px', borderRadius:8,
-                        border:'1.5px solid #bfdbfe', fontSize:13, fontFamily:'inherit', outline:'none',
-                        marginBottom:8, background:'white' }}
+                        border:'1.5px solid var(--blue-pale)', fontSize:13, fontFamily:'inherit', outline:'none',
+                        marginBottom:8, background:'var(--bg-card)' }}
                     />
                     <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                       <select value={newOrgType} onChange={e=>setNewOrgType(e.target.value)}
-                        style={{ flex:1, padding:'7px 10px', borderRadius:8, border:'1.5px solid #bfdbfe',
-                          fontSize:12.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                        style={{ flex:1, padding:'7px 10px', borderRadius:8, border:'1.5px solid var(--blue-pale)',
+                          fontSize:12.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                         {ORG_TYPES.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                       <button type="button" onClick={handleCreateOrg} disabled={!newOrgName.trim()||creatingOrg}
                         style={{
                           padding:'7px 16px', borderRadius:8, border:'none',
-                          background: !newOrgName.trim()||creatingOrg ? '#93c5fd' : '#2563eb',
+                          background: !newOrgName.trim()||creatingOrg ? 'var(--primary-light)' : 'var(--primary)',
                           color:'white', cursor: !newOrgName.trim()||creatingOrg ? 'not-allowed' : 'pointer',
                           fontSize:12.5, fontWeight:700, fontFamily:'inherit', whiteSpace:'nowrap',
                         }}>
@@ -984,8 +984,8 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {inp('LinkedIn URL', 'linkedin', 'url', 'https://linkedin.com/in/...')}
 
               {/* ── YENİ ALANLAR ────────────────────────── */}
-              <div style={{ borderTop:'1px solid #f3f4f6', marginTop:8, marginBottom:14, paddingTop:14 }}>
-                <div style={{ fontSize:11.5, fontWeight:700, color:'#9ca3af', letterSpacing:'0.05em', marginBottom:10, textTransform:'uppercase' }}>
+              <div style={{ borderTop:'1px solid var(--bg-badge)', marginTop:8, marginBottom:14, paddingTop:14 }}>
+                <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text-light)', letterSpacing:'0.05em', marginBottom:10, textTransform:'uppercase' }}>
                   Detay Bilgileri
                 </div>
               </div>
@@ -1018,13 +1018,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
 
               {/* Takip Sorumlusu */}
               <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
                   const p = (allProfiles||[]).find(x=>x.id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
-                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
                   {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
@@ -1033,16 +1033,16 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {/* Süreç Aşaması + Uyum Durumu */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div style={{ marginBottom:14 }}>
-                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Süreç Aşaması</label>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Süreç Aşaması</label>
                   <select value={form.process_stage||'İlk Temas'} onChange={e=>set('process_stage',e.target.value)}
-                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                     {PROCESS_STAGES.map(s=><option key={s.value} value={s.value}>{s.icon} {s.value}</option>)}
                   </select>
                 </div>
                 <div style={{ marginBottom:14 }}>
-                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Uyum Durumu</label>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Uyum Durumu</label>
                   <select value={form.compliance_status||'Değerlendirilmedi'} onChange={e=>set('compliance_status',e.target.value)}
-                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                     {COMPLIANCE_STATUSES.map(s=><option key={s.value} value={s.value}>{s.value}</option>)}
                   </select>
                 </div>
@@ -1051,9 +1051,9 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {/* Öncelik + İlk İletişim Tarihi */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div style={{ marginBottom:14 }}>
-                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Öncelik Derecesi</label>
+                  <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Öncelik Derecesi</label>
                   <select value={form.priority||'Orta'} onChange={e=>set('priority',e.target.value)}
-                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                    style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                     {PRIORITY_OPTIONS.map(p=><option key={p.value} value={p.value}>{p.emoji} {p.value}</option>)}
                   </select>
                 </div>
@@ -1062,7 +1062,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
 
               {/* Kategori (çoklu seçim) */}
               <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kategori</label>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Kategori</label>
                 <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                   {CATEGORY_OPTIONS.map(cat => {
                     const selected = (form.categories||[]).includes(cat);
@@ -1074,9 +1074,9 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
                         }}
                         style={{
                           padding:'5px 12px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:600,
-                          border:`1.5px solid ${selected ? '#111827' : '#e5e7eb'}`,
-                          background: selected ? '#111827' : 'white',
-                          color: selected ? 'white' : '#374151', fontFamily:'inherit',
+                          border:`1.5px solid ${selected ? 'var(--text)' : 'var(--border)'}`,
+                          background: selected ? 'var(--text)' : 'var(--bg-card)',
+                          color: selected ? 'white' : 'var(--text-secondary)', fontFamily:'inherit',
                         }}>{cat}</button>
                     );
                   })}
@@ -1101,13 +1101,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {inp('Adres', 'address', 'text', 'Şehir, Ülke')}
               {/* Takip Sorumlusu */}
               <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
                   const p = (allProfiles||[]).find(x=>x.id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
-                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
                   {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
@@ -1127,13 +1127,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               {inp('Drive Linki', 'drive_url', 'url', 'https://drive.google.com/...')}
               {/* Takip Sorumlusu */}
               <div style={{ marginBottom:14 }}>
-                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
+                <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
                   const p = (allProfiles||[]).find(x=>x.id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
-                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+                  style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
                   {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
@@ -1143,7 +1143,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
 
           {/* Notlar / Açıklama */}
           <div style={{ marginBottom:14 }}>
-            <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+            <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
               {type==='contact' ? 'Notlar' : 'Açıklama'}
             </label>
             <textarea
@@ -1151,13 +1151,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
               onChange={e=>set(type==='contact' ? 'notes' : 'description', e.target.value)}
               rows={3} placeholder="İsteğe bağlı notlar…"
               style={{ width:'100%', boxSizing:'border-box', padding:'9px 12px', borderRadius:9,
-                border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', resize:'vertical', outline:'none' }}
+                border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', resize:'vertical', outline:'none' }}
             />
           </div>
 
           {/* Etiketler */}
           <div style={{ marginBottom:18 }}>
-            <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Etiketler</label>
+            <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Etiketler</label>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
               {(form.tags||[]).map(t=>(
                 <Tag key={t} label={t} onRemove={()=>set('tags',(form.tags||[]).filter(x=>x!==t))} />
@@ -1166,20 +1166,20 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
             <input
               value={tagInput} onChange={e=>setTagInput(e.target.value)} onKeyDown={addTag}
               placeholder="Etiket yaz + Enter"
-              style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13, fontFamily:'inherit', outline:'none' }}
+              style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none' }}
             />
           </div>
 
-          {error && <div style={{ padding:'10px 12px', borderRadius:8, background:'#fef2f2', border:'1px solid #fecaca', color:'#b91c1c', fontSize:13, marginBottom:12 }}>⚠️ {error}</div>}
+          {error && <div style={{ padding:'10px 12px', borderRadius:8, background:'var(--red-pale)', border:'1px solid var(--red)', color:'var(--red)', fontSize:13, marginBottom:12 }}>⚠️ {error}</div>}
 
           <div style={{ display:'flex', gap:10 }}>
             <button type="button" onClick={onClose} style={{
-              flex:1, padding:'11px', borderRadius:10, border:'1.5px solid #e5e7eb',
-              background:'white', cursor:'pointer', fontSize:14, fontWeight:600, color:'#374151', fontFamily:'inherit',
+              flex:1, padding:'11px', borderRadius:10, border:'1.5px solid var(--border)',
+              background:'var(--bg-card)', cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--text-secondary)', fontFamily:'inherit',
             }}>İptal</button>
             <button type="submit" disabled={saving} style={{
               flex:2, padding:'11px', borderRadius:10, border:'none',
-              background: saving ? '#9ca3af' : '#111827',
+              background: saving ? 'var(--text-light)' : 'var(--text)',
               color:'white', cursor: saving ? 'not-allowed' : 'pointer',
               fontSize:14, fontWeight:700, fontFamily:'inherit',
             }}>
@@ -1247,7 +1247,7 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
           <h3 style={{ margin:0, fontSize:16, fontWeight:800 }}>
             {isEventSource ? 'Katılımcı / Kurum Ekle' : 'Etkinliğe Bağla'}
           </h3>
-          <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20, color:'#9ca3af' }}>✕</button>
+          <button onClick={onClose} style={{ border:'none', background:'none', cursor:'pointer', fontSize:20, color:'var(--text-light)' }}>✕</button>
         </div>
 
         {/* Kaynak etkinlikse kişi/kurum seçimi göster */}
@@ -1257,9 +1257,9 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
               <button key={t.id} onClick={()=>{setTargetType(t.id);setTargetId('');}}
                 style={{
                   flex:1, padding:'8px 4px', borderRadius:8, cursor:'pointer',
-                  border:`2px solid ${targetType===t.id ? '#2563eb' : '#e5e7eb'}`,
-                  background: targetType===t.id ? '#eff6ff' : 'white',
-                  color: targetType===t.id ? '#1d4ed8' : '#374151',
+                  border:`2px solid ${targetType===t.id ? 'var(--primary)' : 'var(--border)'}`,
+                  background: targetType===t.id ? 'var(--primary-light)' : 'var(--bg-card)',
+                  color: targetType===t.id ? 'var(--primary)' : 'var(--text-secondary)',
                   fontWeight:600, fontSize:12.5, fontFamily:'inherit',
                 }}>{t.label}</button>
             ))}
@@ -1268,18 +1268,18 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
 
         {/* Kaynak kişi/kurumsa etkinlik seçimi */}
         {!isEventSource && (
-          <div style={{ padding:'8px 12px', borderRadius:8, background:'#eff6ff', color:'#1d4ed8', fontSize:12.5, fontWeight:600, marginBottom:14 }}>
+          <div style={{ padding:'8px 12px', borderRadius:8, background:'var(--primary-light)', color:'var(--primary)', fontSize:12.5, fontWeight:600, marginBottom:14 }}>
             📅 Bu kişi/kurum bir etkinlikte tanışılanlar listesine eklenecek
           </div>
         )}
 
         {/* Hedef seç */}
         <div style={{ marginBottom:14 }}>
-          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
+          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>
             {targetType==='contact' ? 'Kişi Seç' : targetType==='organization' ? 'Kurum Seç' : 'Etkinlik Seç'}
           </label>
           <select value={targetId} onChange={e=>setTargetId(e.target.value)}
-            style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13.5, fontFamily:'inherit', background:'white', outline:'none' }}>
+            style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
             <option value=''>-- Seçin --</option>
             {pool.map(x=><option key={x.id} value={x.id}>{x.full_name||x.name}</option>)}
           </select>
@@ -1287,33 +1287,33 @@ function AddConnectionModal({ sourceType, sourceId, orgs, contacts, events, conn
 
         {/* İlişki etiketi */}
         <div style={{ marginBottom:14 }}>
-          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>İlişki Etiketi</label>
+          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>İlişki Etiketi</label>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
             {EVENT_CONNECTION_LABELS.map(l=>(
               <button key={l} type="button" onClick={()=>setLabel(l)}
                 style={{
                   padding:'4px 12px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:600,
-                  border:`1.5px solid ${label===l ? '#111827' : '#e5e7eb'}`,
-                  background: label===l ? '#111827' : 'white',
-                  color: label===l ? 'white' : '#374151', fontFamily:'inherit',
+                  border:`1.5px solid ${label===l ? 'var(--text)' : 'var(--border)'}`,
+                  background: label===l ? 'var(--text)' : 'var(--bg-card)',
+                  color: label===l ? 'white' : 'var(--text-secondary)', fontFamily:'inherit',
                 }}>{l}</button>
             ))}
           </div>
           <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="veya serbest yazın…"
-            style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+            style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none' }} />
         </div>
 
         <div style={{ marginBottom:16 }}>
-          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'#6b7280', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Not</label>
+          <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Not</label>
           <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="İsteğe bağlı not…"
-            style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid #e5e7eb', fontSize:13, fontFamily:'inherit', outline:'none' }} />
+            style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none' }} />
         </div>
 
         <div style={{ display:'flex', gap:10 }}>
-          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1.5px solid #e5e7eb', background:'white', cursor:'pointer', fontSize:13, fontWeight:600, color:'#374151', fontFamily:'inherit' }}>İptal</button>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1.5px solid var(--border)', background:'var(--bg-card)', cursor:'pointer', fontSize:13, fontWeight:600, color:'var(--text-secondary)', fontFamily:'inherit' }}>İptal</button>
           <button onClick={handleSave} disabled={!targetId||saving} style={{
             flex:2, padding:'10px', borderRadius:10, border:'none',
-            background:!targetId||saving ? '#9ca3af' : '#111827',
+            background:!targetId||saving ? 'var(--text-light)' : 'var(--text)',
             color:'white', cursor:!targetId||saving ? 'not-allowed' : 'pointer',
             fontSize:13, fontWeight:700, fontFamily:'inherit',
           }}>
@@ -1334,15 +1334,15 @@ function ListRow({ item, type, connCount, onClick, orgs=[] }) {
   return (
     <div onClick={onClick} style={{
       display:'flex', alignItems:'center', gap:14, padding:'13px 20px',
-      borderBottom:'1px solid #f9fafb', cursor:'pointer', transition:'background 0.1s',
+      borderBottom:'1px solid var(--bg-hover)', cursor:'pointer', transition:'background 0.1s',
     }}
-    onMouseEnter={e=>e.currentTarget.style.background='#f9fafb'}
+    onMouseEnter={e=>e.currentTarget.style.background='var(--bg-hover)'}
     onMouseLeave={e=>e.currentTarget.style.background='transparent'}
     >
       <Avatar name={name} url={imgUrl} size={44} radius={type==='organization' ? 10 : '50%'} />
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontWeight:700, fontSize:14, color:'#111827', marginBottom:2 }}>{name}</div>
-        <div style={{ fontSize:12.5, color:'#9ca3af', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+        <div style={{ fontWeight:700, fontSize:14, color:'var(--text)', marginBottom:2 }}>{name}</div>
+        <div style={{ fontSize:12.5, color:'var(--text-light)', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           {type==='contact' && item.position && <span>{item.position}</span>}
           {type==='contact' && orgName && <span>🏢 {orgName}</span>}
           {type==='contact' && item.country && <span>{getFlag(item.country)} {item.city ? `${item.city}, ${item.country}` : item.country}</span>}
@@ -1362,10 +1362,10 @@ function ListRow({ item, type, connCount, onClick, orgs=[] }) {
           {item.tags.length > 2 && <Tag label={`+${item.tags.length-2}`} />}
         </div>
       )}
-      <span style={{ fontSize:12, color:'#9ca3af', flexShrink:0 }}>
+      <span style={{ fontSize:12, color:'var(--text-light)', flexShrink:0 }}>
         {connCount > 0 ? `🔗 ${connCount}` : ''}
       </span>
-      <span style={{ color:'#d1d5db', fontSize:16 }}>›</span>
+      <span style={{ color:'var(--gray-mid)', fontSize:16 }}>›</span>
     </div>
   );
 }
@@ -1378,7 +1378,7 @@ function Card({ item, type, connCount, onClick, orgs=[] }) {
     ? orgs.find(o=>o.id===item.organization_id)?.name : null;
   return (
     <div onClick={onClick} style={{
-      background:'white', borderRadius:14, border:'1px solid #e5e7eb',
+      background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)',
       overflow:'hidden', cursor:'pointer', transition:'all 0.15s',
       boxShadow:'0 1px 3px rgba(0,0,0,0.04)',
     }}
@@ -1391,12 +1391,12 @@ function Card({ item, type, connCount, onClick, orgs=[] }) {
         <Avatar name={name} url={imgUrl} size={56} radius={type==='organization' ? 12 : '50%'}
           style={{ border:'3px solid white', boxShadow:'0 2px 8px rgba(0,0,0,0.1)' }} />
         <div style={{ marginTop:8 }}>
-          <div style={{ fontWeight:800, fontSize:14.5, color:'#111827', marginBottom:3 }}>{name}</div>
+          <div style={{ fontWeight:800, fontSize:14.5, color:'var(--text)', marginBottom:3 }}>{name}</div>
           {type==='contact' && item.position && (
-            <div style={{ fontSize:12.5, color:'#6b7280', marginBottom:2 }}>{item.position}</div>
+            <div style={{ fontSize:12.5, color:'var(--text-muted)', marginBottom:2 }}>{item.position}</div>
           )}
           {type==='contact' && orgName && (
-            <div style={{ fontSize:12, color:'#9ca3af' }}>🏢 {orgName}</div>
+            <div style={{ fontSize:12, color:'var(--text-light)' }}>🏢 {orgName}</div>
           )}
           {type==='contact' && (item.country || item.process_stage) && (
             <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4, flexWrap:'wrap' }}>
@@ -1409,14 +1409,14 @@ function Card({ item, type, connCount, onClick, orgs=[] }) {
           )}
           {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
           {type==='event' && (
-            <div style={{ fontSize:12.5, color:'#6b7280' }}>
+            <div style={{ fontSize:12.5, color:'var(--text-muted)' }}>
               {item.event_date && <span>📅 {fmtDate(item.event_date)}</span>}
               {item.location && <span style={{ marginLeft:8 }}>📍 {item.location}</span>}
             </div>
           )}
         </div>
         {connCount > 0 && (
-          <div style={{ marginTop:10, fontSize:12, color:'#9ca3af', fontWeight:600 }}>🔗 {connCount} bağlantı</div>
+          <div style={{ marginTop:10, fontSize:12, color:'var(--text-light)', fontWeight:600 }}>🔗 {connCount} bağlantı</div>
         )}
         {item.tags?.length > 0 && (
           <div style={{ marginTop:8, display:'flex', gap:4, flexWrap:'wrap' }}>
@@ -1449,19 +1449,19 @@ function FocusedView({ items, type, connections, contacts, orgs, events, onItemC
         }).filter(Boolean);
 
         return (
-          <div key={item.id} style={{ background:'white', borderRadius:14, border:'1px solid #e5e7eb', overflow:'hidden' }}>
+          <div key={item.id} style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
             {/* Başlık */}
-            <div style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 20px', borderBottom:'1px solid #f3f4f6', cursor:'pointer' }}
+            <div style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 20px', borderBottom:'1px solid var(--bg-badge)', cursor:'pointer' }}
               onClick={()=>onItemClick(item, type)}>
               <Avatar name={name} url={imgUrl} size={48} radius={type==='organization' ? 10 : '50%'} />
               <div style={{ flex:1 }}>
-                <div style={{ fontWeight:800, fontSize:15, color:'#111827' }}>{name}</div>
-                <div style={{ fontSize:12.5, color:'#9ca3af', marginTop:2 }}>
+                <div style={{ fontWeight:800, fontSize:15, color:'var(--text)' }}>{name}</div>
+                <div style={{ fontSize:12.5, color:'var(--text-light)', marginTop:2 }}>
                   {type==='organization' && <TypeBadge value={item.org_type} types={ORG_TYPES} />}
                   {type==='event' && item.event_date && <span>📅 {fmtDate(item.event_date)}{item.location ? ` · 📍 ${item.location}` : ''}</span>}
                 </div>
               </div>
-              <span style={{ fontSize:12, color:'#9ca3af' }}>{myConns.length} bağlantı ›</span>
+              <span style={{ fontSize:12, color:'var(--text-light)' }}>{myConns.length} bağlantı ›</span>
             </div>
 
             {/* Bağlı kişi/kurum/etkinlik görselleri */}
@@ -1474,16 +1474,16 @@ function FocusedView({ items, type, connections, contacts, orgs, events, onItemC
                     <div key={i} onClick={e=>{e.stopPropagation();onItemClick(n,n.entityType);}}
                       style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, cursor:'pointer', width:64 }}>
                       <Avatar name={nName} url={nImg} size={44} radius={n.entityType==='organization' ? 9 : '50%'} />
-                      <div style={{ fontSize:10.5, color:'#374151', textAlign:'center', lineHeight:1.3, fontWeight:600 }}>
+                      <div style={{ fontSize:10.5, color:'var(--text-secondary)', textAlign:'center', lineHeight:1.3, fontWeight:600 }}>
                         {nName?.length > 10 ? nName.slice(0,9)+'…' : nName}
                       </div>
-                      {n.connLabel && <div style={{ fontSize:9.5, color:'#9ca3af', textAlign:'center' }}>{n.connLabel}</div>}
+                      {n.connLabel && <div style={{ fontSize:9.5, color:'var(--text-light)', textAlign:'center' }}>{n.connLabel}</div>}
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div style={{ padding:'12px 20px', fontSize:13, color:'#9ca3af' }}>Henüz bağlantı yok.</div>
+              <div style={{ padding:'12px 20px', fontSize:13, color:'var(--text-light)' }}>Henüz bağlantı yok.</div>
             )}
           </div>
         );
@@ -1626,27 +1626,27 @@ export default function NetworkManager({ user, profile }) {
 
   const tabStyle = (id) => ({
     padding:'10px 20px', borderRadius:9, border:'none', cursor:'pointer',
-    background: tab===id ? '#111827' : 'transparent',
-    color: tab===id ? 'white' : '#6b7280',
+    background: tab===id ? 'var(--text)' : 'transparent',
+    color: tab===id ? 'white' : 'var(--text-muted)',
     fontWeight:700, fontSize:13.5, fontFamily:'inherit',
     transition:'all 0.15s',
   });
 
   const viewBtnStyle = (id) => ({
     padding:'7px 14px', borderRadius:8, border:'none', cursor:'pointer',
-    background: viewMode===id ? '#111827' : 'transparent',
-    color: viewMode===id ? 'white' : '#6b7280',
+    background: viewMode===id ? 'var(--text)' : 'transparent',
+    color: viewMode===id ? 'white' : 'var(--text-muted)',
     fontWeight:600, fontSize:13, fontFamily:'inherit',
     display:'flex', alignItems:'center', gap:5,
   });
 
   return (
-    <div style={{ padding:'28px 32px', background:'#f7f8fa', minHeight:'100vh' }}>
+    <div style={{ padding:'28px 32px', background:'var(--bg-hover)', minHeight:'100vh' }}>
       {/* Başlık */}
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:24 }}>
         <div>
-          <h1 style={{ fontSize:28, fontWeight:800, color:'#111827', margin:0, lineHeight:1.2 }}>🕸 Network Yönetimi</h1>
-          <p style={{ fontSize:13.5, color:'#9ca3af', margin:'6px 0 0', fontWeight:500 }}>
+          <h1 style={{ fontSize:28, fontWeight:800, color:'var(--text)', margin:0, lineHeight:1.2 }}>🕸 Network Yönetimi</h1>
+          <p style={{ fontSize:13.5, color:'var(--text-light)', margin:'6px 0 0', fontWeight:500 }}>
             Kişiler, kurumlar ve etkinlikler ile ağ bağlantılarını yönetin
           </p>
         </div>
@@ -1658,9 +1658,9 @@ export default function NetworkManager({ user, profile }) {
             { type:'event',        label:'📅 Etkinlik', },
           ].map(btn => (
             <button key={btn.type} onClick={()=>openForm(btn.type)} style={{
-              padding:'9px 16px', borderRadius:10, border:'1.5px solid #e5e7eb',
-              background:'white', cursor:'pointer', fontSize:13, fontWeight:700,
-              color:'#374151', fontFamily:'inherit',
+              padding:'9px 16px', borderRadius:10, border:'1.5px solid var(--border)',
+              background:'var(--bg-card)', cursor:'pointer', fontSize:13, fontWeight:700,
+              color:'var(--text-secondary)', fontFamily:'inherit',
               boxShadow:'0 1px 3px rgba(0,0,0,0.06)',
             }}>{btn.label}</button>
           ))}
@@ -1671,7 +1671,7 @@ export default function NetworkManager({ user, profile }) {
       <div style={{ display:'flex', gap:14, marginBottom:20 }}>
         {stats.map(s => (
           <div key={s.label} style={{
-            flex:1, background:'white', borderRadius:12, border:'1px solid #e5e7eb',
+            flex:1, background:'var(--bg-card)', borderRadius:12, border:'1px solid var(--border)',
             padding:'18px 20px', display:'flex', alignItems:'center', gap:14,
             boxShadow:'0 1px 3px rgba(0,0,0,0.04)',
           }}>
@@ -1681,8 +1681,8 @@ export default function NetworkManager({ user, profile }) {
               justifyContent:'center', fontSize:20,
             }}>{s.icon}</div>
             <div>
-              <div style={{ fontSize:11.5, color:'#9ca3af', fontWeight:600, marginBottom:3 }}>{s.label}</div>
-              <div style={{ fontSize:26, fontWeight:800, color:'#111827', lineHeight:1 }}>{s.value}</div>
+              <div style={{ fontSize:11.5, color:'var(--text-light)', fontWeight:600, marginBottom:3 }}>{s.label}</div>
+              <div style={{ fontSize:26, fontWeight:800, color:'var(--text)', lineHeight:1 }}>{s.value}</div>
             </div>
           </div>
         ))}
@@ -1690,13 +1690,13 @@ export default function NetworkManager({ user, profile }) {
 
       {/* Tab bar + Arama + Görünüm */}
       <div style={{
-        background:'white', borderRadius:12, border:'1px solid #e5e7eb',
+        background:'var(--bg-card)', borderRadius:12, border:'1px solid var(--border)',
         padding:'12px 16px', marginBottom:16,
         boxShadow:'0 1px 3px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           {/* Tablar */}
-          <div style={{ display:'flex', gap:4, background:'#f3f4f6', borderRadius:10, padding:3 }}>
+          <div style={{ display:'flex', gap:4, background:'var(--bg-badge)', borderRadius:10, padding:3 }}>
             <button style={tabStyle('contacts')}     onClick={()=>setTab('contacts')}>🧑 Kişiler <span style={{ fontSize:11, opacity:0.7 }}>({data.contacts.length})</span></button>
             <button style={tabStyle('organizations')} onClick={()=>setTab('organizations')}>🏢 Kurumlar <span style={{ fontSize:11, opacity:0.7 }}>({data.organizations.length})</span></button>
             <button style={tabStyle('events')}        onClick={()=>setTab('events')}>📅 Etkinlikler <span style={{ fontSize:11, opacity:0.7 }}>({data.events.length})</span></button>
@@ -1704,22 +1704,22 @@ export default function NetworkManager({ user, profile }) {
 
           {/* Arama */}
           <div style={{ position:'relative', flex:'1 1 200px', minWidth:160 }}>
-            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#9ca3af', fontSize:15 }}>🔍</span>
+            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:15 }}>🔍</span>
             <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
               placeholder="Ara…"
               style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px 8px 32px',
-                borderRadius:8, border:'1.5px solid #e5e7eb', fontSize:13, fontFamily:'inherit', outline:'none', background:'#fafafa' }} />
+                borderRadius:8, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--bg-card)' }} />
           </div>
 
           {/* Görünüm toggle */}
-          <div style={{ display:'flex', gap:2, background:'#f3f4f6', borderRadius:10, padding:3 }}>
+          <div style={{ display:'flex', gap:2, background:'var(--bg-badge)', borderRadius:10, padding:3 }}>
             <button style={viewBtnStyle('liste')}  onClick={()=>setViewMode('liste')}>☰ Liste</button>
             <button style={viewBtnStyle('kart')}   onClick={()=>setViewMode('kart')}>⊞ Kart</button>
             <button style={viewBtnStyle('odakli')} onClick={()=>setViewMode('odakli')}>🕸 Odaklı</button>
           </div>
         </div>
 
-        <div style={{ fontSize:12.5, color:'#9ca3af', marginTop:8, fontWeight:500 }}>
+        <div style={{ fontSize:12.5, color:'var(--text-light)', marginTop:8, fontWeight:500 }}>
           {currentItems.length} kayıt
           {viewMode==='odakli' && tab==='contacts' && ' — Odaklı görünüm Kurumlar ve Etkinlikler tabında kullanılabilir'}
         </div>
@@ -1727,14 +1727,14 @@ export default function NetworkManager({ user, profile }) {
 
       {/* İçerik */}
       {loading && (
-        <div style={{ textAlign:'center', padding:'60px', color:'#9ca3af' }}>
+        <div style={{ textAlign:'center', padding:'60px', color:'var(--text-light)' }}>
           <div style={{ fontSize:36, marginBottom:10 }}>⏳</div>
           <div style={{ fontSize:14, fontWeight:500 }}>Yükleniyor…</div>
         </div>
       )}
 
       {!loading && currentItems.length === 0 && (
-        <div style={{ background:'white', borderRadius:14, border:'1px solid #e5e7eb' }}>
+        <div style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)' }}>
           <EmptyState
             icon={tab==='contacts' ? '🧑' : tab==='organizations' ? '🏢' : '📅'}
             title={`Henüz ${tab==='contacts' ? 'kişi' : tab==='organizations' ? 'kurum' : 'etkinlik'} yok`}
@@ -1747,7 +1747,7 @@ export default function NetworkManager({ user, profile }) {
         <>
           {/* Liste görünümü */}
           {viewMode==='liste' && (
-            <div style={{ background:'white', borderRadius:14, border:'1px solid #e5e7eb', overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
               {currentItems.map(item => (
                 <ListRow key={item.id} item={item} type={currentType}
                   connCount={connCount(currentType, item.id)}
@@ -1779,7 +1779,7 @@ export default function NetworkManager({ user, profile }) {
             />
           )}
           {viewMode==='odakli' && tab==='contacts' && (
-            <div style={{ background:'white', borderRadius:14, border:'1px solid #e5e7eb', overflow:'hidden' }}>
+            <div style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
               {currentItems.map(item => (
                 <ListRow key={item.id} item={item} type={currentType}
                   connCount={connCount(currentType, item.id)}
@@ -1839,13 +1839,13 @@ export default function NetworkManager({ user, profile }) {
             textAlign:'center',
           }}>
             <div style={{ fontSize:40, marginBottom:12 }}>🗑️</div>
-            <div style={{ fontSize:16, fontWeight:800, color:'#111827', marginBottom:8 }}>Kaydı Sil</div>
-            <div style={{ fontSize:13.5, color:'#6b7280', marginBottom:24 }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Kaydı Sil</div>
+            <div style={{ fontSize:13.5, color:'var(--text-muted)', marginBottom:24 }}>
               Bu kayıt silinecek. Bu işlem geri alınamaz.
             </div>
             <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setDeleteConfirm(null)} style={{ flex:1, padding:'11px', borderRadius:10, border:'1.5px solid #e5e7eb', background:'white', cursor:'pointer', fontSize:14, fontWeight:600, fontFamily:'inherit', color:'#374151' }}>İptal</button>
-              <button onClick={handleDelete} style={{ flex:1, padding:'11px', borderRadius:10, border:'none', background:'#ef4444', color:'white', cursor:'pointer', fontSize:14, fontWeight:700, fontFamily:'inherit' }}>Sil</button>
+              <button onClick={()=>setDeleteConfirm(null)} style={{ flex:1, padding:'11px', borderRadius:10, border:'1.5px solid var(--border)', background:'var(--bg-card)', cursor:'pointer', fontSize:14, fontWeight:600, fontFamily:'inherit', color:'var(--text-secondary)' }}>İptal</button>
+              <button onClick={handleDelete} style={{ flex:1, padding:'11px', borderRadius:10, border:'none', background:'var(--red)', color:'white', cursor:'pointer', fontSize:14, fontWeight:700, fontFamily:'inherit' }}>Sil</button>
             </div>
           </div>
         </>

@@ -97,7 +97,7 @@ function timeAgo(dateStr) {
 function XPBar({ current, max, color = '#6366f1' }) {
   const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0;
   return (
-    <div style={{ width: '100%', height: 8, borderRadius: 4, background: '#e5e7eb', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: 8, borderRadius: 4, background: 'var(--border)', overflow: 'hidden' }}>
       <div style={{
         width: `${pct}%`, height: '100%', borderRadius: 4,
         background: `linear-gradient(90deg, ${color}, ${color}cc)`,
@@ -113,8 +113,8 @@ function BadgeCard({ badge, earned = false }) {
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       padding: '14px 10px', borderRadius: 14,
-      background: earned ? 'var(--bg-card, #fff)' : 'var(--bg, #f9fafb)',
-      border: `1.5px solid ${earned ? '#6366f130' : 'var(--border, #e5e7eb)'}`,
+      background: earned ? 'var(--bg-card)' : 'var(--bg)',
+      border: `1.5px solid ${earned ? '#6366f130' : 'var(--border)'}`,
       opacity: earned ? 1 : 0.45,
       minWidth: 100, position: 'relative',
       transition: 'all 0.2s',
@@ -122,13 +122,13 @@ function BadgeCard({ badge, earned = false }) {
       <div style={{ fontSize: 32 }}>{badge.icon}</div>
       <div style={{
         fontSize: 11.5, fontWeight: 700, textAlign: 'center',
-        color: earned ? 'var(--text, #111827)' : 'var(--text-muted, #9ca3af)',
+        color: earned ? 'var(--text)' : 'var(--text-muted)',
         lineHeight: 1.3,
       }}>
         {badge.name}
       </div>
       <div style={{
-        fontSize: 10, color: 'var(--text-muted, #9ca3af)', textAlign: 'center', lineHeight: 1.3,
+        fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.3,
       }}>
         {badge.description}
       </div>
@@ -155,7 +155,7 @@ function LeaderboardRow({ rank, profile, xpData, isMe }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
       borderRadius: 12, background: isMe ? '#eef2ff' : 'var(--bg-card, #fff)',
-      border: `1.5px solid ${isMe ? '#6366f130' : 'var(--border, #e5e7eb)'}`,
+      border: `1.5px solid ${isMe ? '#6366f130' : 'var(--border)'}`,
       transition: 'all 0.15s',
     }}>
       {/* Sıra */}
@@ -401,9 +401,9 @@ export default function Gamification({ user, profile }) {
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{
               padding: '8px 18px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-              border: `1.5px solid ${tab === t.id ? 'var(--navy, #1a3a5c)' : 'var(--border, #e5e7eb)'}`,
-              background: tab === t.id ? 'var(--navy, #1a3a5c)' : 'var(--bg-card, #fff)',
-              color: tab === t.id ? '#fff' : 'var(--text, #374151)',
+              border: `1.5px solid ${tab === t.id ? 'var(--navy)' : 'var(--border)'}`,
+              background: tab === t.id ? 'var(--navy)' : 'var(--bg-card)',
+              color: tab === t.id ? '#fff' : 'var(--text-secondary)',
               fontWeight: tab === t.id ? 700 : 500,
             }}>
             {t.label}
@@ -456,8 +456,8 @@ export default function Gamification({ user, profile }) {
           {/* Dönemin 1. sıradaki kişisi — vurgulu kart */}
           {filteredLB.length > 0 && (
             <div style={{
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
-              border: '1.5px solid #f59e0b40',
+              background: 'linear-gradient(135deg, var(--orange-pale) 0%, var(--orange-pale) 100%)',
+              border: '1.5px solid var(--gold)40',
               borderRadius: 14, padding: '16px 20px', marginBottom: 16,
               display: 'flex', alignItems: 'center', gap: 14,
             }}>
@@ -485,7 +485,7 @@ export default function Gamification({ user, profile }) {
           {filteredLB.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text, #6b7280)' }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>
                 {lbPeriod === 'weekly' ? 'Bu hafta henüz XP kazanılmadı' : lbPeriod === 'monthly' ? 'Bu ay henüz XP kazanılmadı' : 'Henüz sıralama yok'}
               </div>
             </div>
@@ -517,11 +517,11 @@ export default function Gamification({ user, profile }) {
                   <div key={lh.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
                     borderRadius: 12, background: 'var(--bg-card, #fff)',
-                    border: '1px solid var(--border, #e5e7eb)',
+                    border: '1px solid var(--border)',
                   }}>
                     <div style={{
                       width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                      background: lh.period_type === 'weekly' ? '#dbeafe' : '#fef3c7',
+                      background: lh.period_type === 'weekly' ? 'var(--blue-pale)' : 'var(--orange-pale)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 16,
                     }}>
@@ -538,8 +538,8 @@ export default function Gamification({ user, profile }) {
                     </div>
                     <div style={{
                       padding: '3px 10px', borderRadius: 16, fontSize: 12, fontWeight: 800,
-                      color: lh.period_type === 'weekly' ? '#3b82f6' : '#f59e0b',
-                      background: lh.period_type === 'weekly' ? '#eff6ff' : '#fffbeb',
+                      color: lh.period_type === 'weekly' ? 'var(--primary)' : 'var(--gold)',
+                      background: lh.period_type === 'weekly' ? 'var(--primary-light)' : 'var(--orange-pale)',
                     }}>
                       {lh.total_xp.toLocaleString('tr-TR')} XP
                     </div>
@@ -592,7 +592,7 @@ export default function Gamification({ user, profile }) {
           {xpHistory.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text, #6b7280)' }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)' }}>
                 Henüz XP geçmişi yok
               </div>
               <div style={{ fontSize: 13, marginTop: 4 }}>
@@ -617,7 +617,7 @@ export default function Gamification({ user, profile }) {
                     <div key={action} style={{
                       padding: '10px 12px', borderRadius: 12,
                       background: 'var(--bg-card, #fff)',
-                      border: '1px solid var(--border, #e5e7eb)',
+                      border: '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', gap: 8,
                     }}>
                       <span style={{ fontSize: 18 }}>{meta.icon}</span>
@@ -637,7 +637,7 @@ export default function Gamification({ user, profile }) {
                   <div key={event.id || i} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
                     borderRadius: 10, background: 'var(--bg-card, #fff)',
-                    border: '1px solid var(--border, #e5e7eb)',
+                    border: '1px solid var(--border)',
                   }}>
                     <div style={{
                       width: 36, height: 36, borderRadius: 10,
@@ -703,8 +703,8 @@ export default function Gamification({ user, profile }) {
                     return (
                       <div key={setting.action} style={{
                         display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                        borderRadius: 12, background: 'var(--bg-card, #fff)',
-                        border: `1.5px solid ${isEditing ? '#6366f130' : 'var(--border, #e5e7eb)'}`,
+                        borderRadius: 12, background: 'var(--bg-card)',
+                        border: `1.5px solid ${isEditing ? '#6366f130' : 'var(--border)'}`,
                       }}>
                         <div style={{ fontSize: 22, flexShrink: 0 }}>{setting.icon || meta.icon}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -740,7 +740,7 @@ export default function Gamification({ user, profile }) {
                             <button onClick={() => setEditingSettings(prev => { const n = { ...prev }; delete n[setting.action]; return n; })}
                               style={{
                                 padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                                background: '#f3f4f6', color: '#6b7280', border: 'none', cursor: 'pointer',
+                                background: 'var(--bg-badge)', color: 'var(--text-muted)', border: 'none', cursor: 'pointer',
                               }}>
                               ✕
                             </button>
@@ -756,8 +756,8 @@ export default function Gamification({ user, profile }) {
                             <button onClick={() => setEditingSettings(prev => ({ ...prev, [setting.action]: setting.xp_amount }))}
                               style={{
                                 padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                                background: 'var(--bg, #f9fafb)', color: 'var(--text-muted)',
-                                border: '1px solid var(--border, #e5e7eb)', cursor: 'pointer',
+                                background: 'var(--bg)', color: 'var(--text-muted)',
+                                border: '1px solid var(--border)', cursor: 'pointer',
                               }}>
                               Düzenle
                             </button>

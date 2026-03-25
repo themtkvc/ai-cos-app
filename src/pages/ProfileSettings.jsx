@@ -30,7 +30,7 @@ export function UserAvatar({ profile, size = 36, fontSize = 15, style = {} }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: 'rgba(26,58,92,0.15)', color: '#1a3a5c',
+      background: 'var(--navy-pale)', color: 'var(--navy)',
       fontWeight: 800, fontSize: fontSize,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0, ...style,
@@ -154,7 +154,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
 
   const section = (title, icon, children) => (
     <div style={{
-      background: 'white',
+      background: 'var(--bg-card)',
       borderRadius: 14,
       border: '1px solid rgba(0,0,0,0.08)',
       boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
@@ -164,11 +164,11 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
       <div style={{
         padding: '14px 20px',
         borderBottom: '1px solid rgba(0,0,0,0.07)',
-        background: 'rgba(26,58,92,0.03)',
+        background: 'var(--navy-pale)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <span style={{ fontSize: 18 }}>{icon}</span>
-        <span style={{ fontWeight: 700, fontSize: 14, color: '#1a3a5c' }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>{title}</span>
       </div>
       <div style={{ padding: '20px' }}>{children}</div>
     </div>
@@ -178,7 +178,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
     <div style={{ marginBottom: 14 }}>
       <label style={{
         display: 'block', fontSize: 11.5, fontWeight: 700,
-        color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6,
+        color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6,
         textTransform: 'uppercase',
       }}>{label}</label>
       <input
@@ -189,14 +189,14 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
         style={{
           width: '100%', boxSizing: 'border-box',
           padding: '10px 13px', borderRadius: 9,
-          border: `1.5px solid ${errors[key] ? '#ef4444' : 'rgba(0,0,0,0.15)'}`,
+          border: `1.5px solid ${errors[key] ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
           fontSize: 14, fontFamily: 'inherit',
-          color: '#1f2937', background: 'white', outline: 'none',
+          color: 'var(--text)', background: 'var(--bg-card)', outline: 'none',
           transition: 'border-color 0.15s',
         }}
       />
       {errors[key] && (
-        <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{errors[key]}</div>
+        <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{errors[key]}</div>
       )}
     </div>
   );
@@ -213,8 +213,8 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
       {successMsg && (
         <div style={{
           padding: '12px 16px', borderRadius: 10, marginBottom: 16,
-          background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
-          color: '#15803d', fontSize: 13, fontWeight: 600,
+          background: 'var(--green-pale)', border: '1px solid rgba(34,197,94,0.25)',
+          color: 'var(--green)', fontSize: 13, fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           ✅ {successMsg}
@@ -225,8 +225,8 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
       {errors.general && (
         <div style={{
           padding: '12px 16px', borderRadius: 10, marginBottom: 16,
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-          color: '#b91c1c', fontSize: 13,
+          background: 'var(--red-pale)', border: '1px solid rgba(239,68,68,0.2)',
+          color: 'var(--red)', fontSize: 13,
         }}>⚠️ {errors.general}</div>
       )}
 
@@ -248,10 +248,10 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             ) : (
               <div style={{
                 width: 90, height: 90, borderRadius: '50%',
-                background: 'rgba(26,58,92,0.12)', color: '#1a3a5c',
+                background: 'var(--navy-pale)', color: 'var(--navy)',
                 fontWeight: 800, fontSize: 32,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '3px solid rgba(26,58,92,0.15)',
+                border: '3px solid var(--navy-pale)',
               }}>
                 {(form.full_name || profile?.full_name || '?')[0].toUpperCase()}
               </div>
@@ -272,9 +272,9 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   padding: '9px 18px', borderRadius: 9,
-                  border: '1.5px solid rgba(26,58,92,0.3)',
-                  background: 'white', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, color: '#1a3a5c',
+                  border: '1.5px solid var(--navy-pale)',
+                  background: 'var(--bg-card)', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, color: 'var(--navy)',
                   fontFamily: 'inherit',
                 }}
               >📁 Resim Seç</button>
@@ -286,7 +286,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
                   style={{
                     padding: '9px 18px', borderRadius: 9,
                     border: 'none',
-                    background: uploadingAvatar ? 'rgba(26,58,92,0.4)' : '#1a3a5c',
+                    background: uploadingAvatar ? 'var(--navy-pale)' : 'var(--navy)',
                     cursor: uploadingAvatar ? 'not-allowed' : 'pointer',
                     fontSize: 13, fontWeight: 700, color: 'white',
                     fontFamily: 'inherit',
@@ -296,11 +296,11 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
                 </button>
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 8 }}>
               JPG, PNG, WebP · Maks. 5 MB
             </div>
             {errors.avatar && (
-              <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{errors.avatar}</div>
+              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{errors.avatar}</div>
             )}
           </div>
         </div>
@@ -312,25 +312,25 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
           {/* Rol & Birim (salt okunur) */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
                 Rol
               </div>
               <div style={{
                 padding: '10px 13px', borderRadius: 9,
                 border: '1.5px solid rgba(0,0,0,0.1)',
-                fontSize: 13, color: '#6b7280', background: '#f9fafb',
+                fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
               }}>
                 {ROLE_LABELS[profile?.role] || profile?.role || '—'}
               </div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
                 Birim
               </div>
               <div style={{
                 padding: '10px 13px', borderRadius: 9,
                 border: '1.5px solid rgba(0,0,0,0.1)',
-                fontSize: 13, color: '#6b7280', background: '#f9fafb',
+                fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
               }}>
                 {profile?.unit || '—'}
               </div>
@@ -346,7 +346,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             disabled={saving}
             style={{
               width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: saving ? 'rgba(26,58,92,0.4)' : '#1a3a5c',
+              background: saving ? 'var(--navy-pale)' : 'var(--navy)',
               color: 'white', fontWeight: 700, fontSize: 14,
               cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
               marginTop: 4,
@@ -361,20 +361,20 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
       {section('E-posta Adresi', '📧', (
         <form onSubmit={handleEmailUpdate}>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
               Mevcut E-posta
             </div>
             <div style={{
               padding: '10px 13px', borderRadius: 9,
               border: '1.5px solid rgba(0,0,0,0.1)',
-              fontSize: 13, color: '#6b7280', background: '#f9fafb',
+              fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
             }}>
               {user?.email || '—'}
             </div>
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
+            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
               Yeni E-posta
             </label>
             <input
@@ -385,11 +385,11 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '10px 13px', borderRadius: 9,
-                border: `1.5px solid ${errors.email ? '#ef4444' : 'rgba(0,0,0,0.15)'}`,
-                fontSize: 14, fontFamily: 'inherit', color: '#1f2937', outline: 'none',
+                border: `1.5px solid ${errors.email ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
+                fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', outline: 'none',
               }}
             />
-            {errors.email && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{errors.email}</div>}
+            {errors.email && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{errors.email}</div>}
           </div>
 
           <button
@@ -397,7 +397,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             disabled={savingEmail || !newEmail.trim()}
             style={{
               width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: (!newEmail.trim() || savingEmail) ? 'rgba(26,58,92,0.3)' : '#1a3a5c',
+              background: (!newEmail.trim() || savingEmail) ? 'var(--navy-pale)' : 'var(--navy)',
               color: 'white', fontWeight: 700, fontSize: 14,
               cursor: (!newEmail.trim() || savingEmail) ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
@@ -416,7 +416,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             { label: 'Şifreyi Tekrarla', key: 'confirmPw', val: confirmPw, set: setConfirmPw },
           ].map(({ label, key, val, set }) => (
             <div key={key} style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#6b7280', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 6, textTransform: 'uppercase' }}>
                 {label}
               </label>
               <input
@@ -427,11 +427,11 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '10px 13px', borderRadius: 9,
-                  border: `1.5px solid ${errors[key] ? '#ef4444' : 'rgba(0,0,0,0.15)'}`,
-                  fontSize: 14, fontFamily: 'inherit', color: '#1f2937', outline: 'none',
+                  border: `1.5px solid ${errors[key] ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
+                  fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', outline: 'none',
                 }}
               />
-              {errors[key] && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{errors[key]}</div>}
+              {errors[key] && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>{errors[key]}</div>}
             </div>
           ))}
 
@@ -440,7 +440,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             disabled={savingPw}
             style={{
               width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: savingPw ? 'rgba(26,58,92,0.4)' : '#1a3a5c',
+              background: savingPw ? 'var(--navy-pale)' : 'var(--navy)',
               color: 'white', fontWeight: 700, fontSize: 14,
               cursor: savingPw ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             }}

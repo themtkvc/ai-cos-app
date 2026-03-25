@@ -178,8 +178,8 @@ export default function MentionInput({
             left: 0,
             right: 0,
             marginBottom: 4,
-            background: 'var(--bg-card, #fff)',
-            border: '1px solid var(--border, #e5e7eb)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
             boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
             zIndex: 999,
@@ -203,7 +203,7 @@ export default function MentionInput({
                   gap: 10,
                   padding: '8px 12px',
                   cursor: 'pointer',
-                  background: i === selectedIdx ? 'var(--accent-light, #eef2ff)' : 'transparent',
+                  background: i === selectedIdx ? 'var(--primary-light)' : 'transparent',
                   transition: 'background 0.1s',
                 }}
               >
@@ -218,7 +218,7 @@ export default function MentionInput({
                 ) : (
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%',
-                    background: '#6366f1', color: '#fff',
+                    background: 'var(--primary)', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, fontWeight: 700, flexShrink: 0,
                   }}>

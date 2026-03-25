@@ -29,6 +29,10 @@ import './App.css';
 export const ProfileContext = createContext(null);
 export const useProfile = () => useContext(ProfileContext);
 
+// ── Theme Context ──
+export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} });
+export const useTheme = () => useContext(ThemeContext);
+
 // Role-based page access
 export const ROLE_ACCESS = {
   direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','gamification','admin','users','profile'],
@@ -133,6 +137,16 @@ export default function App() {
   const [dailyLogLinkedTask, setDailyLogLinkedTask] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
+
+  // ── Theme (dark/light) ──
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('ai-cos-theme') || 'light'; } catch { return 'light'; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('ai-cos-theme', theme); } catch {}
+  }, [theme]);
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   // Offline detection
   useEffect(() => {
@@ -300,10 +314,11 @@ export default function App() {
   };
 
   return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
     <ProfileContext.Provider value={{ profile, setProfile, reloadProfile: () => loadProfile(user) }}>
       <div className="app">
         {isOffline && (
-          <div style={{ background: '#dc2626', color: 'white', textAlign: 'center', padding: '8px 16px', fontSize: 13, fontWeight: 500, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999 }}>
+          <div style={{ background: 'var(--red)', color: 'white', textAlign: 'center', padding: '8px 16px', fontSize: 13, fontWeight: 500, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999 }}>
             İnternet bağlantısı kesildi — değişiklikler kaydedilmeyebilir
           </div>
         )}
@@ -376,5 +391,6 @@ export default function App() {
         )}
       </div>
     </ProfileContext.Provider>
+    </ThemeContext.Provider>
   );
 }

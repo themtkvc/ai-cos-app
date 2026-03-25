@@ -25,7 +25,7 @@ function MiniAvatar({ profile, size = 28 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: 'var(--accent)', color: '#fff',
+      background: 'var(--primary)', color: '#fff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.42, fontWeight: 700, flexShrink: 0,
     }}>{initial}</div>
@@ -35,12 +35,12 @@ function MiniAvatar({ profile, size = 28 }) {
 // ── Kullanıcı kartı (sürüklenebilir) ─────────────────────────────────────────
 function UserCard({ profile, isDragging, onDragStart, compact = false }) {
   const roleBg = {
-    direktor: '#fef2f2', direktor_yardimcisi: '#fff7ed',
-    asistan: '#fefce8', koordinator: '#eff6ff', personel: '#f0fdf4',
+    direktor: 'var(--red-pale)', direktor_yardimcisi: 'var(--orange-pale)',
+    asistan: 'var(--gold-pale)', koordinator: 'var(--primary-light)', personel: 'var(--green-pale)',
   };
   const roleColor = {
-    direktor: '#b91c1c', direktor_yardimcisi: '#c2410c',
-    asistan: '#a16207', koordinator: '#1d4ed8', personel: '#16a34a',
+    direktor: 'var(--red)', direktor_yardimcisi: '#c2410c',
+    asistan: '#a16207', koordinator: 'var(--primary)', personel: 'var(--green)',
   };
   const r = profile.role || 'personel';
 
@@ -52,7 +52,7 @@ function UserCard({ profile, isDragging, onDragStart, compact = false }) {
         display: 'flex', alignItems: 'center', gap: compact ? 6 : 8,
         padding: compact ? '5px 8px' : '7px 10px',
         borderRadius: 8, border: '1px solid var(--border)',
-        background: isDragging ? '#eff6ff' : 'var(--bg-card)',
+        background: isDragging ? 'var(--primary-light)' : 'var(--bg-card)',
         cursor: 'grab', opacity: isDragging ? 0.5 : 1,
         transition: 'all 0.15s', userSelect: 'none',
         boxShadow: isDragging ? '0 4px 12px rgba(99,102,241,0.2)' : 'none',
@@ -177,11 +177,11 @@ function UnitCard({ unit, unitIndex, profiles, allUnits, onUpdate, onRemove, onM
         {/* Taşı / Sil */}
         <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
           <button onClick={onMoveUp} disabled={isFirst} title="Yukarı taşı"
-            style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', cursor: isFirst ? 'default' : 'pointer', opacity: isFirst ? 0.3 : 1, fontSize: 11 }}>↑</button>
+            style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-hover)', cursor: isFirst ? 'default' : 'pointer', opacity: isFirst ? 0.3 : 1, fontSize: 11 }}>↑</button>
           <button onClick={onMoveDown} disabled={isLast} title="Aşağı taşı"
-            style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', cursor: isLast ? 'default' : 'pointer', opacity: isLast ? 0.3 : 1, fontSize: 11 }}>↓</button>
+            style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg-hover)', cursor: isLast ? 'default' : 'pointer', opacity: isLast ? 0.3 : 1, fontSize: 11 }}>↓</button>
           <button onClick={e => { e.stopPropagation(); if (window.confirm(`"${unit.name || 'Bu birim'}" silinsin mi?`)) onRemove(); }}
-            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>🗑</button>
+            style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid var(--red)', background: 'var(--red-pale)', color: 'var(--red)', cursor: 'pointer', fontSize: 11 }}>🗑</button>
         </div>
 
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{open ? '▲' : '▼'}</span>
@@ -213,7 +213,7 @@ function UnitCard({ unit, unitIndex, profiles, allUnits, onUpdate, onRemove, onM
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '6px 10px', borderRadius: 8,
                   border: `1px solid ${unit.coordinator_id === p.user_id ? color + '66' : 'var(--border)'}`,
-                  background: unit.coordinator_id === p.user_id ? color + '0a' : 'var(--bg)',
+                  background: unit.coordinator_id === p.user_id ? color + '0a' : 'var(--bg-hover)',
                 }}>
                   <MiniAvatar profile={p} size={26} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -230,7 +230,7 @@ function UnitCard({ unit, unitIndex, profiles, allUnits, onUpdate, onRemove, onM
                     style={{
                       padding: '3px 8px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
                       border: `1px solid ${unit.coordinator_id === p.user_id ? color : 'var(--border)'}`,
-                      background: unit.coordinator_id === p.user_id ? color : 'var(--bg)',
+                      background: unit.coordinator_id === p.user_id ? color : 'var(--bg-hover)',
                       color: unit.coordinator_id === p.user_id ? '#fff' : 'var(--text-muted)',
                       fontWeight: 600, flexShrink: 0, transition: 'all 0.15s',
                     }}>
@@ -241,7 +241,7 @@ function UnitCard({ unit, unitIndex, profiles, allUnits, onUpdate, onRemove, onM
                   <button
                     onClick={() => removeMember(p.user_id)}
                     title="Birimden çıkar"
-                    style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid var(--red)', background: 'var(--red-pale)', color: 'var(--red)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     ×
                   </button>
                 </div>
@@ -353,10 +353,10 @@ export default function OrgChartAdmin({ notify }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 16px', borderRadius: 10, marginBottom: 20,
-        background: dirty ? '#fff9ec' : 'var(--bg)',
-        border: `1px solid ${dirty ? '#fbbf24' : 'var(--border)'}`,
+        background: dirty ? 'var(--gold-pale)' : 'var(--bg-hover)',
+        border: `1px solid ${dirty ? 'var(--gold)' : 'var(--border)'}`,
       }}>
-        <div style={{ fontSize: 12.5, color: dirty ? '#92400e' : 'var(--text-muted)' }}>
+        <div style={{ fontSize: 12.5, color: dirty ? 'var(--gold)' : 'var(--text-muted)' }}>
           {dirty ? '⚠️ Kaydedilmemiş değişiklikler var.' : '✅ Tüm değişiklikler kaydedildi.'}
         </div>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving || !dirty} style={{ minWidth: 120 }}>

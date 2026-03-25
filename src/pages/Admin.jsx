@@ -207,12 +207,12 @@ function UserManagement({ currentUser, notify }) {
               {['koordinator','personel'].includes(p.role) && !p.unit && (
                 <span title="Birim atanmamış — görev ataması çalışmaz" style={{
                   fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4,
-                  background:'#fff7ed', color:'#c2410c', border:'1px solid #f9731644',
+                  background:'var(--orange-pale)', color:'#c2410c', border:'1px solid var(--orange)22',
                 }}>⚠️ Birim yok</span>
               )}
             </div>
             <div style={{fontSize:11.5, color:'var(--text-muted)', marginTop:2}}>
-              {p.unit ? `🏢 ${p.unit}` : <span style={{color:'#9ca3af'}}>Birim atanmamış</span>}
+              {p.unit ? `🏢 ${p.unit}` : <span style={{color:'var(--text-light)'}}>Birim atanmamış</span>}
             </div>
           </>
         )}
@@ -263,7 +263,7 @@ function UserManagement({ currentUser, notify }) {
                 onClick={() => handleDelete(p)}
                 disabled={deletingId === p.user_id}
                 style={{
-                  color: '#ef4444', borderColor: '#ef444444',
+                  color: 'var(--red)', borderColor: 'var(--red)22',
                   opacity: deletingId === p.user_id ? 0.5 : 1,
                 }}>
                 {deletingId === p.user_id ? '⏳' : '🗑'}
@@ -321,7 +321,7 @@ function UserManagement({ currentUser, notify }) {
               }}>
                 {/* Koordinatör başlığı */}
                 <div style={{
-                  background:'linear-gradient(90deg,#fef3c7,#fffbeb)',
+                  background:'linear-gradient(90deg,var(--orange-pale),var(--orange-pale))',
                   padding:'10px 14px', display:'flex', alignItems:'center', gap:10,
                   borderBottom: staff.length > 0 ? '1px solid var(--border)' : 'none',
                 }}>
@@ -334,7 +334,7 @@ function UserManagement({ currentUser, notify }) {
                       {coord.full_name || 'İsimsiz'}
                     </span>
                   </div>
-                  <span style={{fontSize:11,color:'#a16207',background:'#fef3c7',padding:'2px 8px',borderRadius:10,border:'1px solid #f59e0b44'}}>
+                  <span style={{fontSize:11,color:'#a16207',background:'var(--orange-pale)',padding:'2px 8px',borderRadius:10,border:'1px solid var(--gold)22'}}>
                     {staff.length} personel
                   </span>
                   <button className="btn btn-outline btn-sm" onClick={() => startEdit(coord)} style={{fontSize:11}}>✏️</button>
@@ -362,7 +362,7 @@ function UserManagement({ currentUser, notify }) {
             {/* Koordinatörsüz personel */}
             {hierarchyGroups.orphanStaff.length > 0 && (
               <div style={{border:'1px dashed var(--border)',borderRadius:10,padding:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:'#9ca3af',letterSpacing:'0.05em',marginBottom:8}}>BİRİM KOORDİNATÖRSÜZ PERSONEL</div>
+                <div style={{fontSize:11,fontWeight:700,color:'var(--text-light)',letterSpacing:'0.05em',marginBottom:8}}>BİRİM KOORDİNATÖRSÜZ PERSONEL</div>
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   {hierarchyGroups.orphanStaff.map(p => <UserRow key={p.user_id} p={p} />)}
                 </div>
@@ -371,7 +371,7 @@ function UserManagement({ currentUser, notify }) {
 
             {/* Birimsiz koordinatör/personel */}
             {hierarchyGroups.unassigned.length > 0 && (
-              <div style={{border:'1.5px solid #f9731644',borderRadius:10,padding:12,background:'#fff7ed'}}>
+              <div style={{border:'1.5px solid var(--orange)22',borderRadius:10,padding:12,background:'var(--orange-pale)'}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#c2410c',letterSpacing:'0.05em',marginBottom:8}}>
                   ⚠️ BİRİM ATANMAMIŞ ({hierarchyGroups.unassigned.length} kişi)
                 </div>
@@ -413,7 +413,7 @@ function UserManagement({ currentUser, notify }) {
             )}
           </div>
           {['koordinator','personel'].includes(inviteRole) && !inviteUnit && (
-            <div style={{fontSize:12,color:'#92400e',background:'#fff7ed',padding:'8px 12px',borderRadius:7,border:'1px solid #f9731644'}}>
+            <div style={{fontSize:12,color:'#92400e',background:'var(--orange-pale)',padding:'8px 12px',borderRadius:7,border:'1px solid var(--orange)22'}}>
               💡 Koordinatör/Personel için birim seçmeniz önerilir — aksi hâlde görev ataması ve hiyerarşi davet sonrasında çalışmaz.
             </div>
           )}
@@ -767,7 +767,7 @@ function AgendaTypeManagement({ notify }) {
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="btn btn-sm btn-outline" onClick={() => openEdit(t)}>✏️ Düzenle</button>
-                <button className="btn btn-sm btn-outline" style={{ color: '#ef4444' }} onClick={() => handleDelete(t.id, t.name)}>🗑 Sil</button>
+                <button className="btn btn-sm btn-outline" style={{ color: 'var(--red)' }} onClick={() => handleDelete(t.id, t.name)}>🗑 Sil</button>
               </div>
             </div>
           ))}
@@ -820,7 +820,7 @@ function AgendaTypeManagement({ notify }) {
                   {form.fields.map((f, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
                       <span style={{ flex: 1 }}><strong>{f.label}</strong> <span style={{ color: 'var(--text-muted)' }}>({f.type})</span> {f.required ? '· zorunlu' : ''}</span>
-                      <button onClick={() => removeField(idx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
+                      <button onClick={() => removeField(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
                     </div>
                   ))}
                 </div>

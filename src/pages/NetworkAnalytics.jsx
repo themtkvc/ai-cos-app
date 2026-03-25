@@ -63,8 +63,8 @@ function Avatar({ name = '', size = 32 }) {
 function StatCard({ icon, label, value, sub, accent = '#6366f1' }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 16, padding: '20px 22px',
-      border: '1px solid #e5e7eb', flex: '1 1 0',
+      background: 'var(--bg-card)', borderRadius: 16, padding: '20px 22px',
+      border: '1px solid var(--border)', flex: '1 1 0',
       minWidth: 170, position: 'relative', overflow: 'hidden',
     }}>
       <div style={{
@@ -72,24 +72,24 @@ function StatCard({ icon, label, value, sub, accent = '#6366f1' }) {
         borderRadius: '50%', background: accent + '12',
       }} />
       <div style={{ fontSize: 26, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: '#111827', lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginTop: 2 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>{sub}</div>}
+      <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
 
 function MiniBar({ items, colorMap }) {
   const total = items.reduce((s, i) => s + i.count, 0);
-  if (!total) return <div style={{ fontSize: 12, color: '#9ca3af' }}>Veri yok</div>;
+  if (!total) return <div style={{ fontSize: 12, color: 'var(--text-light)' }}>Veri yok</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {/* Stacked bar */}
-      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: '#f3f4f6' }}>
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'var(--bg-badge)' }}>
         {items.filter(i => i.count > 0).map((i, idx) => (
           <div key={idx} style={{
             width: `${(i.count / total) * 100}%`,
-            background: colorMap[i.label] || '#9ca3af',
+            background: colorMap[i.label] || 'var(--text-light)',
             transition: 'width 0.3s',
           }} title={`${i.label}: ${i.count}`} />
         ))}
@@ -98,9 +98,9 @@ function MiniBar({ items, colorMap }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
         {items.filter(i => i.count > 0).map((i, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: colorMap[i.label] || '#9ca3af' }} />
-            <span style={{ color: '#6b7280' }}>{i.label}</span>
-            <span style={{ fontWeight: 700, color: '#111827' }}>{i.count}</span>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: colorMap[i.label] || 'var(--text-light)' }} />
+            <span style={{ color: 'var(--text-muted)' }}>{i.label}</span>
+            <span style={{ fontWeight: 700, color: 'var(--text)' }}>{i.count}</span>
           </div>
         ))}
       </div>
@@ -110,7 +110,7 @@ function MiniBar({ items, colorMap }) {
 
 function DonutChart({ data, size = 130 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>Veri yok</div>;
+  if (!total) return <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 12 }}>Veri yok</div>;
   const cx = size / 2, cy = size / 2, r = size * 0.38, sw = size * 0.18;
   let cumAngle = -Math.PI / 2;
   const arcs = data.filter(d => d.value > 0).map(d => {
@@ -137,8 +137,8 @@ function DonutChart({ data, size = 130 }) {
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>{total}</div>
-        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>TOPLAM</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>{total}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-light)', fontWeight: 600 }}>TOPLAM</div>
       </div>
     </div>
   );
@@ -147,10 +147,10 @@ function DonutChart({ data, size = 130 }) {
 function SectionTitle({ icon, title, sub }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 800, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 20 }}>{icon}</span> {title}
       </h2>
-      {sub && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -158,8 +158,8 @@ function SectionTitle({ icon, title, sub }) {
 function Panel({ children, style = {} }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 16, padding: '22px 24px',
-      border: '1px solid #e5e7eb', ...style,
+      background: 'var(--bg-card)', borderRadius: 16, padding: '22px 24px',
+      border: '1px solid var(--border)', ...style,
     }}>{children}</div>
   );
 }
@@ -183,14 +183,14 @@ function TimelineChart({ events }) {
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 100 }}>
       {months.map(m => (
         <div key={m.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>{m.count || ''}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)' }}>{m.count || ''}</span>
           <div style={{
             width: '100%', maxWidth: 40, borderRadius: '6px 6px 0 0',
-            background: m.count > 0 ? 'linear-gradient(180deg, #6366f1, #818cf8)' : '#f3f4f6',
+            background: m.count > 0 ? 'linear-gradient(180deg, var(--primary), #818cf8)' : 'var(--bg-badge)',
             height: `${Math.max((m.count / max) * 70, 4)}px`,
             transition: 'height 0.3s',
           }} />
-          <span style={{ fontSize: 10, color: '#9ca3af' }}>{m.label}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-light)' }}>{m.label}</span>
         </div>
       ))}
     </div>
@@ -223,27 +223,27 @@ function ConnectionMatrix({ contacts, organizations, events, connections }) {
       .slice(0, 12);
   }, [connections, entityMap]);
 
-  if (!ranked.length) return <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: 20 }}>Henüz bağlantı verisi yok</div>;
+  if (!ranked.length) return <div style={{ color: 'var(--text-light)', fontSize: 13, textAlign: 'center', padding: 20 }}>Henüz bağlantı verisi yok</div>;
 
   const maxCount = ranked[0]?.count || 1;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {ranked.map((r, i) => (
         <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: '#9ca3af', width: 18, textAlign: 'right', fontWeight: 600 }}>#{i + 1}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-light)', width: 18, textAlign: 'right', fontWeight: 600 }}>#{i + 1}</span>
           <span style={{ fontSize: 14 }}>{r.entity.icon}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {r.entity.name}
             </div>
             <div style={{
               height: 5, borderRadius: 3, marginTop: 3,
-              background: `linear-gradient(90deg, #6366f1, #a5b4fc)`,
+              background: `linear-gradient(90deg, var(--primary), #a5b4fc)`,
               width: `${(r.count / maxCount) * 100}%`,
               transition: 'width 0.4s',
             }} />
           </div>
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#6366f1', minWidth: 24, textAlign: 'right' }}>{r.count}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary)', minWidth: 24, textAlign: 'right' }}>{r.count}</span>
         </div>
       ))}
     </div>
@@ -265,9 +265,9 @@ function ContactsTable({ contacts, organizations, onSelect }) {
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
         <thead>
-          <tr style={{ background: '#f8fafc' }}>
+          <tr style={{ background: 'var(--bg-hover)' }}>
             {['Kişi', 'Kurum', 'Ülke', 'Süreç Aşaması', 'Öncelik', 'Takip Sorumlusu', 'İlk İletişim', 'Bağlantı'].map(h => (
-              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                 {h}
               </th>
             ))}
@@ -279,43 +279,43 @@ function ContactsTable({ contacts, organizations, onSelect }) {
             const prio = getPrio(c.priority);
             return (
               <tr key={c.id} onClick={() => onSelect?.(c)} style={{ cursor: 'pointer', transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Avatar name={c.full_name} size={28} />
                     <div>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{c.full_name}</div>
-                      {c.position && <div style={{ fontSize: 11, color: '#9ca3af' }}>{c.position}</div>}
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.full_name}</div>
+                      {c.position && <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{c.position}</div>}
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)' }}>
                   {orgMap[c.organization_id] || '—'}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
-                  {c.country ? <span>{getFlag(c.country)} {c.country}</span> : <span style={{ color: '#d1d5db' }}>—</span>}
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
+                  {c.country ? <span>{getFlag(c.country)} {c.country}</span> : <span style={{ color: 'var(--gray-mid)' }}>—</span>}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     padding: '3px 10px', borderRadius: 20,
                     background: stage.bg, color: stage.color, fontSize: 11, fontWeight: 600,
                   }}>{stage.icon} {stage.value}</span>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
                   <span style={{
                     display: 'inline-block', padding: '3px 10px', borderRadius: 20,
                     background: prio.bg, color: prio.color, fontSize: 11, fontWeight: 600,
                   }}>{prio.emoji} {prio.value}</span>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151', fontSize: 12 }}>
-                  {c.assigned_to_name || <span style={{ color: '#d1d5db' }}>—</span>}
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)', fontSize: 12 }}>
+                  {c.assigned_to_name || <span style={{ color: 'var(--gray-mid)' }}>—</span>}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#6b7280', fontSize: 12 }}>
-                  {c.first_contact_date ? fmtDisplayDate(c.first_contact_date) : <span style={{ color: '#d1d5db' }}>—</span>}
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-muted)', fontSize: 12 }}>
+                  {c.first_contact_date ? fmtDisplayDate(c.first_contact_date) : <span style={{ color: 'var(--gray-mid)' }}>—</span>}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontWeight: 700, color: '#6366f1' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
                   {c._connCount || 0}
                 </td>
               </tr>
@@ -333,9 +333,9 @@ function OrgsTable({ organizations }) {
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
         <thead>
-          <tr style={{ background: '#f8fafc' }}>
+          <tr style={{ background: 'var(--bg-hover)' }}>
             {['Kurum Adı', 'Tür', 'Birim', 'Takip Sorumlusu', 'Kişi Sayısı', 'Bağlantı'].map(h => (
-              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                 {h}
               </th>
             ))}
@@ -346,24 +346,24 @@ function OrgsTable({ organizations }) {
             const ot = getOrgType(o.org_type);
             return (
               <tr key={o.id} style={{ transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 18 }}>{ot.icon}</span>
                     <div>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{o.name}</div>
-                      {o.website && <div style={{ fontSize: 11, color: '#6366f1' }}>{o.website}</div>}
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{o.name}</div>
+                      {o.website && <div style={{ fontSize: 11, color: 'var(--primary)' }}>{o.website}</div>}
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f3f4f6', fontSize: 11, fontWeight: 600, color: '#374151' }}>{ot.label}</span>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--bg-badge)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{ot.label}</span>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151', fontSize: 12 }}>{o.unit || '—'}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151', fontSize: 12 }}>{o.assigned_to_name || '—'}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#111827', textAlign: 'center' }}>{o._contactCount || 0}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#6366f1', textAlign: 'center' }}>{o._connCount || 0}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)', fontSize: 12 }}>{o.unit || '—'}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)', fontSize: 12 }}>{o.assigned_to_name || '—'}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', fontWeight: 700, color: 'var(--text)', textAlign: 'center' }}>{o._contactCount || 0}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', fontWeight: 700, color: 'var(--primary)', textAlign: 'center' }}>{o._connCount || 0}</td>
               </tr>
             );
           })}
@@ -380,9 +380,9 @@ function EventsTable({ events }) {
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 12.5 }}>
         <thead>
-          <tr style={{ background: '#f8fafc' }}>
+          <tr style={{ background: 'var(--bg-hover)' }}>
             {['Etkinlik', 'Tür', 'Tarih', 'Konum', 'Takip Sorumlusu', 'Katılımcılar', 'Bağlantı'].map(h => (
-              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', borderBottom: '2px solid #e2e8f0', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                 {h}
               </th>
             ))}
@@ -395,29 +395,29 @@ function EventsTable({ events }) {
             const isToday = ev.event_date === today;
             return (
               <tr key={ev.id} style={{ transition: 'background 0.15s', opacity: isPast ? 0.6 : 1 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 18 }}>{et.icon}</span>
                     <div>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{ev.name}</div>
-                      {ev.drive_url && <a href={ev.drive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#f59e0b' }}>📁 Drive</a>}
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{ev.name}</div>
+                      {ev.drive_url && <a href={ev.drive_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--orange)' }}>📁 Drive</a>}
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f3f4f6', fontSize: 11, fontWeight: 600, color: '#374151' }}>{et.label}</span>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--bg-badge)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{et.label}</span>
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                  {isToday && <span style={{ background: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, marginRight: 4 }}>BUGÜN</span>}
-                  <span style={{ color: '#374151', fontSize: 12 }}>{ev.event_date ? fmtDisplayDate(ev.event_date) : '—'}</span>
-                  {ev.end_date && ev.end_date !== ev.event_date && <span style={{ color: '#9ca3af', fontSize: 11 }}> → {fmtDisplayDate(ev.end_date)}</span>}
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', whiteSpace: 'nowrap' }}>
+                  {isToday && <span style={{ background: 'var(--green-pale)', color: 'var(--green)', padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, marginRight: 4 }}>BUGÜN</span>}
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{ev.event_date ? fmtDisplayDate(ev.event_date) : '—'}</span>
+                  {ev.end_date && ev.end_date !== ev.event_date && <span style={{ color: 'var(--text-light)', fontSize: 11 }}> → {fmtDisplayDate(ev.end_date)}</span>}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151', fontSize: 12 }}>{ev.location || '—'}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#374151', fontSize: 12 }}>{ev.assigned_to_name || '—'}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#111827', textAlign: 'center' }}>{ev._participantCount || 0}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#6366f1', textAlign: 'center' }}>{ev._connCount || 0}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)', fontSize: 12 }}>{ev.location || '—'}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', color: 'var(--text-secondary)', fontSize: 12 }}>{ev.assigned_to_name || '—'}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', fontWeight: 700, color: 'var(--text)', textAlign: 'center' }}>{ev._participantCount || 0}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bg-hover)', fontWeight: 700, color: 'var(--primary)', textAlign: 'center' }}>{ev._connCount || 0}</td>
               </tr>
             );
           })}
@@ -547,10 +547,10 @@ export default function NetworkAnalytics({ user, profile }) {
 
   if (!isDirektor) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#6b7280', fontSize: 15 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--text-muted)', fontSize: 15 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#111827', marginBottom: 4 }}>Erişim Kısıtlı</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--text)', marginBottom: 4 }}>Erişim Kısıtlı</div>
           <div>Bu sayfa yalnızca Direktör rolüne açıktır.</div>
         </div>
       </div>
@@ -619,8 +619,8 @@ export default function NetworkAnalytics({ user, profile }) {
               style={{
                 padding: '9px 18px', borderRadius: '10px 10px 0 0', border: 'none', cursor: 'pointer',
                 fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap',
-                background: activeTab === tab.id ? 'white' : 'rgba(255,255,255,0.08)',
-                color: activeTab === tab.id ? '#312e81' : 'rgba(255,255,255,0.7)',
+                background: activeTab === tab.id ? 'var(--bg-card)' : 'rgba(255,255,255,0.08)',
+                color: activeTab === tab.id ? 'var(--text)' : 'rgba(255,255,255,0.7)',
                 transition: 'all 0.2s',
               }}
             >
@@ -676,14 +676,14 @@ function OverviewTab({ stats }) {
       {/* UYARI BANNER */}
       {(stats.unassignedContacts.length > 0 || stats.unassignedOrgs.length > 0) && (
         <div style={{
-          background: 'linear-gradient(135deg, #fef3c7, #fde68a)', border: '1px solid #fbbf24',
+          background: 'linear-gradient(135deg, var(--orange-pale), #fde68a)', border: '1px solid var(--orange)',
           borderRadius: 14, padding: '14px 20px',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
           <span style={{ fontSize: 22 }}>⚠️</span>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontWeight: 700, color: '#92400e', fontSize: 13 }}>Atanmamış Kayıtlar</div>
-            <div style={{ fontSize: 12, color: '#a16207' }}>
+            <div style={{ fontWeight: 700, color: 'var(--orange)', fontSize: 13 }}>Atanmamış Kayıtlar</div>
+            <div style={{ fontSize: 12, color: 'var(--orange)' }}>
               {stats.unassignedContacts.length > 0 && `${stats.unassignedContacts.length} kişi`}
               {stats.unassignedContacts.length > 0 && stats.unassignedOrgs.length > 0 && ' ve '}
               {stats.unassignedOrgs.length > 0 && `${stats.unassignedOrgs.length} kurum`}
@@ -719,9 +719,9 @@ function OverviewTab({ stats }) {
             {PROCESS_STAGES.map(s => {
               const count = stats.contacts.filter(c => c.process_stage === s.value).length;
               return (
-                <div key={s.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <div key={s.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--bg-badge)' }}>
                   <span style={{ fontSize: 16 }}>{s.icon}</span>
-                  <span style={{ flex: 1, fontSize: 12.5, color: '#374151', fontWeight: 500 }}>{s.value}</span>
+                  <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-secondary)', fontWeight: 500 }}>{s.value}</span>
                   <span style={{ fontSize: 14, fontWeight: 800, color: s.color }}>{count}</span>
                 </div>
               );
@@ -737,9 +737,9 @@ function OverviewTab({ stats }) {
             {PRIORITY_OPTIONS.map(p => {
               const count = stats.contacts.filter(c => c.priority === p.value).length;
               return (
-                <div key={p.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <div key={p.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--bg-badge)' }}>
                   <span style={{ fontSize: 16 }}>{p.emoji}</span>
-                  <span style={{ flex: 1, fontSize: 12.5, color: '#374151', fontWeight: 500 }}>{p.value}</span>
+                  <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-secondary)', fontWeight: 500 }}>{p.value}</span>
                   <span style={{ fontSize: 14, fontWeight: 800, color: p.color }}>{count}</span>
                 </div>
               );
@@ -756,8 +756,8 @@ function OverviewTab({ stats }) {
               {stats.orgTypeDist.map(d => (
                 <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
                   <div style={{ width: 10, height: 10, borderRadius: 3, background: d.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: '#374151', flex: 1 }}>{d.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>{d.value}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1 }}>{d.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{d.value}</span>
                 </div>
               ))}
             </div>
@@ -771,7 +771,7 @@ function OverviewTab({ stats }) {
         <Panel>
           <SectionTitle icon="🌍" title="Ülke Dağılımı" sub="Kişilerin coğrafi dağılımı" />
           {stats.countryDist.length === 0 ? (
-            <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: 16 }}>Ülke verisi girilmemiş</div>
+            <div style={{ color: 'var(--text-light)', fontSize: 13, textAlign: 'center', padding: 16 }}>Ülke verisi girilmemiş</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {stats.countryDist.map(c => {
@@ -779,15 +779,15 @@ function OverviewTab({ stats }) {
                 return (
                   <div key={c.country} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
                     <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{c.flag}</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', minWidth: 80 }}>{c.country}</span>
-                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: '#f3f4f6', overflow: 'hidden' }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', minWidth: 80 }}>{c.country}</span>
+                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--bg-badge)', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%', borderRadius: 4,
                         background: 'linear-gradient(90deg, #6366f1, #818cf8)',
                         width: `${(c.count / maxC) * 100}%`,
                       }} />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#6366f1', minWidth: 24, textAlign: 'right' }}>{c.count}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary)', minWidth: 24, textAlign: 'right' }}>{c.count}</span>
                   </div>
                 );
               })}
@@ -800,16 +800,16 @@ function OverviewTab({ stats }) {
           <SectionTitle icon="📅" title="Etkinlik Takvimi" sub="Son 6 ay etkinlik yoğunluğu" />
           <TimelineChart events={stats.events} />
           {stats.upcomingEvents.length > 0 && (
-            <div style={{ marginTop: 16, borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8 }}>YAKLAŞAN ETKİNLİKLER</div>
+            <div style={{ marginTop: 16, borderTop: '1px solid var(--bg-badge)', paddingTop: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>YAKLAŞAN ETKİNLİKLER</div>
               {stats.upcomingEvents.slice(0, 4).map(e => (
-                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #f9fafb' }}>
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--bg-hover)' }}>
                   <span style={{ fontSize: 14 }}>📅</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111827' }}>{e.name}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{e.location || 'Konum belirtilmemiş'}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{e.location || 'Konum belirtilmemiş'}</div>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#6366f1', whiteSpace: 'nowrap' }}>{fmtDisplayDate(e.event_date)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>{fmtDisplayDate(e.event_date)}</span>
                 </div>
               ))}
             </div>
@@ -823,7 +823,7 @@ function OverviewTab({ stats }) {
         <Panel>
           <SectionTitle icon="👥" title="Takip Sorumlusu Dağılımı" sub="Kim kaç kayıttan sorumlu?" />
           {stats.assigneeDist.length === 0 ? (
-            <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: 16 }}>Atama yapılmamış</div>
+            <div style={{ color: 'var(--text-light)', fontSize: 13, textAlign: 'center', padding: 16 }}>Atama yapılmamış</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {stats.assigneeDist.map(([name, count]) => {
@@ -831,15 +831,15 @@ function OverviewTab({ stats }) {
                 return (
                   <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
                     <Avatar name={name} size={26} />
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', minWidth: 100 }}>{name}</span>
-                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: '#f3f4f6', overflow: 'hidden' }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)', minWidth: 100 }}>{name}</span>
+                    <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--bg-badge)', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%', borderRadius: 4,
                         background: 'linear-gradient(90deg, #ec4899, #f9a8d4)',
                         width: `${(count / maxA) * 100}%`,
                       }} />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#ec4899', minWidth: 24, textAlign: 'right' }}>{count}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary)', minWidth: 24, textAlign: 'right' }}>{count}</span>
                   </div>
                 );
               })}

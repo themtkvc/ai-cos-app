@@ -34,8 +34,8 @@ function MessageBubble({ msg }) {
         maxWidth: '85%', padding: '10px 14px', borderRadius: 16,
         borderBottomRightRadius: isUser ? 4 : 16,
         borderBottomLeftRadius: isUser ? 16 : 4,
-        background: isUser ? 'var(--navy, #1a3a5c)' : 'var(--bg, #f3f4f6)',
-        color: isUser ? '#fff' : 'var(--text, #111827)',
+        background: isUser ? 'var(--navy)' : 'var(--bg-badge)',
+        color: isUser ? '#fff' : 'var(--text)',
         fontSize: 13.5, lineHeight: 1.5, whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
@@ -70,7 +70,7 @@ function ToolIndicator({ name }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
-      fontSize: 12, color: 'var(--text-muted, #9ca3af)', fontStyle: 'italic',
+      fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic',
     }}>
       <span className="loading-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
       {labels[name] || `⚙️ ${name}…`}
@@ -84,12 +84,12 @@ function ImagePreview({ src, onRemove }) {
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <img src={src} alt="preview" style={{
         width: 56, height: 56, borderRadius: 8, objectFit: 'cover',
-        border: '1.5px solid var(--border, #e5e7eb)',
+        border: '1.5px solid var(--border)',
       }} />
       {onRemove && (
         <button onClick={onRemove} style={{
           position: 'absolute', top: -6, right: -6, width: 18, height: 18,
-          borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none',
+          borderRadius: '50%', background: 'var(--red)', color: '#fff', border: 'none',
           fontSize: 11, lineHeight: 1, cursor: 'pointer', display: 'flex',
           alignItems: 'center', justifyContent: 'center',
         }}>✕</button>
@@ -272,16 +272,16 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
       position: 'fixed', bottom: 20, right: 20, zIndex: 10000,
       width: 400, height: 540, maxHeight: 'calc(100vh - 40px)',
       display: 'flex', flexDirection: 'column',
-      background: 'var(--bg-card, #fff)', borderRadius: 20,
-      border: '1px solid var(--border, #e5e7eb)',
+      background: 'var(--bg-card)', borderRadius: 20,
+      border: '1px solid var(--border)',
       boxShadow: '0 12px 48px rgba(0,0,0,0.18)',
       overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 18px', borderBottom: '1px solid var(--border, #e5e7eb)',
-        background: 'var(--navy, #1a3a5c)', color: '#fff',
+        padding: '14px 18px', borderBottom: '1px solid var(--border)',
+        background: 'var(--navy)', color: '#fff',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 22 }}>🤖</span>
@@ -308,9 +308,9 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
         display: 'flex', flexDirection: 'column',
       }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted, #9ca3af)' }}>
+          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>🤖</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text, #111827)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text)' }}>
               Merhaba, {profile?.full_name?.split(' ')[0] || 'merhaba'}!
             </div>
             <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>
@@ -334,12 +334,12 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
                 }}
                   style={{
                     padding: '8px 12px', borderRadius: 10, fontSize: 12,
-                    border: '1px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-                    cursor: 'pointer', textAlign: 'left', color: 'var(--text, #111827)',
+                    border: '1px solid var(--border)', background: 'var(--bg-hover)',
+                    cursor: 'pointer', textAlign: 'left', color: 'var(--text)',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border, #e5e7eb)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg, #f9fafb)'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 >
                   {s}
                 </button>
@@ -354,7 +354,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
             {[0, 1, 2].map(i => (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: '50%',
-                background: 'var(--text-muted, #9ca3af)',
+                background: 'var(--text-muted)',
                 animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
                 opacity: 0.5,
               }} />
@@ -366,11 +366,11 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
       {/* Pending image preview */}
       {pendingImage && (
         <div style={{
-          padding: '8px 14px 0', borderTop: '1px solid var(--border, #e5e7eb)',
+          padding: '8px 14px 0', borderTop: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <ImagePreview src={pendingImage.preview} onRemove={() => setPendingImage(null)} />
-          <span style={{ fontSize: 11.5, color: 'var(--text-muted, #9ca3af)' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
             Görsel hazır — mesaj yazıp gönderin
           </span>
         </div>
@@ -378,7 +378,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
 
       {/* Input */}
       <div style={{
-        padding: '10px 14px', borderTop: pendingImage ? 'none' : '1px solid var(--border, #e5e7eb)',
+        padding: '10px 14px', borderTop: pendingImage ? 'none' : '1px solid var(--border)',
         display: 'flex', gap: 8, alignItems: 'flex-end',
       }}>
         {/* Hidden file input */}
@@ -395,14 +395,14 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
           disabled={loading}
           title="Ekran görüntüsü yükle"
           style={{
-            width: 40, height: 40, borderRadius: 12, border: '1.5px solid var(--border, #e5e7eb)',
-            background: 'var(--bg, #f9fafb)', cursor: loading ? 'default' : 'pointer',
+            width: 40, height: 40, borderRadius: 12, border: '1.5px solid var(--border)',
+            background: 'var(--bg-hover)', cursor: loading ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, flexShrink: 0, transition: 'background 0.15s',
-            color: 'var(--text-muted, #6b7280)',
+            color: 'var(--text-muted)',
           }}
-          onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--border, #e5e7eb)'; }}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg, #f9fafb)'}
+          onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--border)'; }}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}
         >
           📷
         </button>
@@ -415,11 +415,11 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
           placeholder={pendingImage ? '"Bu kişiyi ekle" yazıp gönderin…' : 'Mesajınızı yazın…'}
           rows={1}
           style={{
-            flex: 1, resize: 'none', border: '1.5px solid var(--border, #e5e7eb)',
+            flex: 1, resize: 'none', border: '1.5px solid var(--border)',
             borderRadius: 12, padding: '10px 14px', fontSize: 13.5,
             fontFamily: 'inherit', outline: 'none', maxHeight: 80,
-            lineHeight: 1.4, color: 'var(--text, #111827)',
-            background: 'var(--bg, #f9fafb)',
+            lineHeight: 1.4, color: 'var(--text)',
+            background: 'var(--bg-hover)',
           }}
           onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'; }}
         />
@@ -428,7 +428,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
           disabled={loading || (!input.trim() && !pendingImage)}
           style={{
             width: 40, height: 40, borderRadius: 12, border: 'none',
-            background: loading || (!input.trim() && !pendingImage) ? 'var(--border, #e5e7eb)' : 'var(--navy, #1a3a5c)',
+            background: loading || (!input.trim() && !pendingImage) ? 'var(--border)' : 'var(--navy)',
             color: '#fff', cursor: loading || (!input.trim() && !pendingImage) ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, flexShrink: 0, transition: 'background 0.15s',

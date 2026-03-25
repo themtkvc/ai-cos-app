@@ -243,7 +243,7 @@ export default function Donors({ user, profile, onNavigate }) {
   const allowedRoles = ['direktor','asistan'];
   if (!allowedRoles.includes(profile?.role)) {
     return (
-      <div style={{padding:40, textAlign:'center', color:'#6b7280'}}>
+      <div style={{padding:40, textAlign:'center', color:'var(--text-muted)'}}>
         <p style={{fontSize:18, fontWeight:600}}>Erişim Yetkiniz Yok</p>
         <p style={{fontSize:14, marginTop:8}}>Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p>
       </div>
@@ -338,7 +338,7 @@ export default function Donors({ user, profile, onNavigate }) {
                     overflow:'hidden',
                     transition:'all 0.15s',
                     boxShadow: isSelected ? `0 4px 16px ${color.bg}33` : 'var(--shadow-sm)',
-                    backgroundColor: isSelected ? 'var(--surface)' : 'white',
+                    backgroundColor: isSelected ? 'var(--surface)' : 'var(--bg-card)',
                   }}
                 >
                   {/* Colored header with icon and name */}
@@ -361,7 +361,7 @@ export default function Donors({ user, profile, onNavigate }) {
                   </div>
 
                   {/* Donor info */}
-                  <div style={{padding:'10px 14px', background:'white'}}>
+                  <div style={{padding:'10px 14px', background:'var(--bg-card)'}}>
                     <div style={{fontSize:12, color:'var(--text-muted)', marginBottom:4}}>
                       Yönetici: <strong style={{color:'var(--text)'}}>
                         {d.account_manager || '—'}

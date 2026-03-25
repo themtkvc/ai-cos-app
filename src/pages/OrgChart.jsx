@@ -153,7 +153,7 @@ function UnitCard({ unit, color, profiles, search, onSelect }) {
 
   return (
     <div style={{
-      background: 'white', borderRadius: 12,
+      background: 'var(--bg-card)', borderRadius: 12,
       border: '1px solid var(--border)', borderTop: `4px solid ${color}`,
       boxShadow: '0 2px 10px rgba(0,0,0,.06)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -221,8 +221,8 @@ function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
 
   return (
     <div style={{
-      background: 'white', borderRadius: 12,
-      border: '1px solid var(--border)', borderLeft: '4px solid #1a3a5c',
+      background: 'var(--bg-card)', borderRadius: 12,
+      border: '1px solid var(--border)', borderLeft: '4px solid var(--navy)',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 24,
       padding: '12px 20px',
     }}>
@@ -234,7 +234,7 @@ function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
         ) : (
           <div style={{
             width: 48, height: 48, borderRadius: '50%',
-            background: '#1a3a5c', color: '#fff',
+            background: 'var(--navy)', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, fontWeight: 700,
           }}>{initials}</div>
@@ -242,7 +242,7 @@ function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)' }}>{name}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            <span style={{ background: '#1a3a5c18', color: '#1a3a5c', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
+            <span style={{ background: 'var(--navy-pale)', color: 'var(--navy)', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
               {label}
             </span>
           </div>
@@ -274,7 +274,7 @@ function AssistantRow({ profile }) {
       ) : (
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: '#64748b', color: '#fff',
+          background: 'var(--gray-mid)', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, fontWeight: 700,
         }}>{initials}</div>
@@ -282,7 +282,7 @@ function AssistantRow({ profile }) {
       <div>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{name}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          <span style={{ background: '#64748b18', color: '#64748b', padding: '1px 7px', borderRadius: 20, fontWeight: 600, fontSize: 10 }}>
+          <span style={{ background: 'var(--gray-mid)', color: '#fff', padding: '1px 7px', borderRadius: 20, fontWeight: 600, fontSize: 10, opacity: 0.2 }}>
             Yönetici Asistanı
           </span>
         </div>

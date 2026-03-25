@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { signIn, signUp, getPublicAnnouncements } from '../lib/supabase';
 
 const PRIORITY_META = {
-  urgent:    { label: 'Acil',     color: '#ef4444', bg: '#fef2f2', border: '#fecaca', icon: '🚨' },
-  important: { label: 'Önemli',   color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', icon: '⚠️' },
-  normal:    { label: 'Duyuru',   color: '#2e6da4', bg: '#eff6ff', border: '#bfdbfe', icon: '📢' },
+  urgent:    { label: 'Acil',     color: 'var(--red)', bg: 'var(--red-pale)', border: '#fecaca', icon: '🚨' },
+  important: { label: 'Önemli',   color: 'var(--orange)', bg: 'var(--orange-pale)', border: '#fde68a', icon: '⚠️' },
+  normal:    { label: 'Duyuru',   color: '#2e6da4', bg: 'var(--primary-light)', border: '#bfdbfe', icon: '📢' },
 };
 
 function timeAgo(dateStr) {
@@ -111,18 +111,18 @@ export default function Login({ onLogin }) {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                         <span style={{ fontSize: 15 }}>{meta.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1f2937' }}>{ann.title}</span>
+                        <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)' }}>{ann.title}</span>
                         <span style={{
                           fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10,
                           background: meta.color + '22', color: meta.color,
                         }}>{meta.label}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
                         {timeAgo(ann.published_at)}
                       </span>
                     </div>
                     {ann.content && (
-                      <p style={{ fontSize: 13, color: '#374151', margin: 0, lineHeight: 1.55 }}>{ann.content}</p>
+                      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.55 }}>{ann.content}</p>
                     )}
                   </div>
                 );
@@ -265,7 +265,7 @@ export default function Login({ onLogin }) {
               <div style={{
                 padding: '10px 14px', borderRadius: 8, fontSize: 12.5,
                 background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 7,
+                color: 'var(--red-light)', display: 'flex', alignItems: 'center', gap: 7,
               }}>
                 ⚠️ {error}
               </div>
@@ -274,7 +274,7 @@ export default function Login({ onLogin }) {
               <div style={{
                 padding: '10px 14px', borderRadius: 8, fontSize: 12.5,
                 background: 'rgba(22,163,74,0.15)', border: '1px solid rgba(22,163,74,0.3)',
-                color: '#86efac',
+                color: 'var(--green-light)',
               }}>
                 ✓ {success}
               </div>

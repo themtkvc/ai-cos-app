@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase';
 
 // ── Renk paleti (Google Keep tarzı) ──────────────────────────────────────────
 const NOTE_COLORS = [
-  { id: 'default',  bg: '#ffffff',  border: '#e5e7eb', label: 'Varsayılan' },
+  { id: 'default',  bg: 'var(--bg-card)',  border: 'var(--border)', label: 'Varsayılan' },
   { id: 'red',      bg: '#fee2e2',  border: '#fca5a5', label: 'Kırmızı' },
   { id: 'orange',   bg: '#ffedd5',  border: '#fdba74', label: 'Turuncu' },
   { id: 'yellow',   bg: '#fef9c3',  border: '#fde047', label: 'Sarı' },
   { id: 'green',    bg: '#dcfce7',  border: '#86efac', label: 'Yeşil' },
   { id: 'teal',     bg: '#ccfbf1',  border: '#5eead4', label: 'Turkuaz' },
-  { id: 'blue',     bg: '#dbeafe',  border: '#93c5fd', label: 'Mavi' },
+  { id: 'blue',     bg: 'var(--primary-light)',  border: '#93c5fd', label: 'Mavi' },
   { id: 'purple',   bg: '#ede9fe',  border: '#c4b5fd', label: 'Mor' },
   { id: 'pink',     bg: '#fce7f3',  border: '#f9a8d4', label: 'Pembe' },
   { id: 'brown',    bg: '#efebe9',  border: '#bcaaa4', label: 'Kahve' },
@@ -37,9 +37,9 @@ function Toolbar({ editorRef }) {
     { cmd: 'insertOrderedList',   icon: '1.', style: { fontSize: 12, fontWeight: 600 }, title: 'Numaralı liste' },
   ];
   return (
-    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--border, #e5e7eb)', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
       {btns.map((b, i) => b === null ? (
-        <div key={i} style={{ width: 1, height: 22, background: 'var(--border, #e5e7eb)', margin: '0 4px', alignSelf: 'center' }} />
+        <div key={i} style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 4px', alignSelf: 'center' }} />
       ) : (
         <button key={b.cmd + (b.val || '')} title={b.title}
           onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
@@ -47,9 +47,9 @@ function Toolbar({ editorRef }) {
             ...b.style, width: 28, height: 28, border: 'none', borderRadius: 6,
             background: 'transparent', cursor: 'pointer', display: 'flex',
             alignItems: 'center', justifyContent: 'center', fontSize: 13,
-            color: 'var(--text, #374151)', transition: 'background 0.1s',
+            color: 'var(--text-secondary)', transition: 'background 0.1s',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >{b.icon}</button>
       ))}
@@ -67,8 +67,8 @@ function Checklist({ items, onChange }) {
   const remove = (idx) => onChange(items.filter((_, i) => i !== idx));
 
   return (
-    <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border, #e5e7eb)' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #9ca3af)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+    <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Yapılacaklar
       </div>
       {items.map((it, i) => (
@@ -85,12 +85,12 @@ function Checklist({ items, onChange }) {
             placeholder="Yeni madde..."
             style={{
               flex: 1, border: 'none', outline: 'none', fontSize: 13, padding: '4px 0',
-              background: 'transparent', color: 'var(--text, #111827)',
+              background: 'transparent', color: 'var(--text)',
               textDecoration: it.done ? 'line-through' : 'none',
               opacity: it.done ? 0.5 : 1,
             }} />
           <button onClick={() => remove(i)}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af', padding: 2, lineHeight: 1, opacity: 0.5 }}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text-muted)', padding: 2, lineHeight: 1, opacity: 0.5 }}
             onMouseEnter={e => e.currentTarget.style.opacity = 1}
             onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
           >✕</button>
@@ -99,7 +99,7 @@ function Checklist({ items, onChange }) {
       <button onClick={add}
         style={{
           border: 'none', background: 'none', cursor: 'pointer', fontSize: 12.5,
-          color: 'var(--text-muted, #9ca3af)', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4,
+          color: 'var(--text-muted)', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4,
         }}>
         <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Madde ekle
       </button>
@@ -135,9 +135,9 @@ function CategoryPicker({ value, onChange, categories }) {
         <button key={cat} onClick={() => onChange(value === cat ? '' : cat)}
           style={{
             padding: '3px 10px', borderRadius: 12, fontSize: 11.5, fontWeight: 500,
-            border: '1px solid var(--border, #e5e7eb)', cursor: 'pointer', transition: 'all 0.1s',
-            background: value === cat ? 'var(--navy, #1a3a5c)' : 'var(--bg, #f9fafb)',
-            color: value === cat ? '#fff' : 'var(--text, #374151)',
+            border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.1s',
+            background: value === cat ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+            color: value === cat ? '#fff' : 'var(--text-secondary)',
           }}>
           {cat}
         </button>
@@ -194,7 +194,7 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
           style={{
             border: 'none', outline: 'none', fontSize: 18, fontWeight: 700,
             padding: '16px 16px 8px', background: 'transparent',
-            color: 'var(--text, #111827)', fontFamily: 'inherit',
+            color: 'var(--text)', fontFamily: 'inherit',
           }} />
 
         {/* Toolbar */}
@@ -208,7 +208,7 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
           style={{
             flex: 1, padding: '12px 16px', outline: 'none', fontSize: 14,
             lineHeight: 1.7, minHeight: 150, maxHeight: 350, overflowY: 'auto',
-            color: 'var(--text, #111827)', background: 'transparent',
+            color: 'var(--text)', background: 'transparent',
           }} />
 
         {/* Checklist */}
@@ -223,23 +223,23 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
         {/* Bottom bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 12px', borderTop: '1px solid var(--border, #e5e7eb)',
+          padding: '10px 12px', borderTop: '1px solid var(--border)',
         }}>
           <div style={{ display: 'flex', gap: 4 }}>
             <button title="Renk" onClick={() => setShowColors(!showColors)}
-              style={{ ...iconBtnStyle, background: showColors ? 'var(--bg-hover, #f3f4f6)' : 'transparent' }}>
+              style={{ ...iconBtnStyle, background: showColors ? 'var(--bg-hover)' : 'transparent' }}>
               🎨
             </button>
             <button title="Yapılacaklar" onClick={() => {
               setShowChecklist(!showChecklist);
               if (!showChecklist && checklist.length === 0) setChecklist([{ text: '', done: false }]);
             }}
-              style={{ ...iconBtnStyle, background: showChecklist ? 'var(--bg-hover, #f3f4f6)' : 'transparent' }}>
+              style={{ ...iconBtnStyle, background: showChecklist ? 'var(--bg-hover)' : 'transparent' }}>
               ☑️
             </button>
             {note?.id && (
               <button title="Sil" onClick={() => { if (window.confirm('Bu notu silmek istediğinize emin misiniz?')) { onDelete(note.id); onClose(); } }}
-                style={{ ...iconBtnStyle, color: '#ef4444' }}>
+                style={{ ...iconBtnStyle, color: 'var(--red)' }}>
                 🗑️
               </button>
             )}
@@ -292,7 +292,7 @@ function NoteCard({ note, onClick, onPin }) {
       <div style={{ padding: '12px 14px' }}>
         {/* Title */}
         {note.title && (
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, paddingRight: 28, color: 'var(--text, #111827)', lineHeight: 1.3 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, paddingRight: 28, color: 'var(--text)', lineHeight: 1.3 }}>
             {note.title}
           </div>
         )}
@@ -300,7 +300,7 @@ function NoteCard({ note, onClick, onPin }) {
         {/* Content preview */}
         {hasContent && (
           <div style={{
-            fontSize: 13, color: 'var(--text, #374151)', lineHeight: 1.5,
+            fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5,
             maxHeight: 120, overflow: 'hidden', opacity: 0.85,
           }}
             dangerouslySetInnerHTML={{ __html: note.content }}
@@ -309,14 +309,14 @@ function NoteCard({ note, onClick, onPin }) {
 
         {/* Checklist preview */}
         {checkTotal > 0 && (
-          <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--text-muted, #6b7280)' }}>
+          <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--text-muted)' }}>
             {(note.checklist || []).slice(0, 4).map((c, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, opacity: c.done ? 0.5 : 1 }}>
                 <span style={{ fontSize: 14 }}>{c.done ? '☑' : '☐'}</span>
                 <span style={{ textDecoration: c.done ? 'line-through' : 'none' }}>{c.text}</span>
               </div>
             ))}
-            {checkTotal > 4 && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>+{checkTotal - 4} madde daha</div>}
+            {checkTotal > 4 && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>+{checkTotal - 4} madde daha</div>}
           </div>
         )}
       </div>
@@ -327,11 +327,11 @@ function NoteCard({ note, onClick, onPin }) {
           {note.category && (
             <span style={{
               padding: '2px 8px', borderRadius: 10, fontSize: 10.5, fontWeight: 600,
-              background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted, #6b7280)',
+              background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)',
             }}>{note.category}</span>
           )}
           {checkTotal > 0 && (
-            <span style={{ fontSize: 10.5, color: '#9ca3af' }}>
+            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
               {checkDone}/{checkTotal} tamamlandı
             </span>
           )}
@@ -432,8 +432,8 @@ export default function Notes({ user }) {
         marginBottom: 20, flexWrap: 'wrap', gap: 12,
       }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text, #111827)' }}>📝 Notlarım</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted, #9ca3af)' }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>📝 Notlarım</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
             {notes.filter(n => !n.is_archived).length} not · {notes.filter(n => n.is_archived).length} arşiv
           </p>
         </div>
@@ -455,8 +455,8 @@ export default function Notes({ user }) {
             placeholder="Not ara…"
             style={{
               width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10,
-              border: '1.5px solid var(--border, #e5e7eb)', fontSize: 13,
-              outline: 'none', background: 'var(--bg, #f9fafb)', color: 'var(--text, #111827)',
+              border: '1.5px solid var(--border)', fontSize: 13,
+              outline: 'none', background: 'var(--bg-hover)', color: 'var(--text)',
               boxSizing: 'border-box',
             }} />
         </div>
@@ -464,8 +464,8 @@ export default function Notes({ user }) {
         {/* Category filter */}
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
           style={{
-            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e7eb)',
-            fontSize: 12.5, background: 'var(--bg, #f9fafb)', color: 'var(--text, #374151)',
+            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border)',
+            fontSize: 12.5, background: 'var(--bg-hover)', color: 'var(--text-secondary)',
             cursor: 'pointer', outline: 'none',
           }}>
           <option value="">Tüm kategoriler</option>
@@ -475,7 +475,7 @@ export default function Notes({ user }) {
         {/* Color filter */}
         <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
           {filterColor && (
-            <button onClick={() => setFilterColor('')} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: '#9ca3af' }}>✕</button>
+            <button onClick={() => setFilterColor('')} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>✕</button>
           )}
           {NOTE_COLORS.slice(1).map(c => (
             <button key={c.id} title={c.label} onClick={() => setFilterColor(filterColor === c.id ? '' : c.id)}
@@ -502,7 +502,7 @@ export default function Notes({ user }) {
       {/* Pinned section */}
       {pinned.length > 0 && !showArchived && (
         <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #9ca3af)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
             📌 Sabitlenmiş
           </div>
           <div style={{ columnCount: 3, columnGap: 12, marginBottom: 24 }}
@@ -520,7 +520,7 @@ export default function Notes({ user }) {
       {unpinned.length > 0 && (
         <>
           {pinned.length > 0 && !showArchived && (
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #9ca3af)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
               Diğer notlar
             </div>
           )}
@@ -537,9 +537,9 @@ export default function Notes({ user }) {
 
       {/* Empty state */}
       {filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted, #9ca3af)' }}>
+        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>{showArchived ? '🗄' : '📝'}</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text, #6b7280)' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>
             {showArchived ? 'Arşivde not yok' : search || filterCategory || filterColor ? 'Filtrelerle eşleşen not yok' : 'Henüz not eklenmemiş'}
           </div>
           <div style={{ fontSize: 13 }}>
@@ -565,7 +565,7 @@ export default function Notes({ user }) {
         @media (max-width: 560px) { .notes-masonry { column-count: 1; } }
         [contenteditable]:empty:before {
           content: attr(data-placeholder);
-          color: var(--text-muted, #9ca3af);
+          color: var(--text-muted);
           pointer-events: none;
         }
       `}</style>
@@ -580,8 +580,8 @@ const primaryBtnStyle = {
 };
 const secondaryBtnStyle = {
   padding: '7px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-  border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-  color: 'var(--text, #374151)', cursor: 'pointer',
+  border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+  color: 'var(--text-secondary)', cursor: 'pointer',
 };
 const iconBtnStyle = {
   width: 32, height: 32, border: 'none', borderRadius: 8, cursor: 'pointer',

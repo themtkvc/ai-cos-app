@@ -5,10 +5,10 @@ import EmptyState from '../components/EmptyState';
 
 // ── STATUS CONFIGURATIONS ────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
-  { value: 'Yolunda', label: 'Yolunda', color: '#10b981' },
-  { value: 'Geride', label: 'Geride', color: '#f59e0b' },
-  { value: 'Risk Altında', label: 'Risk Altında', color: '#ef4444' },
-  { value: 'Tamamlandı', label: 'Tamamlandı', color: '#3b82f6' },
+  { value: 'Yolunda', label: 'Yolunda', color: 'var(--green)' },
+  { value: 'Geride', label: 'Geride', color: 'var(--orange)' },
+  { value: 'Risk Altında', label: 'Risk Altında', color: 'var(--red)' },
+  { value: 'Tamamlandı', label: 'Tamamlandı', color: 'var(--primary)' },
 ];
 
 function getWeekStart() {

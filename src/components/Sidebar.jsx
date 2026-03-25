@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getMeetingActions, getUnreadNotificationCount, signOut } from '../lib/supabase';
-import { ROLE_ACCESS } from '../App';
+import { ROLE_ACCESS, useTheme } from '../App';
 import { ROLE_LABELS } from '../lib/constants';
 
 const ALL_NAV = [
@@ -59,6 +59,7 @@ function SidebarAvatar({ profile, size = 34 }) {
 export default function Sidebar({ activePage, onNavigate, user, profile, mobileOpen, onMobileClose }) {
   const [openActionsCount, setOpenActionsCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const { theme, toggleTheme } = useTheme();
 
   const role = profile?.role || 'personel';
   const allowed = ROLE_ACCESS[role] || ROLE_ACCESS['personel'];
@@ -139,6 +140,15 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
       </div>
 
       <div className="sidebar-footer">
+        {/* Tema değiştir */}
+        <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}>
+          <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          <span style={{ flex: 1 }}>{theme === 'dark' ? 'Açık Tema' : 'Koyu Tema'}</span>
+          <div className={`theme-toggle-track${theme === 'dark' ? ' active' : ''}`}>
+            <div className="theme-toggle-knob" />
+          </div>
+        </button>
+
         {/* Profil ayarlarına git butonu */}
         <button
           className={`nav-item ${activePage === 'profile' ? 'active' : ''}`}

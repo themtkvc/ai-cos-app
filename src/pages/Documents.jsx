@@ -37,12 +37,12 @@ function ToolBtn({ onClick, active, title, children, style: extraStyle }) {
         padding: '4px 8px', borderRadius: 6, fontSize: 13, lineHeight: 1,
         border: 'none', cursor: 'pointer',
         background: active ? '#e0e7ff' : 'transparent',
-        color: active ? '#4338ca' : '#374151',
+        color: active ? '#4338ca' : 'var(--text-secondary)',
         fontWeight: active ? 700 : 500,
         minWidth: 28, textAlign: 'center',
         ...extraStyle,
       }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6'; }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--gray-light)'; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     >
       {children}
@@ -70,8 +70,8 @@ function EditorToolbar({ editor }) {
   return (
     <div style={{
       display: 'flex', gap: 2, flexWrap: 'wrap', padding: '8px 12px',
-      borderBottom: '1px solid var(--border, #e5e7eb)',
-      background: 'var(--bg, #f9fafb)', borderRadius: '12px 12px 0 0',
+      borderBottom: '1px solid var(--border)',
+      background: 'var(--bg-hover)', borderRadius: '12px 12px 0 0',
       alignItems: 'center',
     }}>
       {/* Başlıklar */}
@@ -79,7 +79,7 @@ function EditorToolbar({ editor }) {
       <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Başlık 2">H2</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Başlık 3">H3</ToolBtn>
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Metin stili */}
       <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Kalın"><b>B</b></ToolBtn>
@@ -89,28 +89,28 @@ function EditorToolbar({ editor }) {
       <ToolBtn onClick={() => editor.chain().focus().toggleHighlight().run()} active={editor.isActive('highlight')} title="Vurgula" style={{ background: editor.isActive('highlight') ? '#fef08a' : undefined }}>🖍</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Satır içi kod" style={{ fontFamily: 'monospace' }}>&lt;&gt;</ToolBtn>
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Hizalama */}
       <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Sola hizala">⫷</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Ortala">☰</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Sağa hizala">⫸</ToolBtn>
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Listeler */}
       <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Madde listesi">• ─</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numaralı liste">1. ─</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Görev listesi">☑</ToolBtn>
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Bloklar */}
       <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Alıntı">❝</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Kod bloğu">{'{ }'}</ToolBtn>
       <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Yatay çizgi">─</ToolBtn>
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Tablo */}
       <ToolBtn onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Tablo ekle">⊞</ToolBtn>
@@ -118,11 +118,11 @@ function EditorToolbar({ editor }) {
         <>
           <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="Sütun ekle">+▮</ToolBtn>
           <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="Satır ekle">+▬</ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Tabloyu sil" style={{ color: '#ef4444' }}>🗑</ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Tabloyu sil" style={{ color: 'var(--red)' }}>🗑</ToolBtn>
         </>
       )}
 
-      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
 
       {/* Ekleme */}
       <ToolBtn onClick={setLink} active={editor.isActive('link')} title="Link ekle/düzenle">🔗</ToolBtn>
@@ -140,9 +140,9 @@ function EditorToolbar({ editor }) {
 // ── Kayıt durumu göstergesi ──────────────────────────────────────────────────
 function SaveIndicator({ status }) {
   const labels = { unsaved: '● Kaydedilmemiş', saving: '↻ Kaydediliyor…', saved: '✓ Kaydedildi', error: '✕ Kayıt hatası' };
-  const colors = { unsaved: '#f59e0b', saving: '#6b7280', saved: '#22c55e', error: '#ef4444' };
+  const colors = { unsaved: '#f59e0b', saving: 'var(--text-muted)', saved: '#22c55e', error: 'var(--red)' };
   return (
-    <span style={{ fontSize: 11.5, color: colors[status] || '#9ca3af', fontWeight: 500 }}>
+    <span style={{ fontSize: 11.5, color: colors[status] || 'var(--text-light)', fontWeight: 500 }}>
       {labels[status] || ''}
     </span>
   );
@@ -180,7 +180,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
     editorProps: {
       attributes: {
         class: 'tiptap-editor-content',
-        style: 'outline: none; min-height: 500px; padding: 24px 32px; font-size: 15px; line-height: 1.7; color: var(--text, #111827);',
+        style: 'outline: none; min-height: 500px; padding: 24px 32px; font-size: 15px; line-height: 1.7; color: var(--text);',
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -273,30 +273,30 @@ function DocumentEditor({ doc, user, profile, onBack }) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', marginBottom: 8,
-        borderBottom: '1px solid var(--border, #e5e7eb)',
+        borderBottom: '1px solid var(--border)',
       }}>
         <button onClick={() => { saveToSupabase(); setTimeout(onBack, 300); }} style={{
           border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px',
-          borderRadius: 8, color: 'var(--text-muted, #6b7280)',
+          borderRadius: 8, color: 'var(--text-muted)',
         }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
           onMouseLeave={e => e.currentTarget.style.background = 'none'}
         >←</button>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)' }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
               {getDocType(doc.doc_type).icon} {doc.title}
             </span>
             <SaveIndicator status={saveStatus} />
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {doc.created_by_name} tarafından oluşturuldu · Ctrl+S ile kaydet
           </div>
         </div>
         <button onClick={saveToSupabase} title="Şimdi kaydet" style={{
           padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-          border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-          color: 'var(--text, #374151)', cursor: 'pointer',
+          border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+          color: 'var(--text-secondary)', cursor: 'pointer',
         }}>
           💾 Kaydet
         </button>
@@ -304,8 +304,8 @@ function DocumentEditor({ doc, user, profile, onBack }) {
 
       {/* Editor */}
       <div style={{
-        flex: 1, overflow: 'hidden', border: '1px solid var(--border, #e5e7eb)',
-        borderRadius: 12, background: 'var(--bg-card, #fff)',
+        flex: 1, overflow: 'hidden', border: '1px solid var(--border)',
+        borderRadius: 12, background: 'var(--bg-card)',
         display: 'flex', flexDirection: 'column',
       }}>
         <EditorToolbar editor={editor} />
@@ -325,10 +325,10 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         .tiptap-editor-content li p { margin: 0; }
         .tiptap-editor-content blockquote {
           border-left: 3px solid #6366f1; padding-left: 16px; margin: 8px 0;
-          color: #6b7280; font-style: italic;
+          color: var(--text-muted); font-style: italic;
         }
         .tiptap-editor-content code {
-          background: #f3f4f6; border-radius: 4px; padding: 2px 6px;
+          background: var(--gray-light); border-radius: 4px; padding: 2px 6px;
           font-family: 'Fira Code', monospace; font-size: 13px; color: #e11d48;
         }
         .tiptap-editor-content pre {
@@ -340,7 +340,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
           background: none; color: inherit; padding: 0; border-radius: 0;
         }
         .tiptap-editor-content hr {
-          border: none; border-top: 2px solid #e5e7eb; margin: 16px 0;
+          border: none; border-top: 2px solid var(--border); margin: 16px 0;
         }
         .tiptap-editor-content a { color: #6366f1; text-decoration: underline; cursor: pointer; }
         .tiptap-editor-content img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
@@ -349,16 +349,16 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         /* Tablo stilleri */
         .tiptap-editor-content table {
           border-collapse: collapse; width: 100%; margin: 12px 0;
-          border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+          border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
         }
         .tiptap-editor-content th, .tiptap-editor-content td {
-          border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+          border: 1px solid var(--border); padding: 8px 12px; text-align: left;
           min-width: 80px; font-size: 14px;
         }
         .tiptap-editor-content th {
-          background: #f3f4f6; font-weight: 700; font-size: 13px;
+          background: var(--gray-light); font-weight: 700; font-size: 13px;
         }
-        .tiptap-editor-content td { background: var(--bg-card, #fff); }
+        .tiptap-editor-content td { background: var(--bg-card); }
 
         /* Task list */
         .tiptap-editor-content ul[data-type="taskList"] {
@@ -377,7 +377,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         /* Placeholder */
         .tiptap-editor-content p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
-          float: left; color: #9ca3af; pointer-events: none; height: 0;
+          float: left; color: var(--text-light); pointer-events: none; height: 0;
         }
 
         .ProseMirror { outline: none; }
@@ -410,10 +410,10 @@ function NewDocModal({ onClose, onCreate }) {
       background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        width: 440, background: 'var(--bg-card, #fff)', borderRadius: 16,
+        width: 440, background: 'var(--bg-card)', borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
       }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)' }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
           📄 Yeni Doküman
         </h3>
         <input value={title} onChange={e => setTitle(e.target.value)}
@@ -421,8 +421,8 @@ function NewDocModal({ onClose, onCreate }) {
           placeholder="Doküman başlığı…" autoFocus
           style={{
             width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 14,
-            border: '1.5px solid var(--border, #e5e7eb)', outline: 'none',
-            background: 'var(--bg, #f9fafb)', color: 'var(--text, #111827)',
+            border: '1.5px solid var(--border)', outline: 'none',
+            background: 'var(--bg-hover)', color: 'var(--text)',
             boxSizing: 'border-box', marginBottom: 12,
           }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -430,9 +430,9 @@ function NewDocModal({ onClose, onCreate }) {
             <button key={t.id} onClick={() => setDocType(t.id)}
               style={{
                 padding: '6px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                border: '1.5px solid var(--border, #e5e7eb)', transition: 'all 0.1s',
-                background: docType === t.id ? 'var(--navy, #1a3a5c)' : 'var(--bg, #f9fafb)',
-                color: docType === t.id ? '#fff' : 'var(--text, #374151)',
+                border: '1.5px solid var(--border)', transition: 'all 0.1s',
+                background: docType === t.id ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+                color: docType === t.id ? '#fff' : 'var(--text-secondary)',
               }}>
               {t.icon} {t.label}
             </button>
@@ -441,14 +441,14 @@ function NewDocModal({ onClose, onCreate }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{
             padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-            border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-            color: 'var(--text, #374151)',
+            border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+            color: 'var(--text-secondary)',
           }}>İptal</button>
           <button onClick={handleCreate} disabled={!title.trim() || creating}
             style={{
               padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               border: 'none', cursor: !title.trim() || creating ? 'default' : 'pointer',
-              background: !title.trim() || creating ? 'var(--border, #e5e7eb)' : 'var(--navy, #1a3a5c)',
+              background: !title.trim() || creating ? 'var(--border)' : 'var(--navy, #1a3a5c)',
               color: '#fff',
             }}>
             {creating ? 'Oluşturuluyor…' : 'Oluştur'}
@@ -478,21 +478,21 @@ function UploadModal({ onClose, onUpload }) {
       background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        width: 440, background: 'var(--bg-card, #fff)', borderRadius: 16,
+        width: 440, background: 'var(--bg-card)', borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
       }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)' }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
           📎 Dosya Yükle
         </h3>
         <div style={{
-          border: '2px dashed var(--border, #e5e7eb)', borderRadius: 12, padding: 32,
+          border: '2px dashed var(--border)', borderRadius: 12, padding: 32,
           textAlign: 'center', marginBottom: 16, cursor: 'pointer',
-          background: file ? 'var(--bg, #f0fdf4)' : 'var(--bg, #f9fafb)',
+          background: file ? '#f0fdf4' : 'var(--bg-hover)',
         }}
           onClick={() => document.getElementById('doc-file-input')?.click()}
           onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--navy, #1a3a5c)'; }}
-          onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border, #e5e7eb)'; }}
-          onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); e.currentTarget.style.borderColor = 'var(--border, #e5e7eb)'; }}
+          onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+          onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); e.currentTarget.style.borderColor = 'var(--border)'; }}
         >
           <input id="doc-file-input" type="file" style={{ display: 'none' }}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg"
@@ -500,18 +500,18 @@ function UploadModal({ onClose, onUpload }) {
           {file ? (
             <>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📎</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text, #111827)' }}>{file.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{file.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 {(file.size / 1024 / 1024).toFixed(2)} MB
               </div>
             </>
           ) : (
             <>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
-              <div style={{ fontSize: 14, color: 'var(--text-muted, #6b7280)' }}>
+              <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
                 Dosya sürükleyin veya tıklayarak seçin
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 PDF, Word, Excel, PowerPoint, resim desteklenir
               </div>
             </>
@@ -520,14 +520,14 @@ function UploadModal({ onClose, onUpload }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{
             padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-            border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-            color: 'var(--text, #374151)',
+            border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+            color: 'var(--text-secondary)',
           }}>İptal</button>
           <button onClick={handleUpload} disabled={!file || uploading}
             style={{
               padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               border: 'none', cursor: !file || uploading ? 'default' : 'pointer',
-              background: !file || uploading ? 'var(--border, #e5e7eb)' : 'var(--navy, #1a3a5c)',
+              background: !file || uploading ? 'var(--border)' : 'var(--navy, #1a3a5c)',
               color: '#fff',
             }}>
             {uploading ? 'Yükleniyor…' : 'Yükle'}
@@ -551,7 +551,7 @@ function DocCard({ doc, onClick }) {
   return (
     <div onClick={onClick}
       style={{
-        background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e5e7eb)',
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
         borderRadius: 12, padding: 16, cursor: 'pointer', transition: 'all 0.15s',
         display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120,
       }}
@@ -561,22 +561,22 @@ function DocCard({ doc, onClick }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <span style={{ fontSize: 28 }}>{isFile ? fileIcon : type.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text, #111827)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {doc.title}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {isFile ? (doc.file_name || 'Dosya') : type.label}
           </div>
         </div>
       </div>
-      <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted, #9ca3af)' }}>
+      <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)' }}>
         <span>{doc.created_by_name || 'Bilinmiyor'}</span>
         <span>{dateStr}</span>
       </div>
       {doc.tags?.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {doc.tags.map(t => (
-            <span key={t} style={{ padding: '1px 8px', borderRadius: 8, fontSize: 10, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted, #6b7280)' }}>{t}</span>
+            <span key={t} style={{ padding: '1px 8px', borderRadius: 8, fontSize: 10, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>{t}</span>
           ))}
         </div>
       )}
@@ -695,16 +695,16 @@ export default function Documents({ user }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text, #111827)' }}>📄 Dokümanlar</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted, #9ca3af)' }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>📄 Dokümanlar</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
             Zengin metin editörü ile dokümanlarınızı oluşturun
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setShowUpload(true)} style={{
             padding: '10px 16px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontWeight: 500,
-            border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
-            color: 'var(--text, #374151)', display: 'flex', alignItems: 'center', gap: 6,
+            border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
+            color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6,
           }}>
             📎 Dosya Yükle
           </button>
@@ -726,15 +726,15 @@ export default function Documents({ user }) {
             placeholder="Doküman ara…"
             style={{
               width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10,
-              border: '1.5px solid var(--border, #e5e7eb)', fontSize: 13,
-              outline: 'none', background: 'var(--bg, #f9fafb)', color: 'var(--text, #111827)',
+              border: '1.5px solid var(--border)', fontSize: 13,
+              outline: 'none', background: 'var(--bg-hover)', color: 'var(--text)',
               boxSizing: 'border-box',
             }} />
         </div>
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           style={{
-            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border, #e5e7eb)',
-            fontSize: 12.5, background: 'var(--bg, #f9fafb)', color: 'var(--text, #374151)',
+            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border)',
+            fontSize: 12.5, background: 'var(--bg-hover)', color: 'var(--text-secondary)',
             cursor: 'pointer', outline: 'none',
           }}>
           <option value="">Tüm türler</option>
@@ -743,9 +743,9 @@ export default function Documents({ user }) {
         <button onClick={() => setShowArchived(!showArchived)}
           style={{
             padding: '6px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            border: '1.5px solid var(--border, #e5e7eb)',
-            background: showArchived ? 'var(--navy, #1a3a5c)' : 'var(--bg, #f9fafb)',
-            color: showArchived ? '#fff' : 'var(--text, #374151)',
+            border: '1.5px solid var(--border)',
+            background: showArchived ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+            color: showArchived ? '#fff' : 'var(--text-secondary)',
           }}>
           🗄 {showArchived ? 'Aktif' : 'Arşiv'}
         </button>
@@ -762,9 +762,9 @@ export default function Documents({ user }) {
           ))}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted, #9ca3af)' }}>
+        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text, #6b7280)' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>
             {search || filterType ? 'Filtrelerle eşleşen doküman yok' : 'Henüz doküman oluşturulmamış'}
           </div>
           <div style={{ fontSize: 13 }}>
