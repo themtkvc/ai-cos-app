@@ -560,15 +560,19 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           onSave={async (data) => {
             if (editTask) {
               await updateAgendaTask(editTask.id, data);
-              // Görev atanan kişi değiştiyse bildirim gönder
+              // Görev atanan kişi değiştiyse bildirim + mail gönder
               if (data.assigned_to && data.assigned_to !== myId && data.assigned_to !== editTask.assigned_to) {
                 try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' }); } catch (e) { console.error('Task assign notif error:', e); }
+                // Otomatik mail
+                try { await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: `Bağlı Gündem: ${agenda.title}${data.description ? '\n\n' + data.description : ''}`, taskPriority: data.priority, taskDueDate: data.due_date, taskUnit: agenda.unit || '', createdByName: myProfile?.full_name || myName }); } catch (e) { console.error('Task mail error:', e); }
               }
             } else {
               await createAgendaTask({ ...data, agenda_id: agenda.id, created_by: myId, created_by_name: myProfile?.full_name || '' });
-              // Yeni görev atandıysa bildirim gönder
+              // Yeni görev atandıysa bildirim + mail gönder
               if (data.assigned_to && data.assigned_to !== myId) {
                 try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' }); } catch (e) { console.error('Task assign notif error:', e); }
+                // Otomatik mail
+                try { await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: `Bağlı Gündem: ${agenda.title}${data.description ? '\n\n' + data.description : ''}`, taskPriority: data.priority, taskDueDate: data.due_date, taskUnit: agenda.unit || '', createdByName: myProfile?.full_name || myName }); } catch (e) { console.error('Task mail error:', e); }
               }
             }
             setTaskModal(false);
@@ -1196,9 +1200,16 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
       await updateAgenda(editAgenda.id, data);
-      // Gündem atama değişikliği bildirimi
+      // Gündem atama değişikliği bildirimi + mail
       if (data.assigned_to && data.assigned_to !== editAgenda.assigned_to && data.assigned_to !== myId) {
         try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: editAgenda.id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
+        // Otomatik mail — gündem içindeki görevlerle birlikte
+        try {
+          const agendaTasks = (editAgenda.agenda_tasks || []).map(t => ({
+            title: t.title, assignedToName: t.assigned_to_name || '', priority: t.priority || '', dueDate: t.due_date || '', status: t.status || '',
+          }));
+          await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: data.description || '', taskPriority: null, taskDueDate: data.date || null, taskUnit: data.unit || myUnit || '', createdByName: myName, isAgenda: true, tasks: agendaTasks });
+        } catch (e) { console.error('Agenda mail error:', e); }
       }
     } else {
       // Yeni gündemde unit otomatik atanır; Gündemlerim tabında is_personal=true
@@ -1209,9 +1220,13 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         unit: isMineTab ? null : (myUnit || data.unit || null),
         is_personal: isMineTab,
       });
-      // Yeni gündem atama bildirimi
+      // Yeni gündem atama bildirimi + mail
       if (data.assigned_to && data.assigned_to !== myId && result?.data?.[0]?.id) {
         try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: result.data[0].id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
+        // Otomatik mail
+        try {
+          await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: data.description || '', taskPriority: null, taskDueDate: data.date || null, taskUnit: isMineTab ? '' : (myUnit || data.unit || ''), createdByName: myName, isAgenda: true, tasks: [] });
+        } catch (e) { console.error('Agenda mail error:', e); }
       }
     }
     setAgendaModal(false);
