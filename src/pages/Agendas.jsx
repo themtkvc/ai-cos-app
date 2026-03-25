@@ -968,8 +968,7 @@ export default function Agendas({ user, profile }) {
   const [filterUnit, setFilterUnit] = useState('all');
   const [searchQ, setSearchQ] = useState('');
   // Sekmeler: unit | mine | assigned_to_me | assigned_by_me | assigned_tasks | my_tasks
-  const isPersonelRole = (profile?.role || 'personel') === 'personel';
-  const [personalTab, setPersonalTab] = useState(isPersonelRole ? 'assigned_to_me' : 'unit');
+  const [personalTab, setPersonalTab] = useState('unit');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'gallery' | 'table'
 
   const myId   = user?.id;
@@ -1384,6 +1383,7 @@ export default function Agendas({ user, profile }) {
           {[
             // Personel için özel sekmeler
             ...(isPersonel ? [
+              { id: 'unit',            icon: '🏗', label: 'Birim Gündemleri' },
               { id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan Gündemler' },
               { id: 'assigned_tasks',  icon: '📌', label: 'Bana Atanan Görevler' },
               { id: 'my_tasks',        icon: '✅', label: 'Görevlerim' },
