@@ -341,13 +341,16 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
     commentTargets.forEach(uid => {
       createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
     });
-    // @mention bildirimleri — etiketlenen kişilere her zaman gönder (kendisi hariç)
-    const mentionedIds = extractMentions(text.trim(), allProfiles);
-    mentionedIds.forEach(uid => {
-      if (uid !== myId) {
-        createNotification({ userId: uid, type: 'mention', title: `${myProfile?.full_name || 'Birisi'} sizi bir yorumda etiketledi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+    // @mention bildirimleri — etiketlenen herkese bağımsız bildirim gönder
+    try {
+      const mentionedIds = extractMentions(text.trim(), allProfiles || profiles || []);
+      console.log('[Mention] text:', text.trim(), 'mentionedIds:', mentionedIds);
+      for (const uid of mentionedIds) {
+        if (uid !== myId) {
+          await createNotification({ userId: uid, type: 'mention', title: `${myProfile?.full_name || 'Birisi'} sizi bir yorumda etiketledi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+        }
       }
-    });
+    } catch (e) { console.error('[Mention] notification error:', e); }
     if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
     else setCommentText('');
     setSaving(false);
