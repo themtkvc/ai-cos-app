@@ -17,6 +17,7 @@ import {
   deleteAgendaComment,
   getAllProfiles,
   notifyTaskAssigned,
+  createNotification,
 } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
@@ -158,7 +159,7 @@ function RevisionModal({ task, onConfirm, onClose }) {
 }
 
 // ── GÖREV KARTI ───────────────────────────────────────────────────────────────
-function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNotify }) {
+function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreatedBy, onNotify, agendaId, agendaTitle }) {
   const [revModal, setRevModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
@@ -173,9 +174,12 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNo
 
   const assigneeProfile = profiles.find(p => p.user_id === task.assigned_to);
 
-  const act = async (fn) => {
+  const act = async (fn, notifOpts) => {
     setSaving(true);
     await fn();
+    if (notifOpts) {
+      try { await createNotification(notifOpts); } catch (e) { console.error('Notification error:', e); }
+    }
     await onRefresh();
     setSaving(false);
   };
@@ -228,14 +232,23 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNo
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {canMarkDone && (
           <button className="btn btn-sm btn-primary" disabled={saving}
-            onClick={() => act(() => markAgendaTaskDone(task.id))}>
+            onClick={() => {
+              const notifyTo = task.created_by && task.created_by !== myId ? task.created_by : (agendaCreatedBy && agendaCreatedBy !== myId ? agendaCreatedBy : null);
+              act(
+                () => markAgendaTaskDone(task.id),
+                notifyTo ? { userId: notifyTo, type: 'task_status', title: `"${task.title}" görevi tamamlandı`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' } : null
+              );
+            }}>
             ✅ Tamamlandı İşaretle
           </button>
         )}
         {canApprove && (
           <>
             <button className="btn btn-sm btn-primary" disabled={saving}
-              onClick={() => act(() => approveAgendaTask(task.id))}>
+              onClick={() => act(
+                () => approveAgendaTask(task.id),
+                task.assigned_to && task.assigned_to !== myId ? { userId: task.assigned_to, type: 'task_status', title: `"${task.title}" görevi onaylandı`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' } : null
+              )}>
               👍 Onayla
             </button>
             <button className="btn btn-sm btn-danger" disabled={saving}
@@ -260,6 +273,9 @@ function TaskCard({ task, myId, role, profiles, onRefresh, agendaCreatedBy, onNo
           task={task}
           onConfirm={async (note) => {
             await requestAgendaTaskRevision(task.id, note);
+            if (task.assigned_to && task.assigned_to !== myId) {
+              try { await createNotification({ userId: task.assigned_to, type: 'task_status', title: `"${task.title}" görevi için revize istendi`, body: note ? note.substring(0, 100) : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
+            }
             await onRefresh();
             setRevModal(false);
           }}
@@ -303,6 +319,18 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
       created_by: myId,
       created_by_name: myProfile?.full_name || 'Bilinmiyor',
       avatar_url: myProfile?.avatar_url || null,
+    });
+    // Yorum bildirimi: gündem sahibine ve atanmış kişiye
+    const commentTargets = new Set();
+    if (agenda.created_by && agenda.created_by !== myId) commentTargets.add(agenda.created_by);
+    if (agenda.assigned_to && agenda.assigned_to !== myId) commentTargets.add(agenda.assigned_to);
+    if (taskId) {
+      const task = (detail?.tasks || []).find(t => t.id === taskId);
+      if (task?.assigned_to && task.assigned_to !== myId) commentTargets.add(task.assigned_to);
+      if (task?.created_by && task.created_by !== myId) commentTargets.add(task.created_by);
+    }
+    commentTargets.forEach(uid => {
+      createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
     });
     if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
     else setCommentText('');
@@ -416,11 +444,14 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
                         <TaskCard
                           task={task}
                           myId={myId}
+                          myName={myProfile?.full_name || ''}
                           role={role}
                           profiles={profiles}
                           onRefresh={loadDetail}
                           agendaCreatedBy={agenda.created_by}
                           onNotify={handleNotifyTask}
+                          agendaId={agenda.id}
+                          agendaTitle={agenda.title}
                         />
                         {canAssign && (
                           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
@@ -496,8 +527,16 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           onSave={async (data) => {
             if (editTask) {
               await updateAgendaTask(editTask.id, data);
+              // Görev atanan kişi değiştiyse bildirim gönder
+              if (data.assigned_to && data.assigned_to !== myId && data.assigned_to !== editTask.assigned_to) {
+                createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+              }
             } else {
               await createAgendaTask({ ...data, agenda_id: agenda.id, created_by: myId, created_by_name: myProfile?.full_name || '' });
+              // Yeni görev atandıysa bildirim gönder
+              if (data.assigned_to && data.assigned_to !== myId) {
+                createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+              }
             }
             setTaskModal(false);
             setEditTask(null);
@@ -1105,15 +1144,23 @@ export default function Agendas({ user, profile }) {
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
       await updateAgenda(editAgenda.id, data);
+      // Gündem atama değişikliği bildirimi
+      if (data.assigned_to && data.assigned_to !== editAgenda.assigned_to && data.assigned_to !== myId) {
+        try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: editAgenda.id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
+      }
     } else {
       // Yeni gündemde unit otomatik atanır; Gündemlerim tabında is_personal=true
-      await createAgenda({
+      const result = await createAgenda({
         ...data,
         created_by: myId,
         created_by_name: myName,
         unit: isMineTab ? null : (myUnit || data.unit || null),
         is_personal: isMineTab,
       });
+      // Yeni gündem atama bildirimi
+      if (data.assigned_to && data.assigned_to !== myId && result?.data?.[0]?.id) {
+        try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: result.data[0].id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
+      }
     }
     setAgendaModal(false);
     setEditAgenda(null);
@@ -1628,7 +1675,13 @@ export default function Agendas({ user, profile }) {
                       {/* Tamamla butonu — sadece devam eden görevler */}
                       {task.status !== 'tamamlandi' && task.completion_status !== 'pending_review' && task.completion_status !== 'approved' && (
                         <button className="btn btn-sm btn-primary" style={{ fontSize: 11, padding: '4px 10px' }}
-                          onClick={async (e) => { e.stopPropagation(); await markAgendaTaskDone(task.id, myId, myName); loadAll(); }}>
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await markAgendaTaskDone(task.id, myId, myName);
+                            const notifyTo = task.created_by && task.created_by !== myId ? task.created_by : (agenda.created_by && agenda.created_by !== myId ? agenda.created_by : null);
+                            if (notifyTo) { try { await createNotification({ userId: notifyTo, type: 'task_status', title: `"${task.title}" görevi tamamlandı`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); } }
+                            loadAll();
+                          }}>
                           ✓ Tamamla
                         </button>
                       )}

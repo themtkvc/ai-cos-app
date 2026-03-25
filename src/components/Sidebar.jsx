@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMeetingActions, signOut } from '../lib/supabase';
+import { getMeetingActions, getUnreadNotificationCount, signOut } from '../lib/supabase';
 import { ROLE_ACCESS } from '../App';
 import { ROLE_LABELS } from '../lib/constants';
 
@@ -19,6 +19,7 @@ const ALL_NAV = [
   { id: 'networkanalytics', icon: '🔬', label: 'Network Analiz' },
   { id: 'notes',            icon: '📝', label: 'Notlarım' },
   { id: 'documents',        icon: '📄', label: 'Dokümanlar' },
+  { id: 'notifications',   icon: '🔔', label: 'Bildirimler' },
 ];
 
 const ADMIN_NAV = [
@@ -56,6 +57,7 @@ function SidebarAvatar({ profile, size = 34 }) {
 
 export default function Sidebar({ activePage, onNavigate, user, profile, mobileOpen, onMobileClose }) {
   const [openActionsCount, setOpenActionsCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const role = profile?.role || 'personel';
   const allowed = ROLE_ACCESS[role] || ROLE_ACCESS['personel'];
@@ -68,9 +70,22 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
         setOpenActionsCount(data.filter(a => a.status !== '✅ Completed').length);
       });
     }
+    // Bildirim sayısı
+    getUnreadNotificationCount(user.id).then(({ count }) => {
+      setUnreadNotifCount(count || 0);
+    });
+    // Realtime bildirim sayısı güncelleme
+    const { supabase } = require('../lib/supabase');
+    const channel = supabase
+      .channel('sidebar-notif-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
+        getUnreadNotificationCount(user.id).then(({ count }) => setUnreadNotifCount(count || 0));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user, role]);
 
-  const badges = { meetings: openActionsCount || null };
+  const badges = { meetings: openActionsCount || null, notifications: unreadNotifCount || null };
   const displayName = profile?.full_name || user?.email?.split('@')[0] || '';
   const roleLabel = ROLE_LABELS[role] || role;
 
