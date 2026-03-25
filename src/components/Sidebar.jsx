@@ -5,6 +5,7 @@ import { ROLE_LABELS } from '../lib/constants';
 
 const ALL_NAV = [
   { id: 'dashboard', icon: '⚡', label: 'Dashboard' },
+  { id: 'notifications',   icon: '🔔', label: 'Bildirimler' },
   { id: 'chat',      icon: '🤖', label: 'AI Asistan' },
   { id: 'agendas',   icon: '📋', label: 'Gündemler' },
   { id: 'donors',    icon: '🤝', label: 'Donör CRM' },
@@ -19,7 +20,6 @@ const ALL_NAV = [
   { id: 'networkanalytics', icon: '🔬', label: 'Network Analiz' },
   { id: 'notes',            icon: '📝', label: 'Notlarım' },
   { id: 'documents',        icon: '📄', label: 'Dokümanlar' },
-  { id: 'notifications',   icon: '🔔', label: 'Bildirimler' },
 ];
 
 const ADMIN_NAV = [

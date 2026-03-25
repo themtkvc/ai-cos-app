@@ -523,7 +523,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           myUnit={myUnit}
           role={role}
           allProfiles={allProfiles}
-          allowSelfAssign={isMineTab || isMyTasksTab}
+          allowSelfAssign={isMineTab}
           onSave={async (data) => {
             if (editTask) {
               await updateAgendaTask(editTask.id, data);
@@ -948,6 +948,11 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
               👤 {agenda.assigned_to_name}
             </span>
           )}
+          {agenda.created_by_name && (
+            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontStyle: 'italic', opacity: 0.7 }}>
+              oluşturan: {agenda.created_by_name}
+            </span>
+          )}
         </div>
       </div>
 
@@ -1108,15 +1113,17 @@ export default function Agendas({ user, profile }) {
       } else {
         // "Birim/Departman" sekmesi: kişisel gündemler gizli
         if (a.is_personal) return false;
-        // Koordinatör için: direktörden atanan gündemler bu sekmede gizli (Bana Atanan'da görünür)
-        if (isKoordinator && a.assigned_to === myId && a.created_by !== myId) return false;
-        // Koordinatör için: başkasına (personele) atadığı gündemler bu sekmede gizli (Atadığım'da görünür)
-        if (isKoordinator && a.assigned_to && a.assigned_to !== myId && a.created_by === myId) return false;
-        // Direktör için: koordinatöre/asistana atanmış gündemler bu sekmede gizli
-        if (isDirektor && a.assigned_to && !a.is_personal) return false;
-        // Asistana atanan görevler birim sekmesinde hiç görünmez
-        const assignedProfile = allProfiles.find(p => p.user_id === a.assigned_to || p.id === a.assigned_to);
-        if (assignedProfile?.role === 'asistan' && a.assigned_to !== myId) return false;
+        // Personel ve Koordinatör: birim gündemlerinin hepsi görünsün (atanan/atadığı dahil)
+        if (isPersonel || isKoordinator) {
+          // Sadece kişisel gündemleri gizle (yukarıda zaten yapıldı)
+        } else if (isDirektor) {
+          // Direktör için: atanmış gündemler bu sekmede gizli (Atadığım'da görünür)
+          if (a.assigned_to && !a.is_personal) return false;
+        } else {
+          // Asistana atanan görevler birim sekmesinde hiç görünmez
+          const assignedProfile = allProfiles.find(p => p.user_id === a.assigned_to || p.id === a.assigned_to);
+          if (assignedProfile?.role === 'asistan' && a.assigned_to !== myId) return false;
+        }
       }
       if (filterType !== 'all' && a.type_id !== filterType) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
