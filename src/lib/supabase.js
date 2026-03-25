@@ -516,15 +516,53 @@ export const requestRevision = async (id, note, reviewerId) => {
   return { data, error };
 };
 
-// Açık görevleri getir: assigned_to = userId  VEYA  (created_by = userId ve assigned_to = null → "Kendime" görevler)
+// Açık görevleri getir: gündemler + görevler (agenda_tasks) birleşik
 export const getMyOpenTasks = async (userId) => {
-  const { data, error } = await supabase
+  // 1. Kullanıcıya atanan veya kendisinin oluşturduğu gündemler
+  const { data: agendas, error: agendaErr } = await supabase
     .from('agendas')
     .select('id, title, priority, due_date, unit')
     .or(`assigned_to.eq.${userId},and(created_by.eq.${userId},assigned_to.is.null)`)
     .neq('status', 'tamamlandi')
     .order('due_date', { ascending: true });
-  return { data, error };
+
+  // 2. Kullanıcıya atanan görevler (agenda_tasks tablosundan)
+  const { data: tasks, error: taskErr } = await supabase
+    .from('agenda_tasks')
+    .select('id, title, priority, due_date, status, completion_status, agenda_id')
+    .eq('assigned_to', userId)
+    .not('completion_status', 'eq', 'approved')
+    .order('due_date', { ascending: true });
+
+  // Görevlerin parent gündem başlıklarını çek
+  const taskAgendaIds = [...new Set((tasks || []).map(t => t.agenda_id).filter(Boolean))];
+  let agendaMap = {};
+  if (taskAgendaIds.length > 0) {
+    const { data: parentAgendas } = await supabase
+      .from('agendas')
+      .select('id, title, unit')
+      .in('id', taskAgendaIds);
+    (parentAgendas || []).forEach(a => { agendaMap[a.id] = a; });
+  }
+
+  // Gündemleri _type: 'agenda' ile işaretle
+  const agendaItems = (agendas || []).map(a => ({ ...a, _type: 'agenda' }));
+  // Görevleri _type: 'task' ile işaretle
+  const taskItems = (tasks || [])
+    .filter(t => t.status !== 'tamamlandi')
+    .map(t => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      due_date: t.due_date,
+      unit: agendaMap[t.agenda_id]?.unit || null,
+      _type: 'task',
+      _agendaTitle: agendaMap[t.agenda_id]?.title || '',
+    }));
+
+  // Birleştir: önce görevler, sonra gündemler
+  const combined = [...taskItems, ...agendaItems];
+  return { data: combined, error: agendaErr || taskErr };
 };
 
 // ── GÜNDEM TÜRLERİ ──────────────────────────────────────────────────────────

@@ -196,7 +196,12 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
     </div>
 
     {/* Göreve Bağla satırı */}
-    {(myTasks.length > 0 || item.agenda_item_id) && (
+    {(myTasks.length > 0 || item.agenda_item_id) && (() => {
+      const taskItems = myTasks.filter(t => t._type === 'task');
+      const agendaItems = myTasks.filter(t => t._type === 'agenda');
+      // Eski format desteği (type yok)
+      const legacyItems = myTasks.filter(t => !t._type);
+      return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, paddingLeft: 163 }}>
         <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>🔗 Göreve Bağla:</span>
         {disabled ? (
@@ -205,7 +210,8 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
               fontSize: 11.5, padding: '2px 8px', borderRadius: 6,
               background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontWeight: 600,
             }}>
-              📋 {linkedTask.title}
+              {linkedTask._type === 'task' ? '📌' : '📋'} {linkedTask.title}
+              {linkedTask._agendaTitle ? ` (${linkedTask._agendaTitle})` : ''}
             </span>
           ) : item.agenda_item_id ? (
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>Bağlı görev</span>
@@ -215,16 +221,33 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
             className="form-select"
             value={item.agenda_item_id || ''}
             onChange={e => onChange('agenda_item_id', e.target.value || null)}
-            style={{ fontSize: 11.5, padding: '4px 8px', maxWidth: 360 }}
+            style={{ fontSize: 11.5, padding: '4px 8px', maxWidth: 420 }}
           >
             <option value="">Göreve Bağlayın…</option>
-            {myTasks.map(t => (
+            {taskItems.length > 0 && (
+              <optgroup label="📌 Atanan Görevler">
+                {taskItems.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}{t._agendaTitle ? ` — ${t._agendaTitle}` : ''}{t.unit ? ` (${t.unit})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {agendaItems.length > 0 && (
+              <optgroup label="📋 Gündemler">
+                {agendaItems.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
+                ))}
+              </optgroup>
+            )}
+            {legacyItems.length > 0 && legacyItems.map(t => (
               <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
             ))}
           </select>
         )}
       </div>
-    )}
+      );
+    })()}
     </div>
   );
 }
