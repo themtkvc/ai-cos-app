@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks } from '../lib/supabase';
+import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks, awardXP, awardXPCustom, getXPSettings } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
@@ -380,6 +380,40 @@ export default function DailyLog({ user, profile, linkedTask }) {
       setAutoSaveState('idle');
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       loadWeekLogs();
+
+      // ── XP: sadece personel, sadece ilk gönderimde (editing=false)
+      if (profile?.role === 'personel' && !editing) {
+        try {
+          const xpS = await getXPSettings();
+          const totalHours = Math.floor(totalMin / 60);
+          const entryCount = items.filter(i => i.description?.trim()).length + overtime.filter(i => i.description?.trim()).length;
+
+          // 1) Her iş kaydı başına XP
+          if (entryCount > 0) {
+            const entryXP = (xpS.daily_log_entry || 10) * entryCount;
+            await awardXPCustom(user.id, 'daily_log_entry', entryXP, `${entryCount} iş kaydı eklendi (${selectedDate})`, selectedDate);
+          }
+
+          // 2) Her saat için XP (8 saate kadar)
+          const normalHours = Math.min(totalHours, 8);
+          if (normalHours > 0) {
+            const hourXP = (xpS.daily_log_hour || 5) * normalHours;
+            await awardXPCustom(user.id, 'daily_log_hour', hourXP, `${normalHours} saat mesai (${selectedDate})`, selectedDate);
+          }
+
+          // 3) 8 saat tam gün bonusu
+          if (totalHours >= 8) {
+            await awardXP(user.id, 'daily_log_fullday', `Tam gün çalışma (${selectedDate})`, selectedDate);
+          }
+
+          // 4) 8 saat sonrası fazla mesai — her saat x2
+          const overtimeHours = Math.max(0, totalHours - 8);
+          if (overtimeHours > 0) {
+            const otXP = (xpS.daily_log_overtime || 10) * overtimeHours; // zaten x2 değeri DB'de
+            await awardXPCustom(user.id, 'daily_log_overtime', otXP, `${overtimeHours} saat fazla mesai (${selectedDate})`, selectedDate);
+          }
+        } catch (e) { console.error('[XP] DailyLog error:', e); }
+      }
     }
   };
 

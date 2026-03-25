@@ -32,10 +32,10 @@ export const useProfile = () => useContext(ProfileContext);
 // Role-based page access
 export const ROLE_ACCESS = {
   direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','gamification','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','gamification','profile'],
-  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','gamification','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','gamification','profile'],
-  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','notes','gamification','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
+  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','profile'],
+  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
+  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','notes','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export

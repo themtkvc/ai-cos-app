@@ -1040,26 +1040,70 @@ export const markAllNotificationsRead = async (userId) => {
 
 // ── OYUNLAŞTIRMA (GAMIFICATION) ─────────────────────────────────────────────
 
-export const XP_VALUES = {
-  task_complete:    25,
-  agenda_create:    25,
-  on_time_bonus:    10,
-  comment:           5,
-  collaboration:     5,
-  network_contact:  15,
-  network_org:      15,
-  network_event:    15,
-  fund_opportunity: 50,
+// Fallback değerleri — DB'den okunamazsa bunlar kullanılır
+export const XP_VALUES_DEFAULT = {
+  task_complete:      25,
+  agenda_create:      25,
+  on_time_bonus:      10,
+  comment:             5,
+  collaboration:       5,
+  network_contact:    15,
+  network_org:        15,
+  network_event:      15,
+  fund_opportunity:   50,
+  daily_log_entry:    10,
+  daily_log_hour:      5,
+  daily_log_fullday:  20,
+  daily_log_overtime: 10,
+};
+
+// Cache: DB'den okunan XP settings
+let _xpSettingsCache = null;
+let _xpSettingsCacheTime = 0;
+const XP_CACHE_TTL = 60000; // 1 dk cache
+
+export const getXPSettings = async () => {
+  if (_xpSettingsCache && Date.now() - _xpSettingsCacheTime < XP_CACHE_TTL) return _xpSettingsCache;
+  const { data, error } = await supabase.from('xp_settings').select('*');
+  if (error || !data) return XP_VALUES_DEFAULT;
+  const map = {};
+  data.forEach(row => { map[row.action] = row.xp_amount; });
+  _xpSettingsCache = map;
+  _xpSettingsCacheTime = Date.now();
+  return map;
+};
+
+export const getXPSettingsFull = async () => {
+  const { data, error } = await supabase.from('xp_settings').select('*').order('category, action');
+  return { data, error };
+};
+
+export const updateXPSetting = async (action, xpAmount) => {
+  _xpSettingsCache = null; // cache invalidate
+  const { data, error } = await supabase.from('xp_settings').update({ xp_amount: xpAmount, updated_at: new Date().toISOString() }).eq('action', action).select();
+  return { data, error };
 };
 
 export const awardXP = async (userId, action, description, referenceId) => {
-  const xp = XP_VALUES[action];
+  const settings = await getXPSettings();
+  const xp = settings[action] ?? XP_VALUES_DEFAULT[action];
   if (!xp) { console.warn('[awardXP] Unknown action:', action); return { data: null, error: null }; }
   const { data, error } = await supabase.rpc('award_xp', {
     p_user_id: userId, p_action: action, p_xp_amount: xp,
     p_description: description || null, p_reference_id: referenceId || null,
   });
   if (error) console.error('[awardXP] ERROR:', error);
+  return { data, error };
+};
+
+// Özel miktarla XP ver (DailyLog fazla mesai gibi hesaplanmış değerler için)
+export const awardXPCustom = async (userId, action, xpAmount, description, referenceId) => {
+  if (!xpAmount || xpAmount <= 0) return { data: null, error: null };
+  const { data, error } = await supabase.rpc('award_xp', {
+    p_user_id: userId, p_action: action, p_xp_amount: xpAmount,
+    p_description: description || null, p_reference_id: referenceId || null,
+  });
+  if (error) console.error('[awardXPCustom] ERROR:', error);
   return { data, error };
 };
 
@@ -1075,6 +1119,11 @@ export const getUserXP = async (userId) => {
 
 export const getUserXPHistory = async (userId, limit = 30) => {
   const { data, error } = await supabase.from('xp_events').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(limit);
+  return { data, error };
+};
+
+export const getAllXPHistory = async (limit = 100) => {
+  const { data, error } = await supabase.from('xp_events').select('*').order('created_at', { ascending: false }).limit(limit);
   return { data, error };
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getLeaderboard, getUserXP, getUserXPHistory, getAllBadges, getUserBadges, getAllProfiles, XP_VALUES } from '../lib/supabase';
+import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting } from '../lib/supabase';
 
 // ── Seviye Hesaplama ──────────────────────────────────────────────────────────
 function calculateLevel(totalXp) {
@@ -32,6 +32,10 @@ const ACTION_META = {
   network_org:      { icon: '🏢', label: 'Kurum Ekleme' },
   network_event:    { icon: '📅', label: 'Etkinlik Ekleme' },
   fund_opportunity: { icon: '💰', label: 'Fon Fırsatı' },
+  daily_log_entry:  { icon: '📝', label: 'İş Kaydı Ekleme' },
+  daily_log_hour:   { icon: '⏱️', label: 'Saat Başı Mesai' },
+  daily_log_fullday:{ icon: '🌟', label: 'Tam Gün (8 saat)' },
+  daily_log_overtime:{ icon: '🔥', label: 'Fazla Mesai (saat başı x2)' },
 };
 
 function timeAgo(dateStr) {
@@ -163,41 +167,38 @@ function LeaderboardRow({ rank, profile, xpData, isMe }) {
 // ── ANA BİLEŞEN ─────────────────────────────────────────────────────────────
 export default function Gamification({ user, profile }) {
   const [leaderboard, setLeaderboard] = useState([]);
-  const [myXP, setMyXP] = useState(null);
   const [xpHistory, setXPHistory] = useState([]);
   const [allBadges, setAllBadges] = useState([]);
-  const [myBadges, setMyBadges] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [xpSettings, setXpSettings] = useState([]);
+  const [editingSettings, setEditingSettings] = useState({}); // action -> tempValue
+  const [savingAction, setSavingAction] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('leaderboard'); // 'leaderboard' | 'badges' | 'history'
+  const [tab, setTab] = useState('leaderboard'); // 'leaderboard' | 'badges' | 'history' | 'settings'
   const [lbScope, setLbScope] = useState('all'); // 'all' | 'unit'
 
   const myId = user?.id;
   const myUnit = profile?.unit;
+  const isDirektor = profile?.role === 'direktor';
   const isPersonel = profile?.role === 'personel';
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [lbRes, profilesRes, badgesRes] = await Promise.all([
+    const [lbRes, profilesRes, badgesRes, settingsRes] = await Promise.all([
       getLeaderboard(),
       getAllProfiles(),
       getAllBadges(),
+      getXPSettingsFull(),
     ]);
 
     setLeaderboard(lbRes.data || []);
     setProfiles(profilesRes.data || []);
     setAllBadges(badgesRes.data || []);
+    setXpSettings(settingsRes.data || []);
 
-    if (myId) {
-      const [xpRes, histRes, myBadgesRes] = await Promise.all([
-        getUserXP(myId),
-        getUserXPHistory(myId, 50),
-        getUserBadges(myId),
-      ]);
-      setMyXP(xpRes.data);
-      setXPHistory(histRes.data || []);
-      setMyBadges(myBadgesRes.data || []);
-    }
+    // Direktör: tüm XP geçmişini yükle
+    const histRes = await getAllXPHistory(200);
+    setXPHistory(histRes.data || []);
     setLoading(false);
   }, [myId]);
 
@@ -222,14 +223,7 @@ export default function Gamification({ user, profile }) {
     return items;
   }, [leaderboard, profileMap, lbScope, myUnit]);
 
-  // Benim kazandığım rozetlerin ID'leri
-  const earnedBadgeIds = useMemo(() => {
-    return new Set(myBadges.map(ub => ub.badge_id));
-  }, [myBadges]);
-
-  // Seviye bilgisi
-  const lvl = calculateLevel(myXP?.total_xp || 0);
-  const lc = levelColor(lvl.level);
+  // Rozet kataloğu — direktör tüm rozet koleksiyonunu görür
 
   if (loading) {
     return (
@@ -241,88 +235,50 @@ export default function Gamification({ user, profile }) {
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px' }}>
-      {/* Profil Kartı */}
-      {isPersonel && myXP && (
-        <div style={{
-          background: `linear-gradient(135deg, ${lc.color}12 0%, ${lc.color}06 100%)`,
-          border: `1.5px solid ${lc.color}25`,
-          borderRadius: 18, padding: '24px 28px', marginBottom: 24,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            {/* Avatar */}
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }}
-                onError={(e) => { e.target.style.display = 'none'; }} />
-            ) : (
-              <div style={{
-                width: 56, height: 56, borderRadius: '50%', background: lc.color, color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, fontWeight: 700,
-              }}>
-                {(profile?.full_name?.[0] || '?').toUpperCase()}
-              </div>
-            )}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)' }}>
-                {profile?.full_name || 'Kullanıcı'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                <span style={{
-                  padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                  color: lc.color, background: lc.bg, border: `1px solid ${lc.color}30`,
-                }}>
-                  Lv.{lvl.level} {lc.label}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                  {(myXP?.total_xp || 0).toLocaleString('tr-TR')} XP
-                </span>
-              </div>
+      {/* Özet Kartı — Direktör görünümü */}
+      <div style={{
+        background: 'linear-gradient(135deg, #6366f112 0%, #6366f106 100%)',
+        border: '1.5px solid #6366f125',
+        borderRadius: 18, padding: '24px 28px', marginBottom: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 38 }}>🏆</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)' }}>
+              Oyunlaştırma Paneli
             </div>
-            {/* Rozet sayısı */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: lc.color }}>{myBadges.length}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>ROZET</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+              Sistem arka planda çalışıyor — personeller bu sayfayı göremez
             </div>
-          </div>
-
-          {/* XP Bar */}
-          <div style={{ marginBottom: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Sonraki seviye</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: lc.color }}>
-                {lvl.xpInLevel} / {lvl.xpForNext} XP
-              </span>
-            </div>
-            <XPBar current={lvl.xpInLevel} max={lvl.xpForNext} color={lc.color} />
-          </div>
-
-          {/* Hızlı istatistikler */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Liderlik Sırası', value: (() => { const idx = filteredLB.findIndex(x => x.user_id === myId); return idx >= 0 ? `#${idx + 1}` : '—'; })() },
-              { label: 'Bu Hafta', value: `+${xpHistory.filter(e => new Date(e.created_at) > new Date(Date.now() - 7 * 86400000)).reduce((s, e) => s + (e.xp_amount || 0), 0)} XP` },
-              { label: 'Toplam Etkinlik', value: xpHistory.length },
-            ].map((s, i) => (
-              <div key={i} style={{
-                flex: '1 1 100px', padding: '8px 12px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.6)', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{s.label}</div>
-              </div>
-            ))}
           </div>
         </div>
-      )}
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Aktif Personel', value: filteredLB.length, icon: '👥' },
+            { label: 'Toplam XP Dağıtıldı', value: `${filteredLB.reduce((s, x) => s + (x.total_xp || 0), 0).toLocaleString('tr-TR')}`, icon: '⚡' },
+            { label: 'En Yüksek Seviye', value: filteredLB.length > 0 ? `Lv.${Math.max(...filteredLB.map(x => calculateLevel(x.total_xp || 0).level))}` : '—', icon: '🎯' },
+            { label: 'Tanımlı Rozet', value: allBadges.length, icon: '🎖️' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              flex: '1 1 120px', padding: '10px 14px', borderRadius: 12,
+              background: 'rgba(255,255,255,0.6)', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{s.icon}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{s.value}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Sekme Başlıkları */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
         {[
           { id: 'leaderboard', label: '🏆 Liderlik Tablosu' },
-          ...(isPersonel ? [
-            { id: 'badges', label: '🎖️ Rozetler' },
-            { id: 'history', label: '📊 XP Geçmişi' },
-          ] : []),
+          { id: 'badges', label: '🎖️ Rozetler' },
+          { id: 'history', label: '📊 XP Geçmişi' },
+          ...(isDirektor ? [{ id: 'settings', label: '⚙️ Puan Ayarları' }] : []),
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{
@@ -386,10 +342,10 @@ export default function Gamification({ user, profile }) {
       )}
 
       {/* ── ROZETLER ── */}
-      {tab === 'badges' && isPersonel && (
+      {tab === 'badges' && (
         <div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-            {myBadges.length} / {allBadges.length} rozet kazanıldı
+            Sistemde tanımlı {allBadges.length} rozet — otomatik olarak koşullar sağlandığında verilir
           </div>
 
           {/* Kategori grupları */}
@@ -411,7 +367,7 @@ export default function Gamification({ user, profile }) {
                   gap: 10,
                 }}>
                   {catBadges.map(b => (
-                    <BadgeCard key={b.id} badge={b} earned={earnedBadgeIds.has(b.id)} />
+                    <BadgeCard key={b.id} badge={b} earned={true} />
                   ))}
                 </div>
               </div>
@@ -421,7 +377,7 @@ export default function Gamification({ user, profile }) {
       )}
 
       {/* ── XP GEÇMİŞİ ── */}
-      {tab === 'history' && isPersonel && (
+      {tab === 'history' && (
         <div>
           {xpHistory.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
@@ -482,7 +438,8 @@ export default function Gamification({ user, profile }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {event.description || meta.label}
+                        <span style={{ color: '#6366f1', fontWeight: 700 }}>{profileMap[event.user_id]?.full_name || '?'}</span>
+                        {' — '}{event.description || meta.label}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         {meta.label} · {timeAgo(event.created_at)}
@@ -502,30 +459,113 @@ export default function Gamification({ user, profile }) {
         </div>
       )}
 
-      {/* XP Bilgi Tablosu (tüm roller görebilir) */}
-      {tab === 'leaderboard' && (
-        <div style={{
-          marginTop: 28, padding: '18px 20px', borderRadius: 14,
-          background: 'var(--bg-card, #fff)',
-          border: '1px solid var(--border, #e5e7eb)',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
-            ℹ️ XP Kazanım Tablosu
+      {/* ── PUAN AYARLARI ── */}
+      {tab === 'settings' && isDirektor && (
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Her bir işlem için verilecek XP puanını buradan düzenleyebilirsiniz. Değişiklikler hemen yürürlüğe girer.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-            {Object.entries(XP_VALUES).map(([action, xp]) => {
-              const meta = ACTION_META[action] || { icon: '🔵', label: action };
-              return (
-                <div key={action} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                  borderRadius: 8, background: 'var(--bg, #f9fafb)',
+
+          {/* Kategorilere göre grupla */}
+          {['task', 'social', 'network', 'dailylog', 'general'].map(cat => {
+            const catSettings = xpSettings.filter(s => s.category === cat);
+            if (catSettings.length === 0) return null;
+            const catLabel = cat === 'task' ? '📋 Görev & Gündem'
+              : cat === 'social' ? '💬 Sosyal & İşbirliği'
+              : cat === 'network' ? '🕸️ Network'
+              : cat === 'dailylog' ? '📝 İş Kaydı'
+              : '📌 Genel';
+            return (
+              <div key={cat} style={{ marginBottom: 24 }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: 'var(--text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10,
                 }}>
-                  <span style={{ fontSize: 16 }}>{meta.icon}</span>
-                  <span style={{ fontSize: 12, flex: 1 }}>{meta.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#6366f1' }}>+{xp}</span>
+                  {catLabel}
                 </div>
-              );
-            })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {catSettings.map(setting => {
+                    const meta = ACTION_META[setting.action] || { icon: setting.icon || '🔵', label: setting.label || setting.action };
+                    const isEditing = editingSettings[setting.action] !== undefined;
+                    const tempVal = editingSettings[setting.action];
+                    const isSaving = savingAction === setting.action;
+
+                    return (
+                      <div key={setting.action} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                        borderRadius: 12, background: 'var(--bg-card, #fff)',
+                        border: `1.5px solid ${isEditing ? '#6366f130' : 'var(--border, #e5e7eb)'}`,
+                      }}>
+                        <div style={{ fontSize: 22, flexShrink: 0 }}>{setting.icon || meta.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{setting.label || meta.label}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{setting.action}</div>
+                        </div>
+
+                        {isEditing ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input
+                              type="number" min="0" max="999"
+                              value={tempVal}
+                              onChange={(e) => setEditingSettings(prev => ({ ...prev, [setting.action]: parseInt(e.target.value) || 0 }))}
+                              style={{
+                                width: 70, padding: '5px 8px', borderRadius: 8, fontSize: 14, fontWeight: 800,
+                                border: '1.5px solid #6366f1', textAlign: 'center', outline: 'none',
+                                color: '#6366f1', background: '#eef2ff',
+                              }}
+                              autoFocus
+                            />
+                            <button disabled={isSaving} onClick={async () => {
+                              setSavingAction(setting.action);
+                              await updateXPSetting(setting.action, tempVal);
+                              setXpSettings(prev => prev.map(s => s.action === setting.action ? { ...s, xp_amount: tempVal } : s));
+                              setEditingSettings(prev => { const n = { ...prev }; delete n[setting.action]; return n; });
+                              setSavingAction(null);
+                            }} style={{
+                              padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                              background: '#22c55e', color: '#fff', border: 'none', cursor: 'pointer',
+                            }}>
+                              {isSaving ? '...' : '✓'}
+                            </button>
+                            <button onClick={() => setEditingSettings(prev => { const n = { ...prev }; delete n[setting.action]; return n; })}
+                              style={{
+                                padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                background: '#f3f4f6', color: '#6b7280', border: 'none', cursor: 'pointer',
+                              }}>
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              padding: '4px 14px', borderRadius: 16, fontSize: 14, fontWeight: 800,
+                              color: '#6366f1', background: '#eef2ff',
+                            }}>
+                              +{setting.xp_amount} XP
+                            </span>
+                            <button onClick={() => setEditingSettings(prev => ({ ...prev, [setting.action]: setting.xp_amount }))}
+                              style={{
+                                padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                                background: 'var(--bg, #f9fafb)', color: 'var(--text-muted)',
+                                border: '1px solid var(--border, #e5e7eb)', cursor: 'pointer',
+                              }}>
+                              Düzenle
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div style={{
+            padding: '12px 16px', borderRadius: 10, fontSize: 12,
+            background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', marginTop: 8,
+          }}>
+            💡 Not: Fazla mesai (daily_log_overtime) değeri, 8 saat sonrası her bir saat için x2 olarak uygulanır.
           </div>
         </div>
       )}
