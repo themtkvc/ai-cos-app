@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getOrgChart, saveOrgChart, getAllProfiles } from '../lib/supabase';
+import { getOrgChart, saveOrgChart, getAllProfiles, updateUserProfile } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 const UNIT_COLORS = [
@@ -281,9 +281,39 @@ export default function OrgChartAdmin({ notify }) {
   const handleSave = async () => {
     setSaving(true);
     const { error } = await saveOrgChart(chart);
+    if (error) { setSaving(false); notify('Hata: ' + error.message, 'error'); return; }
+
+    // Org şeması kaydedildiğinde kullanıcıların unit alanını senkronize et
+    const units = chart?.units || [];
+    const syncPromises = [];
+    for (const unit of units) {
+      const unitName = unit.name;
+      const memberIds = unit.member_ids || [];
+      for (const uid of memberIds) {
+        const prof = profiles.find(p => p.user_id === uid);
+        if (prof && prof.unit !== unitName) {
+          syncPromises.push(updateUserProfile(uid, { unit: unitName }));
+        }
+      }
+    }
+    // Birimden çıkarılmış kullanıcıların unit'ini temizle
+    const allAssignedIds = new Set(units.flatMap(u => u.member_ids || []));
+    for (const prof of profiles) {
+      if (prof.unit && !allAssignedIds.has(prof.user_id) && ['koordinator', 'personel'].includes(prof.role)) {
+        // Bu kullanıcı artık hiçbir birimde değil
+        const stillInUnit = units.some(u => (u.member_ids || []).includes(prof.user_id));
+        if (!stillInUnit) {
+          syncPromises.push(updateUserProfile(prof.user_id, { unit: null }));
+        }
+      }
+    }
+    if (syncPromises.length > 0) await Promise.all(syncPromises);
+
     setSaving(false);
-    if (error) notify('Hata: ' + error.message, 'error');
-    else { notify('✅ Organizasyon şeması kaydedildi.'); setDirty(false); }
+    notify('✅ Organizasyon şeması kaydedildi.');
+    setDirty(false);
+    // Profilleri yeniden yükle
+    getAllProfiles().then(({ data }) => setProfiles(data || []));
   };
 
   const addUnit = () => update({ ...chart, units: [...(chart.units || []), emptyUnit()] });
