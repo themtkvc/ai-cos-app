@@ -933,6 +933,7 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
       style={{
         cursor: 'pointer',
         borderTop: `3px solid ${typeColor}`,
+        background: `linear-gradient(135deg, ${typeColor}08 0%, ${typeColor}04 100%)`,
         transition: 'transform 0.15s, box-shadow 0.15s',
         display: 'flex',
         flexDirection: 'column',
@@ -1342,7 +1343,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
         return (
           <div key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
-            className="card" style={{ cursor:'pointer', overflow:'hidden', padding:0, display:'flex', flexDirection:'row', transition:'transform 0.15s, box-shadow 0.15s' }}
+            className="card" style={{ cursor:'pointer', overflow:'hidden', padding:0, display:'flex', flexDirection:'row', transition:'transform 0.15s, box-shadow 0.15s', background:`linear-gradient(135deg, ${typeColor}08 0%, ${typeColor}04 100%)` }}
             onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)';}}
             onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='';}}
           >
@@ -1400,8 +1401,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               borderBottom: i<items.length-1 ? '1px solid var(--border)' : 'none',
               borderLeft:`3px solid ${typeColor}`, transition:'background 0.1s',
             }}
-            onMouseEnter={e=>e.currentTarget.style.background='var(--bg)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+            onMouseEnter={e=>e.currentTarget.style.background=typeColor+'0c'}
+            onMouseLeave={e=>e.currentTarget.style.background=typeColor+'05'}
           >
             <span style={{ fontSize:20, flexShrink:0 }}>{typeIcon}</span>
             <div style={{ flex:1, minWidth:0 }}>
