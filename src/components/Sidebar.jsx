@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMeetingActions, getUnreadNotificationCount, signOut } from '../lib/supabase';
+import { supabase, getMeetingActions, getUnreadNotificationCount, signOut } from '../lib/supabase';
 import { ROLE_ACCESS } from '../App';
 import { ROLE_LABELS } from '../lib/constants';
 
@@ -75,7 +75,6 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
       setUnreadNotifCount(count || 0);
     });
     // Realtime bildirim sayısı güncelleme
-    const { supabase } = require('../lib/supabase');
     const channel = supabase
       .channel('sidebar-notif-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/supabase';
+import { supabase, getNotifications, markNotificationRead, markAllNotificationsRead } from '../lib/supabase';
 
 // ── Bildirim tipleri ─────────────────────────────────────────────────────────
 const TYPE_META = {
@@ -116,7 +116,6 @@ export default function Notifications({ user }) {
   // Realtime subscription
   useEffect(() => {
     if (!user?.id) return;
-    const { supabase } = require('../lib/supabase');
     const channel = supabase
       .channel('notifications-realtime')
       .on('postgres_changes', {
@@ -129,7 +128,7 @@ export default function Notifications({ user }) {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => supabase.removeChannel(channel);
   }, [user?.id]);
 
   const handleRead = async (id) => {
