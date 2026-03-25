@@ -967,8 +967,9 @@ export default function Agendas({ user, profile }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
   const [searchQ, setSearchQ] = useState('');
-  // Direktör/Yardımcısı/Koordinatör için iki tab: 'unit' | 'mine'
-  const [personalTab, setPersonalTab] = useState('unit');
+  // Sekmeler: unit | mine | assigned_to_me | assigned_by_me | assigned_tasks | my_tasks
+  const isPersonelRole = (profile?.role || 'personel') === 'personel';
+  const [personalTab, setPersonalTab] = useState(isPersonelRole ? 'assigned_to_me' : 'unit');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'gallery' | 'table'
 
   const myId   = user?.id;
@@ -980,12 +981,15 @@ export default function Agendas({ user, profile }) {
   const isAsistan      = role === 'asistan';
   const isDirYardimcisi = role === 'direktor_yardimcisi'; // Grants birimi sorumlusu
   const isKoordinator  = role === 'koordinator' || isDirYardimcisi; // dir.yard. koordinatör gibi davranır
-  const hasPersonalTab = isDirektor || isKoordinator || isAsistan;
+  const isPersonel     = role === 'personel';
+  const hasPersonalTab = isDirektor || isKoordinator || isAsistan || isPersonel;
   const canSeeAllUnits = ['direktor', 'asistan'].includes(role);
   const canCreate      = CREATOR_ROLES.includes(role);
   const isMineTab          = hasPersonalTab && personalTab === 'mine';
-  const isAssignedToMeTab  = (isKoordinator || isAsistan) && personalTab === 'assigned_to_me';
+  const isAssignedToMeTab  = (isKoordinator || isAsistan || isPersonel) && personalTab === 'assigned_to_me';
   const isAssignedByMeTab  = (isDirektor || isKoordinator) && personalTab === 'assigned_by_me';
+  const isAssignedTasksTab = isPersonel && personalTab === 'assigned_tasks';
+  const isMyTasksTab       = isPersonel && personalTab === 'my_tasks';
 
   // Tab başlığı role göre
   const unitTabLabel = (isDirektor || isAsistan) ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -1021,11 +1025,21 @@ export default function Agendas({ user, profile }) {
         // "Atadığım Gündemler" sekmesi (direktör/koordinatör): başkasına atanmış gündemler
         if (!(a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal)) return false;
       } else if (isAssignedToMeTab) {
-        // "Bana Atanan" sekmesi (koordinatör/asistan): başkası tarafından atanmış gündemler
+        // "Bana Atanan Gündemler" sekmesi: başkası tarafından atanmış gündemler
         if (!(a.assigned_to === myId && a.created_by !== myId)) return false;
+      } else if (isAssignedTasksTab) {
+        // "Bana Atanan Görevler" sekmesi (personel): içinde bana atanmış görev olan gündemleri göster
+        const tasks = a.agenda_tasks || [];
+        const hasMyTask = tasks.some(t => t.assigned_to === myId && t.created_by !== myId);
+        if (!hasMyTask) return false;
+      } else if (isMyTasksTab) {
+        // "Görevlerim" sekmesi (personel): kendi oluşturduğu görevler (kendi kendine atamış)
+        const tasks = a.agenda_tasks || [];
+        const hasMyOwnTask = tasks.some(t => t.assigned_to === myId && t.created_by === myId);
+        if (!hasMyOwnTask) return false;
       } else if (isMineTab) {
-        // "Gündemlerim" sekmesi: sadece kişisel gündemler
-        if (!a.is_personal) return false;
+        // "Gündemlerim" sekmesi: sadece kişisel gündemler (kendi oluşturduğu)
+        if (!(a.is_personal && a.created_by === myId)) return false;
       } else {
         // "Birim/Departman" sekmesi: kişisel gündemler gizli
         if (a.is_personal) return false;
@@ -1048,7 +1062,7 @@ export default function Agendas({ user, profile }) {
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, myId, isKoordinator, isDirektor, allProfiles]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, isAssignedTasksTab, isMyTasksTab, myId, isKoordinator, isDirektor, allProfiles]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
@@ -1341,11 +1355,15 @@ export default function Agendas({ user, profile }) {
               ? `${filteredAgendas.length} gündem · atadığım`
               : isAssignedToMeTab
                 ? `${filteredAgendas.length} gündem · bana atanan`
-                : isMineTab
-                  ? `${filteredAgendas.length} gündem · kişisel`
-                  : canSeeAllUnits
-                    ? `${agendas.filter(a => !a.is_personal && !a.assigned_to).length} gündem · tüm birimler`
-                    : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
+                : isAssignedTasksTab
+                  ? `${filteredAgendas.length} gündem · bana atanan görevler`
+                  : isMyTasksTab
+                    ? `${filteredAgendas.length} gündem · görevlerim`
+                    : isMineTab
+                      ? `${filteredAgendas.length} gündem · kişisel`
+                      : canSeeAllUnits
+                        ? `${agendas.filter(a => !a.is_personal && !a.assigned_to).length} gündem · tüm birimler`
+                        : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
             {pendingApprovalCount > 0 && (
               <span style={{ marginLeft: 8, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
                 ⏳ {pendingApprovalCount} onay bekliyor
@@ -1353,7 +1371,7 @@ export default function Agendas({ user, profile }) {
             )}
           </p>
         </div>
-        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && (
+        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1362,20 +1380,34 @@ export default function Agendas({ user, profile }) {
 
       {/* ── Direktör / Koordinatör ana tab ── */}
       {hasPersonalTab && (
-        <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, margin: '16px 0 20px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, width: 'fit-content', flexWrap: 'wrap' }}>
           {[
-            { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
-            ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
-            ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
-            { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
+            // Personel için özel sekmeler
+            ...(isPersonel ? [
+              { id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan Gündemler' },
+              { id: 'assigned_tasks',  icon: '📌', label: 'Bana Atanan Görevler' },
+              { id: 'my_tasks',        icon: '✅', label: 'Görevlerim' },
+              { id: 'mine',            icon: '📋', label: 'Gündemlerim' },
+            ] : [
+              // Diğer roller için mevcut sekmeler
+              { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
+              ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
+              ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
+              { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
+            ]),
           ].map(tab => {
             const isActive = personalTab === tab.id;
-            // Badge: "Bana Atanan" veya "Atadığım" sekmelerinde bekleyen gündem sayısı
-            const assignedCount = tab.id === 'assigned_to_me'
-              ? agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length
-              : tab.id === 'assigned_by_me'
-                ? agendas.filter(a => a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal).length
-                : 0;
+            // Badge sayıları
+            let assignedCount = 0;
+            if (tab.id === 'assigned_to_me') {
+              assignedCount = agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length;
+            } else if (tab.id === 'assigned_by_me') {
+              assignedCount = agendas.filter(a => a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal).length;
+            } else if (tab.id === 'assigned_tasks') {
+              assignedCount = agendas.reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by !== myId).length, 0);
+            } else if (tab.id === 'my_tasks') {
+              assignedCount = agendas.reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by === myId).length, 0);
+            }
             return (
               <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
                 style={{
@@ -1506,13 +1538,79 @@ export default function Agendas({ user, profile }) {
         </div>
       ) : filteredAgendas.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>{isAssignedTasksTab || isMyTasksTab ? '📌' : '📋'}</div>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-            {agendas.length === 0 ? 'Henüz gündem yok' : 'Filtre ile eşleşen gündem yok'}
+            {isAssignedTasksTab ? 'Bana atanan görev yok'
+              : isMyTasksTab ? 'Henüz görev oluşturmadınız'
+              : isAssignedToMeTab ? 'Bana atanan gündem yok'
+              : isMineTab ? 'Henüz kişisel gündem yok'
+              : agendas.length === 0 ? 'Henüz gündem yok' : 'Filtre ile eşleşen gündem yok'}
           </div>
           <div style={{ fontSize: 13.5 }}>
-            {canCreate ? '+ Yeni Gündem düğmesiyle ekleyebilirsiniz.' : 'Henüz atanmış bir gündem bulunmuyor.'}
+            {isMineTab && canCreate ? '+ Yeni Gündem düğmesiyle ekleyebilirsiniz.'
+              : isAssignedTasksTab ? 'Size görev atandığında burada görünecek.'
+              : isMyTasksTab ? 'Gündem detayından kendinize görev ekleyebilirsiniz.'
+              : canCreate ? '+ Yeni Gündem düğmesiyle ekleyebilirsiniz.'
+              : 'Henüz atanmış bir gündem bulunmuyor.'}
           </div>
+        </div>
+      ) : (isAssignedTasksTab || isMyTasksTab) ? (
+        /* Personel: görev bazlı görünüm — ilgili görevleri gündem başlıkları altında listele */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {filteredAgendas.map(agenda => {
+            const tasks = (agenda.agenda_tasks || []).filter(t =>
+              isAssignedTasksTab
+                ? (t.assigned_to === myId && t.created_by !== myId)
+                : (t.assigned_to === myId && t.created_by === myId)
+            );
+            const type = agenda.agenda_types;
+            const typeColor = type?.color || '#6366f1';
+            return (
+              <div key={agenda.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                {/* Gündem başlığı */}
+                <div onClick={() => { setDetailAgenda(agenda); setDetailIsMine(false); }}
+                  style={{
+                    padding: '12px 20px', background: typeColor + '08', borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                  <span style={{ fontSize: 18 }}>{type?.icon || '📋'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{agenda.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {type?.name || 'Gündem'} {agenda.unit ? `· 🏗 ${agenda.unit}` : ''}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11.5, color: typeColor, fontWeight: 600 }}>{tasks.length} görev</span>
+                </div>
+                {/* Görevler */}
+                {tasks.map((task, i) => {
+                  const prio = prioMeta(task.priority);
+                  return (
+                    <div key={task.id} style={{
+                      padding: '10px 20px 10px 36px', display: 'flex', alignItems: 'center', gap: 10,
+                      borderBottom: i < tasks.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}>
+                      <TaskStatusBadge status={task.status} completionStatus={task.completion_status} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                          <PriorityBadge value={task.priority} />
+                          {task.due_date && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>📅 {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>}
+                        </div>
+                      </div>
+                      {/* Tamamla butonu — sadece devam eden görevler */}
+                      {task.status !== 'tamamlandi' && task.completion_status !== 'pending_review' && task.completion_status !== 'approved' && (
+                        <button className="btn btn-sm btn-primary" style={{ fontSize: 11, padding: '4px 10px' }}
+                          onClick={async (e) => { e.stopPropagation(); await markAgendaTaskDone(task.id, myId, myName); loadAll(); }}>
+                          ✓ Tamamla
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       ) : isAssignedByMeTab ? (
         /* Direktör/Koordinatör: atanan kişiye göre gruplu "Atadığım Gündemler" görünümü */
