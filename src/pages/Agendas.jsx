@@ -38,7 +38,7 @@ const AGENDA_STATUSES = [
 const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[2];
 
 const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
-const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'];
+const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
 
 // ── YARDIMCI BİLEŞENLER ───────────────────────────────────────────────────────
 
@@ -535,6 +535,10 @@ function TaskModal({ task, agendaId, myId, myName, myUnit, role, allProfiles = [
     if (!allProfiles || !allProfiles.length) return [];
     const withUnit = allProfiles.filter(p => p.unit || TOP_ROLES.includes(p.role) || p.role === 'asistan');
     if (role === 'koordinator' || role === 'direktor_yardimcisi') return withUnit.filter(p => p.role === 'personel' && p.unit === myUnit);
+    if (role === 'personel') {
+      // Personel sadece kendine görev atayabilir
+      return allProfiles.filter(p => p.user_id === myId);
+    }
     if (allowSelfAssign) {
       return allProfiles.filter(p => p.user_id === myId);
     }
