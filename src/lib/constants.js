@@ -21,7 +21,7 @@ export const UNIT_ICON_MAP  = Object.fromEntries(UNITS.map(u => [u.name, u.icon]
 export const ROLE_LABELS = {
   direktor:            'Direktör',
   direktor_yardimcisi: 'Direktör Yardımcısı (Hibeler)',
-  asistan:             'Asistan',
+  asistan:             'Yönetici Asistanı',
   koordinator:         'Koordinatör',
   personel:            'Personel',
 };

@@ -213,35 +213,77 @@ function UnitCard({ unit, color, profiles, search, onSelect }) {
   );
 }
 
-// ── Direktör/Genel Müdür kartı ────────────────────────────────────────────────
-function DirectorCard({ profile, label = 'Direktör' }) {
+// ── Direktör/Genel Müdür kartı + Yönetici Asistanı ──────────────────────────
+function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
   const [err, setErr] = useState(false);
   const name = profile?.full_name || profile?.email || label;
   const initials = name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 20px', background: 'white', borderRadius: 12,
+      background: 'white', borderRadius: 12,
       border: '1px solid var(--border)', borderLeft: '4px solid #1a3a5c',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 24,
+      padding: '12px 20px',
     }}>
+      {/* Direktör */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {profile?.avatar_url && !err ? (
+          <img src={profile.avatar_url} alt={name} onError={() => setErr(true)}
+            style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '3px solid #1a3a5c22' }} />
+        ) : (
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: '#1a3a5c', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, fontWeight: 700,
+          }}>{initials}</div>
+        )}
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)' }}>{name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            <span style={{ background: '#1a3a5c18', color: '#1a3a5c', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
+              {label}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Yönetici Asistanı */}
+      {assistants.length > 0 && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          {assistants.map(a => (
+            <AssistantRow key={a.user_id} profile={a} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssistantRow({ profile }) {
+  const name = profile?.full_name || profile?.email || '';
+  const initials = name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+  const [err, setErr] = useState(false);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
       {profile?.avatar_url && !err ? (
         <img src={profile.avatar_url} alt={name} onError={() => setErr(true)}
-          style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '3px solid #1a3a5c22' }} />
+          style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }} />
       ) : (
         <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: '#1a3a5c', color: '#fff',
+          width: 32, height: 32, borderRadius: '50%',
+          background: '#64748b', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, fontWeight: 700,
+          fontSize: 12, fontWeight: 700,
         }}>{initials}</div>
       )}
       <div>
-        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)' }}>{name}</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          <span style={{ background: '#1a3a5c18', color: '#1a3a5c', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
-            {label}
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{name}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ background: '#64748b18', color: '#64748b', padding: '1px 7px', borderRadius: 20, fontWeight: 600, fontSize: 10 }}>
+            Yönetici Asistanı
           </span>
         </div>
       </div>
@@ -344,9 +386,13 @@ export default function OrgChart({ user, profile, onNavigate }) {
         </div>
       </div>
 
-      {/* Direktör kartı */}
+      {/* Direktör kartı + Yönetici Asistanı */}
       {headProfile && !q && (
-        <DirectorCard profile={headProfile} label={ROLE_LABELS[headProfile.role] || 'Direktör'} />
+        <DirectorCard
+          profile={headProfile}
+          label={ROLE_LABELS[headProfile.role] || 'Direktör'}
+          assistants={profiles.filter(p => p.role === 'asistan' && p.user_id !== headProfile.user_id)}
+        />
       )}
 
       {/* Birim kartları */}
