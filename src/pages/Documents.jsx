@@ -23,12 +23,12 @@ function CollaborativeEditor({ docId, onSaveStatus }) {
     offlineSupport_experimental: false,
   });
 
-  const saveTimerRef = useRef(null);
   const lastSavedRef = useRef(null);
+  const savingRef = useRef(false);
 
   // Supabase'e kaydet
   const saveToSupabase = useCallback(async () => {
-    if (!editor) return;
+    if (!editor || savingRef.current) return;
     try {
       const blocks = editor.document;
       const json = JSON.stringify(blocks);
@@ -36,6 +36,7 @@ function CollaborativeEditor({ docId, onSaveStatus }) {
       if (json === lastSavedRef.current) return;
       lastSavedRef.current = json;
 
+      savingRef.current = true;
       onSaveStatus?.('saving');
       await supabase.from('documents').update({
         content: blocks,
@@ -45,14 +46,16 @@ function CollaborativeEditor({ docId, onSaveStatus }) {
     } catch (err) {
       console.error('Save error:', err);
       onSaveStatus?.('error');
+    } finally {
+      savingRef.current = false;
     }
   }, [editor, docId, onSaveStatus]);
 
-  // Otomatik kayıt: her 10 saniyede bir
+  // Otomatik kayıt: her 45 saniyede bir
   useEffect(() => {
     const interval = setInterval(() => {
       saveToSupabase();
-    }, 10000);
+    }, 45000);
     return () => clearInterval(interval);
   }, [saveToSupabase]);
 
@@ -60,15 +63,6 @@ function CollaborativeEditor({ docId, onSaveStatus }) {
   useEffect(() => {
     return () => { saveToSupabase(); };
   }, [saveToSupabase]);
-
-  // Değişikliklerde debounced kayıt (3 saniye)
-  const handleChange = useCallback(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    onSaveStatus?.('unsaved');
-    saveTimerRef.current = setTimeout(() => {
-      saveToSupabase();
-    }, 3000);
-  }, [saveToSupabase, onSaveStatus]);
 
   // Manuel kayıt fonksiyonunu parent'a expose et
   useEffect(() => {
@@ -101,7 +95,6 @@ function CollaborativeEditor({ docId, onSaveStatus }) {
         hyperlinkToolbar={true}
         imageToolbar={true}
         tableHandles={true}
-        onChange={handleChange}
       />
     </div>
   );
