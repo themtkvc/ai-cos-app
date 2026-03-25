@@ -1161,3 +1161,34 @@ export const upsertLeaderHistory = async (record) => {
     .select();
   return { data, error };
 };
+
+// ── FUND OPPORTUNITIES ──
+
+export const getFundOpportunities = async () => {
+  const { data, error } = await supabase.from('fund_opportunities')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const createFundOpportunity = async (record) => {
+  const { data, error } = await supabase.from('fund_opportunities')
+    .insert(record)
+    .select();
+  return { data, error };
+};
+
+export const updateFundOpportunity = async (id, updates) => {
+  const { data, error } = await supabase.from('fund_opportunities')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  return { data, error };
+};
+
+export const deleteFundOpportunity = async (id) => {
+  const { data, error } = await supabase.from('fund_opportunities')
+    .delete()
+    .eq('id', id);
+  return { data, error };
+};
