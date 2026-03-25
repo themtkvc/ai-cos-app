@@ -2,21 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useProfile } from '../App';
 import { LiveblocksProvider, RoomProvider, ClientSideSuspense } from '@liveblocks/react/suspense';
-import { useLiveblocksExtension, FloatingToolbar } from '@liveblocks/react-tiptap';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
-import Highlight from '@tiptap/extension-highlight';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import { Table } from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
-import TextAlign from '@tiptap/extension-text-align';
+import { useCreateBlockNoteWithLiveblocks } from '@liveblocks/react-blocknote';
+import { BlockNoteView } from '@blocknote/mantine';
+import '@blocknote/mantine/style.css';
 import '@liveblocks/react-ui/styles.css';
-import '@liveblocks/react-tiptap/styles.css';
 
 // ── Doküman tipleri ──────────────────────────────────────────────────────────
 const DOC_TYPES = [
@@ -28,88 +17,24 @@ const DOC_TYPES = [
 ];
 const getDocType = (id) => DOC_TYPES.find(t => t.id === id) || DOC_TYPES[0];
 
-// ── Liveblocks collaborative editor ──────────────────────────────────────────
+// ── BlockNote + Liveblocks collaborative editor ──────────────────────────────
 function CollaborativeEditor() {
-  const liveblocks = useLiveblocksExtension();
-
-  const editor = useEditor({
-    extensions: [
-      liveblocks,
-      StarterKit.configure({ history: false }),
-      Placeholder.configure({ placeholder: 'Yazmaya başlayın… Ekibiniz canlı olarak görebilir.' }),
-      Underline,
-      Highlight.configure({ multicolor: true }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    ],
-    editorProps: {
-      attributes: {
-        class: 'collab-editor-content',
-      },
-    },
+  const editor = useCreateBlockNoteWithLiveblocks({}, {
+    offlineSupport_experimental: false,
   });
 
   return (
     <div className="collab-editor-wrapper">
-      <EditorToolbar editor={editor} />
-      <EditorContent editor={editor} />
-      <FloatingToolbar editor={editor} />
-    </div>
-  );
-}
-
-// ── Editör toolbar ───────────────────────────────────────────────────────────
-function EditorToolbar({ editor }) {
-  if (!editor) return null;
-
-  const ToolBtn = ({ onClick, active, icon, title }) => (
-    <button onClick={onClick} title={title}
-      style={{
-        width: 32, height: 32, border: 'none', borderRadius: 6,
-        background: active ? 'var(--navy, #1a3a5c)' : 'transparent',
-        color: active ? '#fff' : 'var(--text, #374151)',
-        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 13, fontWeight: active ? 700 : 400, transition: 'all 0.1s',
-      }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'; }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-    >{icon}</button>
-  );
-
-  const Sep = () => <div style={{ width: 1, height: 22, background: 'var(--border, #e5e7eb)', margin: '0 3px', alignSelf: 'center' }} />;
-
-  return (
-    <div style={{
-      display: 'flex', gap: 2, padding: '8px 12px', borderBottom: '1px solid var(--border, #e5e7eb)',
-      background: 'var(--bg, #f9fafb)', borderRadius: '12px 12px 0 0', flexWrap: 'wrap', alignItems: 'center',
-    }}>
-      <ToolBtn icon={<b>B</b>} title="Kalın" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} />
-      <ToolBtn icon={<i>I</i>} title="İtalik" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} />
-      <ToolBtn icon={<u>U</u>} title="Altı çizili" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} />
-      <ToolBtn icon={<s>S</s>} title="Üstü çizili" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} />
-      <ToolBtn icon="🖍" title="Vurgula" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} />
-      <Sep />
-      <ToolBtn icon="H1" title="Başlık 1" active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} />
-      <ToolBtn icon="H2" title="Başlık 2" active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
-      <ToolBtn icon="H3" title="Başlık 3" active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} />
-      <Sep />
-      <ToolBtn icon="•" title="Madde listesi" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} />
-      <ToolBtn icon="1." title="Numaralı liste" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
-      <ToolBtn icon="☑" title="Yapılacaklar" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()} />
-      <Sep />
-      <ToolBtn icon="⇤" title="Sola hizala" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} />
-      <ToolBtn icon="⇔" title="Ortala" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} />
-      <ToolBtn icon="⇥" title="Sağa hizala" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} />
-      <Sep />
-      <ToolBtn icon="▦" title="Tablo ekle" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
-      <ToolBtn icon="—" title="Ayraç" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
-      <ToolBtn icon="❝" title="Alıntı" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
-      <ToolBtn icon="<>" title="Kod" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
+      <BlockNoteView
+        editor={editor}
+        theme="light"
+        sideMenu={true}
+        slashMenu={true}
+        formattingToolbar={true}
+        hyperlinkToolbar={true}
+        imageToolbar={true}
+        tableHandles={true}
+      />
     </div>
   );
 }
@@ -156,7 +81,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         </div>
       </div>
 
-      {/* Liveblocks editor */}
+      {/* Liveblocks + BlockNote editor */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <LiveblocksProvider authEndpoint={authEndpoint}>
           <RoomProvider id={roomId}>
@@ -440,13 +365,6 @@ export default function Documents({ user }) {
     loadDocs();
   };
 
-  // ── Doküman sil ────────────────────────────────────────────────────────────
-  const deleteDoc = async (id) => {
-    if (!window.confirm('Bu dokümanı silmek istediğinize emin misiniz?')) return;
-    await supabase.from('documents').delete().eq('id', id);
-    loadDocs();
-  };
-
   // ── Filtreleme ─────────────────────────────────────────────────────────────
   const filtered = useMemo(() => docs.filter(d => {
     if (d.is_archived !== showArchived) return false;
@@ -460,7 +378,6 @@ export default function Documents({ user }) {
 
   // ── Editör görünümü ────────────────────────────────────────────────────────
   if (activeDoc) {
-    // Dosya ise doğrudan aç
     if (activeDoc.file_url) {
       window.open(activeDoc.file_url, '_blank');
       setActiveDoc(null);
@@ -583,67 +500,13 @@ export default function Documents({ user }) {
           height: calc(100vh - 200px);
           overflow: hidden;
         }
-        .collab-editor-content {
-          padding: 24px 32px;
-          min-height: 400px;
-          outline: none;
-          font-size: 15px;
-          line-height: 1.8;
-          color: var(--text, #111827);
+        .collab-editor-wrapper .bn-editor {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px 24px;
         }
-        .collab-editor-content h1 { font-size: 28px; font-weight: 800; margin: 24px 0 12px; }
-        .collab-editor-content h2 { font-size: 22px; font-weight: 700; margin: 20px 0 10px; }
-        .collab-editor-content h3 { font-size: 18px; font-weight: 600; margin: 16px 0 8px; }
-        .collab-editor-content p { margin: 0 0 8px; }
-        .collab-editor-content ul, .collab-editor-content ol { padding-left: 24px; margin: 8px 0; }
-        .collab-editor-content blockquote {
-          border-left: 3px solid var(--navy, #1a3a5c);
-          padding-left: 16px; margin: 12px 0;
-          color: var(--text-muted, #6b7280); font-style: italic;
-        }
-        .collab-editor-content pre {
-          background: var(--bg, #f3f4f6); border-radius: 8px;
-          padding: 12px 16px; font-size: 13px; overflow-x: auto;
-        }
-        .collab-editor-content table {
-          border-collapse: collapse; width: 100%; margin: 12px 0;
-        }
-        .collab-editor-content th, .collab-editor-content td {
-          border: 1px solid var(--border, #e5e7eb);
-          padding: 8px 12px; text-align: left; font-size: 14px;
-        }
-        .collab-editor-content th {
-          background: var(--bg, #f3f4f6); font-weight: 600;
-        }
-        .collab-editor-content ul[data-type="taskList"] {
-          list-style: none; padding-left: 0;
-        }
-        .collab-editor-content ul[data-type="taskList"] li {
-          display: flex; align-items: flex-start; gap: 8px;
-        }
-        .collab-editor-content ul[data-type="taskList"] li label input {
-          margin-top: 4px;
-        }
-        .collab-editor-content mark { background: #fef08a; padding: 0 2px; border-radius: 2px; }
-        .collab-editor-content hr { border: none; border-top: 1.5px solid var(--border, #e5e7eb); margin: 20px 0; }
-        .collab-editor-content .tiptap { height: 100%; overflow-y: auto; }
-        .collab-editor-wrapper .tiptap { flex: 1; overflow-y: auto; }
-        .collab-editor-content .collaboration-cursor__caret {
-          position: relative;
-          border-left: 2px solid;
-          margin-right: -2px;
-        }
-        .collab-editor-content .collaboration-cursor__label {
-          position: absolute;
-          top: -1.4em;
-          left: -2px;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 1px 6px;
-          border-radius: 4px 4px 4px 0;
-          color: #fff;
-          white-space: nowrap;
-          pointer-events: none;
+        .collab-editor-wrapper .bn-container {
+          height: 100%;
         }
       `}</style>
     </div>
