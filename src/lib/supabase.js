@@ -953,6 +953,7 @@ export const uploadNetworkMedia = async (userId, entityType, entityId, file) => 
 
 // Bildirim oluştur
 export const createNotification = async ({ userId, type, title, body, linkType, linkId, createdBy, createdByName }) => {
+  console.log('[createNotification] inserting:', { userId, type, title });
   const { data, error } = await supabase.from('notifications').insert({
     user_id: userId,
     type,
@@ -963,6 +964,8 @@ export const createNotification = async ({ userId, type, title, body, linkType, 
     created_by: createdBy || null,
     created_by_name: createdByName || null,
   }).select().single();
+  if (error) console.error('[createNotification] ERROR:', error);
+  else console.log('[createNotification] OK:', data?.id);
   return { data, error };
 };
 
