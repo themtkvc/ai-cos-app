@@ -37,7 +37,7 @@ const AGENDA_STATUSES = [
 
 const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[2];
 
-const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'];
+const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
 const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'];
 
 // ── YARDIMCI BİLEŞENLER ───────────────────────────────────────────────────────
