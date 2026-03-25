@@ -952,9 +952,12 @@ export const uploadNetworkMedia = async (userId, entityType, entityId, file) => 
 // ── BİLDİRİMLER ──────────────────────────────────────────────────────────────
 
 // Bildirim oluştur
+// NOT: Başka kullanıcı için bildirim oluştururken .select() kullanılamaz
+// çünkü SELECT RLS politikası sadece kendi bildirimlerini görmeye izin verir.
+// Bu yüzden sadece .insert() kullanıyoruz — RETURNING olmadan.
 export const createNotification = async ({ userId, type, title, body, linkType, linkId, createdBy, createdByName }) => {
   console.log('[createNotification] inserting:', { userId, type, title });
-  const { data, error } = await supabase.from('notifications').insert({
+  const { error } = await supabase.from('notifications').insert({
     user_id: userId,
     type,
     title,
@@ -963,10 +966,10 @@ export const createNotification = async ({ userId, type, title, body, linkType, 
     link_id: linkId || null,
     created_by: createdBy || null,
     created_by_name: createdByName || null,
-  }).select().single();
+  });
   if (error) console.error('[createNotification] ERROR:', error);
-  else console.log('[createNotification] OK:', data?.id);
-  return { data, error };
+  else console.log('[createNotification] OK — notification inserted for', userId);
+  return { data: null, error };
 };
 
 // Toplu bildirim oluştur (birden fazla kişiye)
@@ -981,8 +984,8 @@ export const createNotifications = async (notifications) => {
     created_by: n.createdBy || null,
     created_by_name: n.createdByName || null,
   }));
-  const { data, error } = await supabase.from('notifications').insert(rows).select();
-  return { data, error };
+  const { error } = await supabase.from('notifications').insert(rows);
+  return { data: null, error };
 };
 
 // Kullanıcının bildirimlerini getir
