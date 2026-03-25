@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useProfile } from '../App';
-import { LiveblocksProvider, RoomProvider, ClientSideSuspense } from '@liveblocks/react/suspense';
-import { useCreateBlockNoteWithLiveblocks } from '@liveblocks/react-blocknote';
-import { BlockNoteView } from '@blocknote/mantine';
-import '@blocknote/mantine/style.css';
-import '@liveblocks/react-ui/styles.css';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Highlight from '@tiptap/extension-highlight';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
 
 // ── Doküman tipleri ──────────────────────────────────────────────────────────
 const DOC_TYPES = [
@@ -17,85 +28,111 @@ const DOC_TYPES = [
 ];
 const getDocType = (id) => DOC_TYPES.find(t => t.id === id) || DOC_TYPES[0];
 
-// ── BlockNote + Liveblocks collaborative editor ──────────────────────────────
-function CollaborativeEditor({ docId, onSaveStatus }) {
-  const editor = useCreateBlockNoteWithLiveblocks({}, {
-    offlineSupport_experimental: false,
-  });
+// ── Toolbar buton yardımcısı ─────────────────────────────────────────────────
+function ToolBtn({ onClick, active, title, children, style: extraStyle }) {
+  return (
+    <button
+      onClick={onClick} title={title}
+      style={{
+        padding: '4px 8px', borderRadius: 6, fontSize: 13, lineHeight: 1,
+        border: 'none', cursor: 'pointer',
+        background: active ? '#e0e7ff' : 'transparent',
+        color: active ? '#4338ca' : '#374151',
+        fontWeight: active ? 700 : 500,
+        minWidth: 28, textAlign: 'center',
+        ...extraStyle,
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+    >
+      {children}
+    </button>
+  );
+}
 
-  const lastSavedRef = useRef(null);
-  const savingRef = useRef(false);
+// ── TipTap Toolbar ──────────────────────────────────────────────────────────
+function EditorToolbar({ editor }) {
+  if (!editor) return null;
 
-  // Supabase'e kaydet
-  const saveToSupabase = useCallback(async () => {
-    if (!editor || savingRef.current) return;
-    try {
-      const blocks = editor.document;
-      const json = JSON.stringify(blocks);
-      // Aynı içeriği tekrar kaydetme
-      if (json === lastSavedRef.current) return;
-      lastSavedRef.current = json;
+  const addImage = () => {
+    const url = window.prompt('Resim URL:');
+    if (url) editor.chain().focus().setImage({ src: url }).run();
+  };
 
-      savingRef.current = true;
-      onSaveStatus?.('saving');
-      await supabase.from('documents').update({
-        content: blocks,
-        updated_at: new Date().toISOString(),
-      }).eq('id', docId);
-      onSaveStatus?.('saved');
-    } catch (err) {
-      console.error('Save error:', err);
-      onSaveStatus?.('error');
-    } finally {
-      savingRef.current = false;
-    }
-  }, [editor, docId, onSaveStatus]);
-
-  // Otomatik kayıt: her 45 saniyede bir
-  useEffect(() => {
-    const interval = setInterval(() => {
-      saveToSupabase();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [saveToSupabase]);
-
-  // Editörden çıkınca son kayıt
-  useEffect(() => {
-    return () => { saveToSupabase(); };
-  }, [saveToSupabase]);
-
-  // Manuel kayıt fonksiyonunu parent'a expose et
-  useEffect(() => {
-    if (window._docManualSave) window._docManualSave = null;
-    window._docManualSave = saveToSupabase;
-    return () => { window._docManualSave = null; };
-  }, [saveToSupabase]);
-
-  // Mevcut içeriği yükle (ilk açılışta)
-  const loadedRef = useRef(false);
-  useEffect(() => {
-    if (!editor || loadedRef.current) return;
-    loadedRef.current = true;
-    (async () => {
-      const { data } = await supabase.from('documents').select('content').eq('id', docId).single();
-      if (data?.content && Array.isArray(data.content) && data.content.length > 0) {
-        try { editor.replaceBlocks(editor.document, data.content); } catch (e) { /* Liveblocks zaten yüklemiş olabilir */ }
-      }
-    })();
-  }, [editor, docId]);
+  const setLink = () => {
+    const prev = editor.getAttributes('link').href;
+    const url = window.prompt('Link URL:', prev || 'https://');
+    if (url === null) return;
+    if (url === '') { editor.chain().focus().unsetLink().run(); return; }
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+  };
 
   return (
-    <div className="collab-editor-wrapper">
-      <BlockNoteView
-        editor={editor}
-        theme="light"
-        sideMenu={true}
-        slashMenu={true}
-        formattingToolbar={true}
-        hyperlinkToolbar={true}
-        imageToolbar={true}
-        tableHandles={true}
-      />
+    <div style={{
+      display: 'flex', gap: 2, flexWrap: 'wrap', padding: '8px 12px',
+      borderBottom: '1px solid var(--border, #e5e7eb)',
+      background: 'var(--bg, #f9fafb)', borderRadius: '12px 12px 0 0',
+      alignItems: 'center',
+    }}>
+      {/* Başlıklar */}
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Başlık 1">H1</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Başlık 2">H2</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Başlık 3">H3</ToolBtn>
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Metin stili */}
+      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Kalın"><b>B</b></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="İtalik"><i>I</i></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Altı çizili"><u>U</u></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Üstü çizili"><s>S</s></ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleHighlight().run()} active={editor.isActive('highlight')} title="Vurgula" style={{ background: editor.isActive('highlight') ? '#fef08a' : undefined }}>🖍</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Satır içi kod" style={{ fontFamily: 'monospace' }}>&lt;&gt;</ToolBtn>
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Hizalama */}
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Sola hizala">⫷</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Ortala">☰</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Sağa hizala">⫸</ToolBtn>
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Listeler */}
+      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Madde listesi">• ─</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numaralı liste">1. ─</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Görev listesi">☑</ToolBtn>
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Bloklar */}
+      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Alıntı">❝</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Kod bloğu">{'{ }'}</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Yatay çizgi">─</ToolBtn>
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Tablo */}
+      <ToolBtn onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Tablo ekle">⊞</ToolBtn>
+      {editor.isActive('table') && (
+        <>
+          <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="Sütun ekle">+▮</ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="Satır ekle">+▬</ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Tabloyu sil" style={{ color: '#ef4444' }}>🗑</ToolBtn>
+        </>
+      )}
+
+      <div style={{ width: 1, height: 20, background: '#d1d5db', margin: '0 4px' }} />
+
+      {/* Ekleme */}
+      <ToolBtn onClick={setLink} active={editor.isActive('link')} title="Link ekle/düzenle">🔗</ToolBtn>
+      <ToolBtn onClick={addImage} title="Resim ekle">🖼</ToolBtn>
+
+      <div style={{ flex: 1 }} />
+
+      {/* Geri/İleri */}
+      <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="Geri al" style={{ opacity: editor.can().undo() ? 1 : 0.3 }}>↩</ToolBtn>
+      <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="İleri al" style={{ opacity: editor.can().redo() ? 1 : 0.3 }}>↪</ToolBtn>
     </div>
   );
 }
@@ -111,37 +148,134 @@ function SaveIndicator({ status }) {
   );
 }
 
-// ── Room'lu editör wrapper ───────────────────────────────────────────────────
+// ── TipTap Document Editor ──────────────────────────────────────────────────
 function DocumentEditor({ doc, user, profile, onBack }) {
-  const roomId = doc.liveblocks_room_id || `doc-${doc.id}`;
   const [saveStatus, setSaveStatus] = useState('saved');
+  const savingRef = useRef(false);
+  const lastSavedRef = useRef(null);
+  const contentLoadedRef = useRef(false);
 
-  const authEndpoint = useCallback(async () => {
-    const res = await fetch('/api/liveblocks-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        userName: profile?.full_name || user.email,
-        userUnit: profile?.unit || '',
-        room: roomId,
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
       }),
-    });
-    return res.json();
-  }, [user, profile, roomId]);
+      Placeholder.configure({
+        placeholder: 'Yazmaya başlayın…',
+      }),
+      Highlight,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Link.configure({ openOnClick: false }),
+      Image,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      TextStyle,
+      Color,
+    ],
+    editorProps: {
+      attributes: {
+        class: 'tiptap-editor-content',
+        style: 'outline: none; min-height: 500px; padding: 24px 32px; font-size: 15px; line-height: 1.7; color: var(--text, #111827);',
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      setSaveStatus('unsaved');
+    },
+  });
 
-  const handleManualSave = () => {
-    if (window._docManualSave) window._docManualSave();
-  };
+  // İçeriği yükle
+  useEffect(() => {
+    if (!editor || contentLoadedRef.current) return;
+    contentLoadedRef.current = true;
+    (async () => {
+      const { data } = await supabase.from('documents').select('content').eq('id', doc.id).single();
+      if (data?.content) {
+        try {
+          // TipTap JSON formatı ise direkt yükle
+          if (data.content.type === 'doc') {
+            editor.commands.setContent(data.content);
+          }
+          // BlockNote eski format ise text olarak yükle
+          else if (Array.isArray(data.content)) {
+            const text = data.content.map(b => {
+              if (typeof b === 'string') return b;
+              if (b.content) {
+                return (b.content || []).map(c => c.text || '').join('');
+              }
+              return '';
+            }).filter(Boolean).join('\n');
+            if (text.trim()) {
+              editor.commands.setContent(`<p>${text.split('\n').join('</p><p>')}</p>`);
+            }
+          }
+        } catch (e) {
+          console.error('Content load error:', e);
+        }
+      }
+    })();
+  }, [editor, doc.id]);
+
+  // Kaydet fonksiyonu
+  const saveToSupabase = useCallback(async () => {
+    if (!editor || savingRef.current) return;
+    try {
+      const json = editor.getJSON();
+      const jsonStr = JSON.stringify(json);
+      if (jsonStr === lastSavedRef.current) return;
+      lastSavedRef.current = jsonStr;
+      savingRef.current = true;
+      setSaveStatus('saving');
+      await supabase.from('documents').update({
+        content: json,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+        updated_by_name: profile?.full_name || user.email,
+      }).eq('id', doc.id);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Save error:', err);
+      setSaveStatus('error');
+    } finally {
+      savingRef.current = false;
+    }
+  }, [editor, doc.id, user, profile]);
+
+  // Otomatik kayıt: 30 sn
+  useEffect(() => {
+    const interval = setInterval(() => saveToSupabase(), 30000);
+    return () => clearInterval(interval);
+  }, [saveToSupabase]);
+
+  // Unmount'ta kaydet
+  useEffect(() => {
+    return () => { saveToSupabase(); };
+  }, [saveToSupabase]);
+
+  // Ctrl+S
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveToSupabase();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [saveToSupabase]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Editor header */}
+      {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', marginBottom: 8,
         borderBottom: '1px solid var(--border, #e5e7eb)',
       }}>
-        <button onClick={() => { handleManualSave(); setTimeout(onBack, 300); }} style={{
+        <button onClick={() => { saveToSupabase(); setTimeout(onBack, 300); }} style={{
           border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px',
           borderRadius: 8, color: 'var(--text-muted, #6b7280)',
         }}
@@ -156,10 +290,10 @@ function DocumentEditor({ doc, user, profile, onBack }) {
             <SaveIndicator status={saveStatus} />
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 2 }}>
-            {doc.created_by_name} tarafından oluşturuldu · Canlı düzenleme aktif
+            {doc.created_by_name} tarafından oluşturuldu · Ctrl+S ile kaydet
           </div>
         </div>
-        <button onClick={handleManualSave} title="Şimdi kaydet" style={{
+        <button onClick={saveToSupabase} title="Şimdi kaydet" style={{
           padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
           border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
           color: 'var(--text, #374151)', cursor: 'pointer',
@@ -168,21 +302,90 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         </button>
       </div>
 
-      {/* Liveblocks + BlockNote editor */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <LiveblocksProvider authEndpoint={authEndpoint}>
-          <RoomProvider id={roomId}>
-            <ClientSideSuspense fallback={
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--text-muted, #9ca3af)' }}>
-                <div className="loading-spinner" style={{ width: 20, height: 20 }} />
-                <span>Doküman yükleniyor…</span>
-              </div>
-            }>
-              <CollaborativeEditor docId={doc.id} onSaveStatus={setSaveStatus} />
-            </ClientSideSuspense>
-          </RoomProvider>
-        </LiveblocksProvider>
+      {/* Editor */}
+      <div style={{
+        flex: 1, overflow: 'hidden', border: '1px solid var(--border, #e5e7eb)',
+        borderRadius: 12, background: 'var(--bg-card, #fff)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <EditorToolbar editor={editor} />
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
+
+      {/* TipTap stilleri */}
+      <style>{`
+        .tiptap-editor-content h1 { font-size: 28px; font-weight: 800; margin: 20px 0 8px; line-height: 1.3; }
+        .tiptap-editor-content h2 { font-size: 22px; font-weight: 700; margin: 18px 0 6px; line-height: 1.3; }
+        .tiptap-editor-content h3 { font-size: 18px; font-weight: 700; margin: 16px 0 4px; line-height: 1.3; }
+        .tiptap-editor-content p { margin: 0 0 8px; }
+        .tiptap-editor-content ul, .tiptap-editor-content ol { padding-left: 24px; margin: 4px 0; }
+        .tiptap-editor-content li { margin: 2px 0; }
+        .tiptap-editor-content li p { margin: 0; }
+        .tiptap-editor-content blockquote {
+          border-left: 3px solid #6366f1; padding-left: 16px; margin: 8px 0;
+          color: #6b7280; font-style: italic;
+        }
+        .tiptap-editor-content code {
+          background: #f3f4f6; border-radius: 4px; padding: 2px 6px;
+          font-family: 'Fira Code', monospace; font-size: 13px; color: #e11d48;
+        }
+        .tiptap-editor-content pre {
+          background: #1e1e2e; color: #cdd6f4; border-radius: 10px;
+          padding: 16px 20px; margin: 8px 0; overflow-x: auto;
+          font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.6;
+        }
+        .tiptap-editor-content pre code {
+          background: none; color: inherit; padding: 0; border-radius: 0;
+        }
+        .tiptap-editor-content hr {
+          border: none; border-top: 2px solid #e5e7eb; margin: 16px 0;
+        }
+        .tiptap-editor-content a { color: #6366f1; text-decoration: underline; cursor: pointer; }
+        .tiptap-editor-content img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+        .tiptap-editor-content mark { background: #fef08a; border-radius: 2px; padding: 0 2px; }
+
+        /* Tablo stilleri */
+        .tiptap-editor-content table {
+          border-collapse: collapse; width: 100%; margin: 12px 0;
+          border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+        }
+        .tiptap-editor-content th, .tiptap-editor-content td {
+          border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+          min-width: 80px; font-size: 14px;
+        }
+        .tiptap-editor-content th {
+          background: #f3f4f6; font-weight: 700; font-size: 13px;
+        }
+        .tiptap-editor-content td { background: var(--bg-card, #fff); }
+
+        /* Task list */
+        .tiptap-editor-content ul[data-type="taskList"] {
+          list-style: none; padding-left: 4px;
+        }
+        .tiptap-editor-content ul[data-type="taskList"] li {
+          display: flex; align-items: flex-start; gap: 8px;
+        }
+        .tiptap-editor-content ul[data-type="taskList"] li label {
+          margin-top: 3px; cursor: pointer;
+        }
+        .tiptap-editor-content ul[data-type="taskList"] li[data-checked="true"] > div > p {
+          text-decoration: line-through; opacity: 0.6;
+        }
+
+        /* Placeholder */
+        .tiptap-editor-content p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left; color: #9ca3af; pointer-events: none; height: 0;
+        }
+
+        .ProseMirror { outline: none; }
+        .ProseMirror-focused { outline: none; }
+
+        /* Tablo seçim */
+        .tiptap-editor-content .selectedCell { background: #eef2ff; }
+      `}</style>
     </div>
   );
 }
@@ -409,7 +612,6 @@ export default function Documents({ user }) {
 
   // ── Yeni doküman oluştur ───────────────────────────────────────────────────
   const createDocument = async (title, docType) => {
-    const roomId = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const { data, error } = await supabase.from('documents').insert({
       title,
       doc_type: docType,
@@ -418,7 +620,6 @@ export default function Documents({ user }) {
       created_by_name: profile?.full_name || user.email,
       updated_by: user.id,
       updated_by_name: profile?.full_name || user.email,
-      liveblocks_room_id: roomId,
     }).select().single();
     if (!error && data) {
       loadDocs();
@@ -496,7 +697,7 @@ export default function Documents({ user }) {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text, #111827)' }}>📄 Dokümanlar</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted, #9ca3af)' }}>
-            Biriminizle canlı olarak birlikte çalışın
+            Zengin metin editörü ile dokümanlarınızı oluşturun
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -575,27 +776,6 @@ export default function Documents({ user }) {
       {/* Modals */}
       {showNewDoc && <NewDocModal onClose={() => setShowNewDoc(false)} onCreate={createDocument} />}
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} onUpload={uploadFile} />}
-
-      {/* Editor styles */}
-      <style>{`
-        .collab-editor-wrapper {
-          border: 1px solid var(--border, #e5e7eb);
-          border-radius: 12px;
-          background: var(--bg-card, #fff);
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 200px);
-          overflow: hidden;
-        }
-        .collab-editor-wrapper .bn-editor {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px 24px;
-        }
-        .collab-editor-wrapper .bn-container {
-          height: 100%;
-        }
-      `}</style>
     </div>
   );
 }
