@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useProfile } from '../App';
 import { LiveblocksProvider, RoomProvider, ClientSideSuspense } from '@liveblocks/react/suspense';
@@ -18,10 +18,77 @@ const DOC_TYPES = [
 const getDocType = (id) => DOC_TYPES.find(t => t.id === id) || DOC_TYPES[0];
 
 // ── BlockNote + Liveblocks collaborative editor ──────────────────────────────
-function CollaborativeEditor() {
+function CollaborativeEditor({ docId, onSaveStatus }) {
   const editor = useCreateBlockNoteWithLiveblocks({}, {
     offlineSupport_experimental: false,
   });
+
+  const saveTimerRef = useRef(null);
+  const lastSavedRef = useRef(null);
+
+  // Supabase'e kaydet
+  const saveToSupabase = useCallback(async () => {
+    if (!editor) return;
+    try {
+      const blocks = editor.document;
+      const json = JSON.stringify(blocks);
+      // Aynı içeriği tekrar kaydetme
+      if (json === lastSavedRef.current) return;
+      lastSavedRef.current = json;
+
+      onSaveStatus?.('saving');
+      await supabase.from('documents').update({
+        content: blocks,
+        updated_at: new Date().toISOString(),
+      }).eq('id', docId);
+      onSaveStatus?.('saved');
+    } catch (err) {
+      console.error('Save error:', err);
+      onSaveStatus?.('error');
+    }
+  }, [editor, docId, onSaveStatus]);
+
+  // Otomatik kayıt: her 10 saniyede bir
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveToSupabase();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [saveToSupabase]);
+
+  // Editörden çıkınca son kayıt
+  useEffect(() => {
+    return () => { saveToSupabase(); };
+  }, [saveToSupabase]);
+
+  // Değişikliklerde debounced kayıt (3 saniye)
+  const handleChange = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    onSaveStatus?.('unsaved');
+    saveTimerRef.current = setTimeout(() => {
+      saveToSupabase();
+    }, 3000);
+  }, [saveToSupabase, onSaveStatus]);
+
+  // Manuel kayıt fonksiyonunu parent'a expose et
+  useEffect(() => {
+    if (window._docManualSave) window._docManualSave = null;
+    window._docManualSave = saveToSupabase;
+    return () => { window._docManualSave = null; };
+  }, [saveToSupabase]);
+
+  // Mevcut içeriği yükle (ilk açılışta)
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (!editor || loadedRef.current) return;
+    loadedRef.current = true;
+    (async () => {
+      const { data } = await supabase.from('documents').select('content').eq('id', docId).single();
+      if (data?.content && Array.isArray(data.content) && data.content.length > 0) {
+        try { editor.replaceBlocks(editor.document, data.content); } catch (e) { /* Liveblocks zaten yüklemiş olabilir */ }
+      }
+    })();
+  }, [editor, docId]);
 
   return (
     <div className="collab-editor-wrapper">
@@ -34,14 +101,27 @@ function CollaborativeEditor() {
         hyperlinkToolbar={true}
         imageToolbar={true}
         tableHandles={true}
+        onChange={handleChange}
       />
     </div>
+  );
+}
+
+// ── Kayıt durumu göstergesi ──────────────────────────────────────────────────
+function SaveIndicator({ status }) {
+  const labels = { unsaved: '● Kaydedilmemiş', saving: '↻ Kaydediliyor…', saved: '✓ Kaydedildi', error: '✕ Kayıt hatası' };
+  const colors = { unsaved: '#f59e0b', saving: '#6b7280', saved: '#22c55e', error: '#ef4444' };
+  return (
+    <span style={{ fontSize: 11.5, color: colors[status] || '#9ca3af', fontWeight: 500 }}>
+      {labels[status] || ''}
+    </span>
   );
 }
 
 // ── Room'lu editör wrapper ───────────────────────────────────────────────────
 function DocumentEditor({ doc, user, profile, onBack }) {
   const roomId = doc.liveblocks_room_id || `doc-${doc.id}`;
+  const [saveStatus, setSaveStatus] = useState('saved');
 
   const authEndpoint = useCallback(async () => {
     const res = await fetch('/api/liveblocks-auth', {
@@ -57,6 +137,10 @@ function DocumentEditor({ doc, user, profile, onBack }) {
     return res.json();
   }, [user, profile, roomId]);
 
+  const handleManualSave = () => {
+    if (window._docManualSave) window._docManualSave();
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Editor header */}
@@ -64,7 +148,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
         display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', marginBottom: 8,
         borderBottom: '1px solid var(--border, #e5e7eb)',
       }}>
-        <button onClick={onBack} style={{
+        <button onClick={() => { handleManualSave(); setTimeout(onBack, 300); }} style={{
           border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px',
           borderRadius: 8, color: 'var(--text-muted, #6b7280)',
         }}
@@ -72,13 +156,23 @@ function DocumentEditor({ doc, user, profile, onBack }) {
           onMouseLeave={e => e.currentTarget.style.background = 'none'}
         >←</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)' }}>
-            {getDocType(doc.doc_type).icon} {doc.title}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111827)' }}>
+              {getDocType(doc.doc_type).icon} {doc.title}
+            </span>
+            <SaveIndicator status={saveStatus} />
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted, #9ca3af)', marginTop: 2 }}>
             {doc.created_by_name} tarafından oluşturuldu · Canlı düzenleme aktif
           </div>
         </div>
+        <button onClick={handleManualSave} title="Şimdi kaydet" style={{
+          padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+          border: '1.5px solid var(--border, #e5e7eb)', background: 'var(--bg, #f9fafb)',
+          color: 'var(--text, #374151)', cursor: 'pointer',
+        }}>
+          💾 Kaydet
+        </button>
       </div>
 
       {/* Liveblocks + BlockNote editor */}
@@ -91,7 +185,7 @@ function DocumentEditor({ doc, user, profile, onBack }) {
                 <span>Doküman yükleniyor…</span>
               </div>
             }>
-              <CollaborativeEditor />
+              <CollaborativeEditor docId={doc.id} onSaveStatus={setSaveStatus} />
             </ClientSideSuspense>
           </RoomProvider>
         </LiveblocksProvider>
