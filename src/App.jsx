@@ -16,6 +16,7 @@ import OrgChart from './pages/OrgChart';
 import NetworkManager from './pages/NetworkManager';
 import NetworkAnalytics from './pages/NetworkAnalytics';
 import Notes from './pages/Notes';
+import Documents from './pages/Documents';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -28,11 +29,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','chat','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
-  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','profile'],
-  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
-  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','network','notes','profile'],
+  direktor:             ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','chat','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','documents','profile'],
+  asistan:              ['dashboard','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','documents','profile'],
+  koordinator:          ['dashboard','chat','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','documents','profile'],
+  personel:             ['dashboard','chat','agendas','reports','dailylog','analytics','orgchart','network','notes','documents','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
@@ -259,6 +260,7 @@ export default function App() {
     network:          NetworkManager,
     networkanalytics: NetworkAnalytics,
     notes:     Notes,
+    documents: Documents,
     admin:     Admin,
     users:     Admin,
   };
@@ -280,6 +282,7 @@ export default function App() {
     network:          '🕸️ Network',
     networkanalytics: '🔬 Network Analiz',
     notes:      '📝 Notlarım',
+    documents:  '📄 Dokümanlar',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',
