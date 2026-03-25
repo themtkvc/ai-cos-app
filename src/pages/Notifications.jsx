@@ -7,6 +7,7 @@ const TYPE_META = {
   agenda_assigned: { icon: '📋', label: 'Gündem Ataması',      color: '#0891b2', bg: '#ecfeff' },
   task_status:     { icon: '🔄', label: 'Görev Durumu',        color: '#f59e0b', bg: '#fffbeb' },
   comment_added:   { icon: '💬', label: 'Yeni Yorum',          color: '#10b981', bg: '#ecfdf5' },
+  mention:         { icon: '@',  label: 'Bahsedilenler',       color: '#8b5cf6', bg: '#f5f3ff' },
 };
 
 const getTypeMeta = (type) => TYPE_META[type] || { icon: '🔔', label: 'Bildirim', color: '#6b7280', bg: '#f9fafb' };
@@ -209,6 +210,7 @@ export default function Notifications({ user }) {
           { id: 'agenda_assigned', label: '📋 Gündem Ataması' },
           { id: 'task_status', label: '🔄 Durum Değişikliği' },
           { id: 'comment_added', label: '💬 Yorumlar' },
+          { id: 'mention', label: '@ Bahsedilenler' },
         ].map(f => {
           const isActive = filter === f.id;
           const cnt = f.count !== undefined ? f.count

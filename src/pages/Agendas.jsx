@@ -20,6 +20,7 @@ import {
   createNotification,
 } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
+import MentionInput, { extractMentions, renderMentionText } from '../components/MentionInput';
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
@@ -86,7 +87,7 @@ function TaskStatusBadge({ status, completionStatus }) {
 }
 
 // ── YORUM BALONU ──────────────────────────────────────────────────────────────
-function CommentBubble({ comment, myId, onDelete }) {
+function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
   const isMe = comment.created_by === myId;
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
@@ -108,7 +109,15 @@ function CommentBubble({ comment, myId, onDelete }) {
           lineHeight: 1.55,
           wordBreak: 'break-word',
         }}>
-          {comment.content}
+          {renderMentionText(comment.content, profiles).map((part, i) =>
+            part.isMention ? (
+              <span key={i} style={{ fontWeight: 700, color: isMe ? '#93c5fd' : '#6366f1' }}>
+                {part.text}
+              </span>
+            ) : (
+              <span key={i}>{part.text}</span>
+            )
+          )}
         </div>
         <div style={{
           fontSize: 11, color: '#94a3b8', marginTop: 3,
@@ -332,6 +341,13 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
     commentTargets.forEach(uid => {
       createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
     });
+    // @mention bildirimleri
+    const mentionedIds = extractMentions(text.trim(), allProfiles);
+    mentionedIds.forEach(uid => {
+      if (uid !== myId && !commentTargets.has(uid)) {
+        createNotification({ userId: uid, type: 'mention', title: `${myProfile?.full_name || 'Birisi'} sizi bir yorumda etiketledi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
+      }
+    });
     if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
     else setCommentText('');
     setSaving(false);
@@ -465,18 +481,21 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
                       {taskComments.length > 0 && (
                         <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', background: 'var(--bg-sidebar)' }}>
                           {taskComments.map(c => (
-                            <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} />
+                            <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} profiles={allProfiles} />
                           ))}
                         </div>
                       )}
                       <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', display: 'flex', gap: 6 }}>
-                        <input
-                          className="form-input"
-                          style={{ flex: 1, fontSize: 13 }}
-                          placeholder="Göreve yorum ekle…"
+                        <MentionInput
                           value={taskCommentTexts[task.id] || ''}
-                          onChange={e => setTaskCommentTexts(prev => ({ ...prev, [task.id]: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddComment(task.id)}
+                          onChange={v => setTaskCommentTexts(prev => ({ ...prev, [task.id]: v }))}
+                          onSubmit={() => handleAddComment(task.id)}
+                          profiles={allProfiles}
+                          myId={myId}
+                          myUnit={myUnit}
+                          isDirektor={role === 'direktor'}
+                          placeholder="Yorum yaz… @ ile etiketle"
+                          disabled={saving}
                         />
                         <button className="btn btn-sm btn-primary" disabled={saving} onClick={() => handleAddComment(task.id)}>↑</button>
                       </div>
@@ -495,18 +514,21 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
             {agendaComments.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 {agendaComments.map(c => (
-                  <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} />
+                  <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} profiles={allProfiles} />
                 ))}
               </div>
             )}
             <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                className="form-input"
-                style={{ flex: 1, fontSize: 13 }}
-                placeholder="Not ekle…"
+              <MentionInput
                 value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddComment()}
+                onChange={setCommentText}
+                onSubmit={() => handleAddComment()}
+                profiles={allProfiles}
+                myId={myId}
+                myUnit={myUnit}
+                isDirektor={role === 'direktor'}
+                placeholder="Not ekle… @ ile etiketle"
+                disabled={saving}
               />
               <button className="btn btn-primary" disabled={saving} onClick={() => handleAddComment()}>↑</button>
             </div>
