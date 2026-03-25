@@ -1058,7 +1058,7 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
 }
 
 // ── ANA BİLEŞEN ───────────────────────────────────────────────────────────────
-export default function Agendas({ user, profile }) {
+export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAgenda }) {
   const [agendas, setAgendas] = useState([]);
   const [agendaTypes, setAgendaTypes] = useState([]);
   const [allProfiles, setAllProfiles] = useState([]);
@@ -1114,6 +1114,18 @@ export default function Agendas({ user, profile }) {
   }, [myId, myUnit, canSeeAllUnits]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Bildirimden gelen linkedAgendaId ile otomatik detay aç
+  useEffect(() => {
+    if (linkedAgendaId && agendas.length > 0 && !loading) {
+      const target = agendas.find(a => a.id === linkedAgendaId);
+      if (target) {
+        setDetailAgenda(target);
+        setDetailIsMine(false);
+      }
+      if (onClearLinkedAgenda) onClearLinkedAgenda();
+    }
+  }, [linkedAgendaId, agendas, loading, onClearLinkedAgenda]);
 
   // Direktör için mevcut birim listesi (profillerdeki + gündemlerdeki)
   const availableUnits = useMemo(() => {

@@ -24,26 +24,32 @@ function timeAgo(dateStr) {
 }
 
 // ── Bildirim Kartı ───────────────────────────────────────────────────────────
-function NotificationCard({ notification, onRead }) {
+function NotificationCard({ notification, onRead, onNavigate }) {
   const meta = getTypeMeta(notification.type);
   const isUnread = !notification.is_read;
 
   const handleClick = () => {
     if (isUnread) onRead(notification.id);
+    // Bildirimin kaynağına git
+    if (onNavigate && notification.link_type && notification.link_id) {
+      if (notification.link_type === 'agenda') {
+        onNavigate('agendas', { agendaId: notification.link_id });
+      }
+    }
   };
 
   return (
     <div
       onClick={handleClick}
       style={{
-        display: 'flex', gap: 12, padding: '14px 18px', cursor: isUnread ? 'pointer' : 'default',
+        display: 'flex', gap: 12, padding: '14px 18px', cursor: 'pointer',
         background: isUnread ? meta.bg : 'var(--bg-card, #fff)',
         border: `1px solid ${isUnread ? meta.color + '30' : 'var(--border, #e5e7eb)'}`,
         borderRadius: 12, transition: 'all 0.15s',
         borderLeft: `3px solid ${isUnread ? meta.color : 'transparent'}`,
         opacity: isUnread ? 1 : 0.7,
       }}
-      onMouseEnter={e => { if (isUnread) e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'; }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
     >
       {/* İkon */}
@@ -94,12 +100,22 @@ function NotificationCard({ notification, onRead }) {
           </div>
         )}
       </div>
+
+      {/* Yönlendirme göstergesi */}
+      {notification.link_type && notification.link_id && (
+        <div style={{
+          display: 'flex', alignItems: 'center', flexShrink: 0,
+          color: 'var(--text-muted, #9ca3af)', fontSize: 16,
+        }}>
+          →
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Ana Bildirimler Bileşeni ─────────────────────────────────────────────────
-export default function Notifications({ user }) {
+export default function Notifications({ user, onNavigate }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all' | 'unread' | type
@@ -254,7 +270,7 @@ export default function Notifications({ user }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {items.map(n => (
-                  <NotificationCard key={n.id} notification={n} onRead={handleRead} />
+                  <NotificationCard key={n.id} notification={n} onRead={handleRead} onNavigate={onNavigate} />
                 ))}
               </div>
             </div>

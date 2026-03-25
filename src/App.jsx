@@ -211,6 +211,8 @@ export default function App() {
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  const [linkedAgendaId, setLinkedAgendaId] = useState(null);
+
   const navigate = (page, opts = {}) => {
     // Check role access
     const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
@@ -223,6 +225,9 @@ export default function App() {
     }
     if (opts && opts.linkedTask !== undefined) {
       setDailyLogLinkedTask(opts.linkedTask || null);
+    }
+    if (opts && opts.agendaId !== undefined) {
+      setLinkedAgendaId(opts.agendaId || null);
     }
   };
 
@@ -333,6 +338,8 @@ export default function App() {
               defaultTab={activePage === 'users' ? 'users' : undefined}
               onProfileUpdate={() => loadProfile(user)}
               linkedTask={activePage === 'dailylog' ? dailyLogLinkedTask : undefined}
+              linkedAgendaId={activePage === 'agendas' ? linkedAgendaId : undefined}
+              onClearLinkedAgenda={() => setLinkedAgendaId(null)}
             />
           ) : (
             <Dashboard user={user} profile={profile} onNavigate={navigate} />
