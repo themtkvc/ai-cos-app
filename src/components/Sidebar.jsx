@@ -20,6 +20,7 @@ const ALL_NAV = [
   { id: 'networkanalytics', icon: '🔬', label: 'Network Analiz' },
   { id: 'notes',            icon: '📝', label: 'Notlarım' },
   { id: 'documents',        icon: '📄', label: 'Dokümanlar' },
+  { id: 'gamification',     icon: '🏆', label: 'Oyunlaştırma' },
 ];
 
 const ADMIN_NAV = [

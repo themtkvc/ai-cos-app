@@ -19,6 +19,7 @@ import Notes from './pages/Notes';
 import Documents from './pages/Documents';
 import Notifications from './pages/Notifications';
 import Admin from './pages/Admin';
+import Gamification from './pages/Gamification';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import AIChatPanel from './components/AIChatPanel';
@@ -30,11 +31,11 @@ export const useProfile = () => useContext(ProfileContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
-  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','profile'],
-  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','notes','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','gamification','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','notes','gamification','profile'],
+  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','notes','gamification','profile'],
+  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','notes','gamification','profile'],
+  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','notes','gamification','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
@@ -268,6 +269,7 @@ export default function App() {
     notes:     Notes,
     documents: Documents,
     notifications: Notifications,
+    gamification: Gamification,
     admin:     Admin,
     users:     Admin,
   };
@@ -291,6 +293,7 @@ export default function App() {
     notes:      '📝 Notlarım',
     documents:  '📄 Dokümanlar',
     notifications: '🔔 Bildirimler',
+    gamification: '🏆 Oyunlaştırma',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',

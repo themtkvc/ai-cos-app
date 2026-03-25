@@ -19,6 +19,7 @@ import {
   getAllProfiles,
   notifyTaskAssigned,
   createNotification,
+  awardXP,
 } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 import MentionInput, { extractMentions, renderMentionText } from '../components/MentionInput';
@@ -249,7 +250,17 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
             onClick={() => {
               if (isPersonalAgenda) {
                 // Kişisel gündem: direkt tamamla, onay gerekmez
-                act(() => markAgendaTaskDoneSelf(task.id), null);
+                act(async () => {
+                  await markAgendaTaskDoneSelf(task.id);
+                  // XP: sadece personel
+                  if (role === 'personel') {
+                    await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
+                    // Zamanında tamamlama bonusu
+                    if (task.due_date && new Date() <= new Date(task.due_date)) {
+                      await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
+                    }
+                  }
+                }, null);
               } else {
                 // Birim gündemi: onay bekliyor → koordinatöre/gündem sahibine bildirim
                 const notifications = [];
@@ -276,7 +287,19 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
                 if (role === 'koordinator' && direktorProfile && direktorProfile.user_id !== myId) {
                   notifications.push({ userId: direktorProfile.user_id, type: 'task_status', title: `"${task.title}" görevi koordinatör tarafından onaylandı`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' });
                 }
-                act(() => approveAgendaTask(task.id), notifications);
+                act(async () => {
+                  await approveAgendaTask(task.id);
+                  // XP: onay sonrası personele XP ver
+                  if (task.assigned_to) {
+                    const assignee = profiles.find(p => p.user_id === task.assigned_to);
+                    if (assignee?.role === 'personel') {
+                      await awardXP(task.assigned_to, 'task_complete', `Görev onaylandı: ${task.title}`, task.id);
+                      if (task.due_date && new Date(task.completed_at || Date.now()) <= new Date(task.due_date)) {
+                        await awardXP(task.assigned_to, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
+                      }
+                    }
+                  }
+                }, notifications);
               }}>
               👍 Onayla
             </button>
@@ -378,6 +401,16 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           await createNotification({ userId: uid, type: 'comment_added', title: taskId ? 'Görevinize yorum eklendi' : `"${agenda.title}" gündemine yorum eklendi`, body: text.trim().substring(0, 100), linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myProfile?.full_name || '' });
         } catch (e) { console.error('[Comment] notification error:', e); }
       }
+    }
+    // XP: yorum yazma (sadece personel)
+    if (role === 'personel') {
+      try {
+        await awardXP(myId, 'comment', `Yorum yazıldı: ${agenda.title}`, agenda.id);
+        // @mention ile işbirliği bonusu
+        if (mentionedIds.length > 0) {
+          await awardXP(myId, 'collaboration', `İşbirliği: ${mentionedIds.length} kişi etiketlendi`, agenda.id);
+        }
+      } catch (e) { console.error('[XP] comment error:', e); }
     }
     if (taskId) setTaskCommentTexts(prev => ({ ...prev, [taskId]: '' }));
     else setCommentText('');
@@ -1259,6 +1292,10 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         } catch (e) { console.error('Agenda mail error:', e); }
       }
     }
+    // XP: gündem oluşturma (sadece personel, yeni gündem)
+    if (!editAgenda && isPersonel) {
+      try { await awardXP(myId, 'agenda_create', `Gündem oluşturuldu: ${data.title}`); } catch (e) { console.error('[XP] agenda_create error:', e); }
+    }
     setAgendaModal(false);
     setEditAgenda(null);
     loadAll();
@@ -1778,6 +1815,15 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                             if (isMyTasksTab || agenda.is_personal) {
                               // Kendi görevi: direkt tamamla
                               await markAgendaTaskDoneSelf(task.id);
+                              // XP: sadece personel
+                              if (isPersonel) {
+                                try {
+                                  await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
+                                  if (task.due_date && new Date() <= new Date(task.due_date)) {
+                                    await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
+                                  }
+                                } catch (e) { console.error('[XP] task error:', e); }
+                              }
                             } else {
                               // Birim gündemi: onay bekliyor
                               await markAgendaTaskDone(task.id);

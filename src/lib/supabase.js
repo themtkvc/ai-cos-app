@@ -1037,3 +1037,53 @@ export const markAllNotificationsRead = async (userId) => {
     .eq('is_read', false);
   return { error };
 };
+
+// ── OYUNLAŞTIRMA (GAMIFICATION) ─────────────────────────────────────────────
+
+export const XP_VALUES = {
+  task_complete:    25,
+  agenda_create:    25,
+  on_time_bonus:    10,
+  comment:           5,
+  collaboration:     5,
+  network_contact:  15,
+  network_org:      15,
+  network_event:    15,
+  fund_opportunity: 50,
+};
+
+export const awardXP = async (userId, action, description, referenceId) => {
+  const xp = XP_VALUES[action];
+  if (!xp) { console.warn('[awardXP] Unknown action:', action); return { data: null, error: null }; }
+  const { data, error } = await supabase.rpc('award_xp', {
+    p_user_id: userId, p_action: action, p_xp_amount: xp,
+    p_description: description || null, p_reference_id: referenceId || null,
+  });
+  if (error) console.error('[awardXP] ERROR:', error);
+  return { data, error };
+};
+
+export const getLeaderboard = async () => {
+  const { data, error } = await supabase.from('user_xp').select('user_id, total_xp, level').order('total_xp', { ascending: false });
+  return { data, error };
+};
+
+export const getUserXP = async (userId) => {
+  const { data, error } = await supabase.from('user_xp').select('*').eq('user_id', userId).maybeSingle();
+  return { data, error };
+};
+
+export const getUserXPHistory = async (userId, limit = 30) => {
+  const { data, error } = await supabase.from('xp_events').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(limit);
+  return { data, error };
+};
+
+export const getAllBadges = async () => {
+  const { data, error } = await supabase.from('badges').select('*').order('sort_order');
+  return { data, error };
+};
+
+export const getUserBadges = async (userId) => {
+  const { data, error } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', userId).order('earned_at', { ascending: false });
+  return { data, error };
+};

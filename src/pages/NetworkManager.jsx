@@ -8,6 +8,7 @@ import {
   uploadNetworkMedia,
   getContactComms, createContactComm, deleteContactComm,
   getAllProfiles,
+  awardXP,
 } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDisplayDate } from '../lib/constants';
 import { WORLD_COUNTRIES, getCountryFlag, CITIES_BY_COUNTRY } from '../lib/worldData';
@@ -1567,12 +1568,28 @@ export default function NetworkManager({ user, profile }) {
   };
 
   const handleFormSave = async (savedItem) => {
+    const isNew = !editItem; // editItem null ise yeni kayıt
+    const savedType = formType;
     setShowForm(false);
     setEditItem(null);
     await load();
     // Detay panelinde açıksa güncelle
     if (selectedItem?.id === savedItem?.id) {
       setSelectedItem(savedItem);
+    }
+    // XP: sadece personel, sadece yeni kayıt
+    if (isNew && profile?.role === 'personel' && user?.id) {
+      try {
+        const xpAction = savedType === 'contact' ? 'network_contact'
+          : savedType === 'organization' ? 'network_org'
+          : savedType === 'event' ? 'network_event' : null;
+        const label = savedType === 'contact' ? 'Kişi eklendi'
+          : savedType === 'organization' ? 'Kurum eklendi'
+          : 'Etkinlik eklendi';
+        if (xpAction) {
+          await awardXP(user.id, xpAction, `${label}: ${savedItem?.name || savedItem?.full_name || ''}`, savedItem?.id);
+        }
+      } catch (e) { console.error('[XP] network error:', e); }
     }
   };
 
