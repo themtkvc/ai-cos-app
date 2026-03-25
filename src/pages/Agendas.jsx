@@ -492,7 +492,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
           myUnit={myUnit}
           role={role}
           allProfiles={allProfiles}
-          allowSelfAssign={isMineTab}
+          allowSelfAssign={isMineTab || isMyTasksTab}
           onSave={async (data) => {
             if (editTask) {
               await updateAgendaTask(editTask.id, data);
@@ -619,7 +619,7 @@ function TaskModal({ task, agendaId, myId, myName, myUnit, role, allProfiles = [
 }
 
 // ── GÜNDEM MODALI ─────────────────────────────────────────────────────────────
-function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits, availableUnits, isDirektor, allProfiles, onSave, onClose }) {
+function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits, availableUnits, isDirektor, isKoordinator, role, allProfiles, onSave, onClose }) {
   const [form, setForm] = useState({
     title: agenda?.title || '',
     description: agenda?.description || '',
@@ -637,15 +637,25 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
   const selectedType = agendaTypes.find(t => t.id === form.type_id);
   const typeFields = selectedType?.fields || [];
 
-  // Atanabilir profiller — direktör koordinatörlere ve asistana gündem atayabilir
-  const koordinatorProfiles = useMemo(() => {
-    if (!isDirektor || !allProfiles) return [];
-    return allProfiles.filter(p =>
-      (p.role === 'koordinator' && p.unit) ||
-      p.role === 'asistan' ||
-      p.role === 'direktor_yardimcisi'
-    );
-  }, [isDirektor, allProfiles]);
+  // Atanabilir profiller
+  // Direktör → koordinatörlere, asistana, dir.yardımcısına atayabilir
+  // Koordinatör → kendi birimindeki personellere atayabilir
+  const assignableProfiles = useMemo(() => {
+    if (!allProfiles) return [];
+    if (isDirektor) {
+      return allProfiles.filter(p =>
+        (p.role === 'koordinator' && p.unit) ||
+        p.role === 'asistan' ||
+        p.role === 'direktor_yardimcisi'
+      );
+    }
+    if (isKoordinator && myUnit) {
+      return allProfiles.filter(p =>
+        p.role === 'personel' && p.unit === myUnit && p.user_id !== myId
+      );
+    }
+    return [];
+  }, [isDirektor, isKoordinator, myUnit, myId, allProfiles]);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
   const setCustom = (k, v) => setForm(prev => ({ ...prev, custom_fields: { ...prev.custom_fields, [k]: v } }));
@@ -765,14 +775,16 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
           </div>
         ) : null}
 
-        {/* Koordinatöre Atama — sadece direktör görür */}
-        {isDirektor && koordinatorProfiles.length > 0 && (
+        {/* Sorumlu Atama — direktör ve koordinatör */}
+        {(isDirektor || isKoordinator) && assignableProfiles.length > 0 && (
           <div className="form-group">
-            <label className="form-label">👤 Koordinatöre Ata <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(isteğe bağlı)</span></label>
+            <label className="form-label">👤 Sorumlu Ata <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(isteğe bağlı)</span></label>
             <select className="form-select" value={form.assigned_to} onChange={e => handleAssignCoord(e.target.value)}>
-              <option value="">— Koordinatör Seç —</option>
-              {koordinatorProfiles.map(p => (
-                <option key={p.user_id} value={p.user_id}>{p.full_name}</option>
+              <option value="">— Sorumlu Seç —</option>
+              {assignableProfiles.map(p => (
+                <option key={p.user_id} value={p.user_id}>
+                  {p.full_name}{p.unit ? ` (${p.unit})` : ''} — {p.role === 'koordinator' ? 'Koordinatör' : p.role === 'asistan' ? 'Asistan' : p.role === 'direktor_yardimcisi' ? 'Dir. Yardımcısı' : 'Personel'}
+                </option>
               ))}
             </select>
             {form.assigned_to && (
@@ -878,11 +890,22 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
           </p>
         )}
 
-        {agenda.date && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {agenda.date && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+          )}
+          {agenda.assigned_to_name && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: '#6366f1',
+              background: '#6366f110', padding: '2px 8px', borderRadius: 12,
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              👤 {agenda.assigned_to_name}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Görevler bölümü */}
@@ -1146,7 +1169,7 @@ export default function Agendas({ user, profile }) {
     profiles: allProfiles,
     onEdit: handleEdit,
     onDelete: handleDeleteAgenda,
-    onOpen: (a) => { setDetailAgenda(a); setDetailIsMine(isMineTab); },
+    onOpen: (a) => { setDetailAgenda(a); setDetailIsMine(isMineTab || isMyTasksTab); },
     onNotify: handleNotifyAgenda,
   });
 
@@ -1568,7 +1591,7 @@ export default function Agendas({ user, profile }) {
             return (
               <div key={agenda.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 {/* Gündem başlığı */}
-                <div onClick={() => { setDetailAgenda(agenda); setDetailIsMine(false); }}
+                <div onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMyTasksTab); }}
                   style={{
                     padding: '12px 20px', background: typeColor + '08', borderBottom: '1px solid var(--border)',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
@@ -1683,6 +1706,8 @@ export default function Agendas({ user, profile }) {
           canSeeAllUnits={canSeeAllUnits}
           availableUnits={availableUnits}
           isDirektor={isDirektor}
+          isKoordinator={isKoordinator}
+          role={role}
           allProfiles={allProfiles}
           onSave={handleSaveAgenda}
           onClose={() => { setAgendaModal(false); setEditAgenda(null); }}
