@@ -247,27 +247,21 @@ export default function MentionInput({
 /**
  * Yorumdaki @mention'ları tespit edip user_id listesi döner.
  * Metin formatı: "@Ad Soyad" — profiles listesinden eşleştir.
+ * En uzun isimden başlayarak eşleştir (greedy matching).
  */
 export function extractMentions(text, profiles) {
   if (!text || !profiles?.length) return [];
   const mentionedIds = new Set();
 
-  // @Ad Soyad formatını yakala
-  const mentionRegex = /@([A-Za-zÇçĞğİıÖöŞşÜü\s]+?)(?=\s@|\s*$|[.,;:!?)])/g;
-  let match;
-  while ((match = mentionRegex.exec(text)) !== null) {
-    const name = match[1].trim();
-    const profile = profiles.find(p =>
-      p.full_name?.toLowerCase() === name.toLowerCase()
-    );
-    if (profile) {
-      mentionedIds.add(profile.user_id);
-    }
-  }
+  // Tüm profillerin isimlerini uzundan kısaya sırala (greedy matching)
+  const sorted = [...profiles]
+    .filter(p => p.full_name)
+    .sort((a, b) => b.full_name.length - a.full_name.length);
 
-  // Daha basit eşleştirme: tüm profillerin isimlerini kontrol et
-  profiles.forEach(p => {
-    if (p.full_name && text.includes(`@${p.full_name}`)) {
+  sorted.forEach(p => {
+    // Tam eşleşme: @Ad Soyad (case-insensitive)
+    const tag = `@${p.full_name}`;
+    if (text.toLowerCase().includes(tag.toLowerCase())) {
       mentionedIds.add(p.user_id);
     }
   });
