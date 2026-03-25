@@ -1136,3 +1136,28 @@ export const getUserBadges = async (userId) => {
   const { data, error } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', userId).order('earned_at', { ascending: false });
   return { data, error };
 };
+
+// ── Dönemsel XP (haftalık/aylık liderlik tablosu) ──
+
+export const getXPEventsByPeriod = async (startDate, endDate) => {
+  const { data, error } = await supabase.from('xp_events')
+    .select('user_id, xp_amount')
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+  return { data, error };
+};
+
+export const getLeaderHistory = async (limit = 50) => {
+  const { data, error } = await supabase.from('leader_history')
+    .select('*')
+    .order('period_start', { ascending: false })
+    .limit(limit);
+  return { data, error };
+};
+
+export const upsertLeaderHistory = async (record) => {
+  const { data, error } = await supabase.from('leader_history')
+    .upsert(record, { onConflict: 'period_type,period_label' })
+    .select();
+  return { data, error };
+};

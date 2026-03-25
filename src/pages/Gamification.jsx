@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting } from '../lib/supabase';
+import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting, getXPEventsByPeriod, getLeaderHistory, upsertLeaderHistory } from '../lib/supabase';
 
 // ── Seviye Hesaplama ──────────────────────────────────────────────────────────
 function calculateLevel(totalXp) {
@@ -37,6 +37,50 @@ const ACTION_META = {
   daily_log_fullday:{ icon: '🌟', label: 'Tam Gün (8 saat)' },
   daily_log_overtime:{ icon: '🔥', label: 'Fazla Mesai (saat başı x2)' },
 };
+
+// ── Dönem Hesaplamaları ───────────────────────────────────────────────────
+function getWeekRange(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  const weekNum = getISOWeek(monday);
+  return { start: monday, end: sunday, label: `${monday.getFullYear()}-W${String(weekNum).padStart(2, '0')}` };
+}
+
+function getMonthRange(date = new Date()) {
+  const d = new Date(date);
+  const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+  const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return { start, end, label };
+}
+
+function getISOWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+}
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+function formatPeriodLabel(type, label) {
+  if (type === 'weekly') {
+    // "2026-W13" → "13. Hafta, 2026"
+    const [year, w] = label.split('-W');
+    return `${parseInt(w)}. Hafta, ${year}`;
+  }
+  // "2026-03" → "Mart 2026"
+  const [year, month] = label.split('-');
+  return `${MONTHS_TR[parseInt(month) - 1]} ${year}`;
+}
 
 function timeAgo(dateStr) {
   const now = new Date();
@@ -167,15 +211,19 @@ function LeaderboardRow({ rank, profile, xpData, isMe }) {
 // ── ANA BİLEŞEN ─────────────────────────────────────────────────────────────
 export default function Gamification({ user, profile }) {
   const [leaderboard, setLeaderboard] = useState([]);
+  const [weeklyXP, setWeeklyXP] = useState({}); // user_id -> xp
+  const [monthlyXP, setMonthlyXP] = useState({}); // user_id -> xp
+  const [leaderHistoryList, setLeaderHistoryList] = useState([]);
   const [xpHistory, setXPHistory] = useState([]);
   const [allBadges, setAllBadges] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [xpSettings, setXpSettings] = useState([]);
-  const [editingSettings, setEditingSettings] = useState({}); // action -> tempValue
+  const [editingSettings, setEditingSettings] = useState({});
   const [savingAction, setSavingAction] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('leaderboard'); // 'leaderboard' | 'badges' | 'history' | 'settings'
-  const [lbScope, setLbScope] = useState('all'); // 'all' | 'unit'
+  const [tab, setTab] = useState('leaderboard');
+  const [lbScope, setLbScope] = useState('all');
+  const [lbPeriod, setLbPeriod] = useState('all'); // 'all' | 'weekly' | 'monthly'
 
   const myId = user?.id;
   const myUnit = profile?.unit;
@@ -184,21 +232,79 @@ export default function Gamification({ user, profile }) {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [lbRes, profilesRes, badgesRes, settingsRes] = await Promise.all([
+
+    // Dönem aralıkları
+    const week = getWeekRange();
+    const month = getMonthRange();
+
+    const [lbRes, profilesRes, badgesRes, settingsRes, histRes, weekRes, monthRes, leaderHistRes] = await Promise.all([
       getLeaderboard(),
       getAllProfiles(),
       getAllBadges(),
       getXPSettingsFull(),
+      getAllXPHistory(200),
+      getXPEventsByPeriod(week.start.toISOString(), week.end.toISOString()),
+      getXPEventsByPeriod(month.start.toISOString(), month.end.toISOString()),
+      getLeaderHistory(50),
     ]);
 
     setLeaderboard(lbRes.data || []);
     setProfiles(profilesRes.data || []);
     setAllBadges(badgesRes.data || []);
     setXpSettings(settingsRes.data || []);
-
-    // Direktör: tüm XP geçmişini yükle
-    const histRes = await getAllXPHistory(200);
     setXPHistory(histRes.data || []);
+    setLeaderHistoryList(leaderHistRes.data || []);
+
+    // Haftalık XP toplamları: user_id -> toplam
+    const wMap = {};
+    (weekRes.data || []).forEach(e => { wMap[e.user_id] = (wMap[e.user_id] || 0) + (e.xp_amount || 0); });
+    setWeeklyXP(wMap);
+
+    // Aylık XP toplamları
+    const mMap = {};
+    (monthRes.data || []).forEach(e => { mMap[e.user_id] = (mMap[e.user_id] || 0) + (e.xp_amount || 0); });
+    setMonthlyXP(mMap);
+
+    // Otomatik lider loglama: bu haftanın ve bu ayın lideri
+    const allProfiles = profilesRes.data || [];
+    const personelIds = new Set(allProfiles.filter(p => p.role === 'personel').map(p => p.user_id));
+
+    // Haftalık lider
+    const weekLeader = Object.entries(wMap)
+      .filter(([uid]) => personelIds.has(uid))
+      .sort((a, b) => b[1] - a[1])[0];
+    if (weekLeader && weekLeader[1] > 0) {
+      const wProfile = allProfiles.find(p => p.user_id === weekLeader[0]);
+      try {
+        await upsertLeaderHistory({
+          period_type: 'weekly', period_start: week.start.toISOString().split('T')[0],
+          period_end: week.end.toISOString().split('T')[0], period_label: week.label,
+          user_id: weekLeader[0], user_name: wProfile?.full_name || '', user_unit: wProfile?.unit || null,
+          total_xp: weekLeader[1],
+        });
+      } catch (e) { console.error('[LeaderHistory] weekly error:', e); }
+    }
+
+    // Aylık lider
+    const monthLeader = Object.entries(mMap)
+      .filter(([uid]) => personelIds.has(uid))
+      .sort((a, b) => b[1] - a[1])[0];
+    if (monthLeader && monthLeader[1] > 0) {
+      const mProfile = allProfiles.find(p => p.user_id === monthLeader[0]);
+      try {
+        await upsertLeaderHistory({
+          period_type: 'monthly', period_start: month.start.toISOString().split('T')[0],
+          period_end: month.end.toISOString().split('T')[0], period_label: month.label,
+          user_id: monthLeader[0], user_name: mProfile?.full_name || '', user_unit: mProfile?.unit || null,
+          total_xp: monthLeader[1],
+        });
+      } catch (e) { console.error('[LeaderHistory] monthly error:', e); }
+    }
+
+    // Refresh leader history after upsert
+    const freshHistory = await getLeaderHistory(50);
+    setLeaderHistoryList(freshHistory.data || []);
+
     setLoading(false);
   }, [myId]);
 
@@ -211,17 +317,29 @@ export default function Gamification({ user, profile }) {
     return m;
   }, [profiles]);
 
-  // Sadece personel olan kullanıcıları leaderboard'da göster
+  // Dönemsel leaderboard hesaplama
   const filteredLB = useMemo(() => {
-    let items = leaderboard.filter(xp => {
-      const p = profileMap[xp.user_id];
-      return p?.role === 'personel';
-    });
+    let items;
+    if (lbPeriod === 'weekly') {
+      // Haftalık: weeklyXP'den oluştur
+      items = Object.entries(weeklyXP)
+        .filter(([uid]) => profileMap[uid]?.role === 'personel')
+        .map(([user_id, total_xp]) => ({ user_id, total_xp }))
+        .sort((a, b) => b.total_xp - a.total_xp);
+    } else if (lbPeriod === 'monthly') {
+      items = Object.entries(monthlyXP)
+        .filter(([uid]) => profileMap[uid]?.role === 'personel')
+        .map(([user_id, total_xp]) => ({ user_id, total_xp }))
+        .sort((a, b) => b.total_xp - a.total_xp);
+    } else {
+      // Tüm zamanlar: mevcut leaderboard
+      items = leaderboard.filter(xp => profileMap[xp.user_id]?.role === 'personel');
+    }
     if (lbScope === 'unit' && myUnit) {
       items = items.filter(xp => profileMap[xp.user_id]?.unit === myUnit);
     }
     return items;
-  }, [leaderboard, profileMap, lbScope, myUnit]);
+  }, [leaderboard, profileMap, lbScope, lbPeriod, myUnit, weeklyXP, monthlyXP]);
 
   // Rozet kataloğu — direktör tüm rozet koleksiyonunu görür
 
@@ -296,6 +414,26 @@ export default function Gamification({ user, profile }) {
       {/* ── LİDERLİK TABLOSU ── */}
       {tab === 'leaderboard' && (
         <div>
+          {/* Dönem filtresi */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {[
+              { id: 'weekly', label: '📅 Bu Hafta' },
+              { id: 'monthly', label: '🗓️ Bu Ay' },
+              { id: 'all', label: '🏆 Tüm Zamanlar' },
+            ].map(p => (
+              <button key={p.id} onClick={() => setLbPeriod(p.id)}
+                style={{
+                  padding: '6px 16px', borderRadius: 16, fontSize: 12.5, cursor: 'pointer',
+                  border: `1.5px solid ${lbPeriod === p.id ? '#6366f1' : 'var(--border)'}`,
+                  background: lbPeriod === p.id ? '#6366f1' : 'var(--bg-card, #fff)',
+                  color: lbPeriod === p.id ? '#fff' : 'var(--text-muted)',
+                  fontWeight: lbPeriod === p.id ? 700 : 500,
+                }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           {/* Kapsam filtresi */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
             {[
@@ -315,14 +453,40 @@ export default function Gamification({ user, profile }) {
             ))}
           </div>
 
+          {/* Dönemin 1. sıradaki kişisi — vurgulu kart */}
+          {filteredLB.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)',
+              border: '1.5px solid #f59e0b40',
+              borderRadius: 14, padding: '16px 20px', marginBottom: 16,
+              display: 'flex', alignItems: 'center', gap: 14,
+            }}>
+              <div style={{ fontSize: 36 }}>👑</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {lbPeriod === 'weekly' ? 'Haftanın Lideri' : lbPeriod === 'monthly' ? 'Ayın Lideri' : 'Genel Lider'}
+                </div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#78350f', marginTop: 2 }}>
+                  {profileMap[filteredLB[0].user_id]?.full_name || 'Bilinmiyor'}
+                </div>
+                <div style={{ fontSize: 12, color: '#92400e', marginTop: 1 }}>
+                  {profileMap[filteredLB[0].user_id]?.unit || '—'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#b45309' }}>
+                  {filteredLB[0].total_xp.toLocaleString('tr-TR')}
+                </div>
+                <div style={{ fontSize: 10, color: '#92400e', fontWeight: 600 }}>XP</div>
+              </div>
+            </div>
+          )}
+
           {filteredLB.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text, #6b7280)' }}>
-                Henüz sıralama yok
-              </div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
-                Görevleri tamamlayarak XP kazanın ve liderlik tablosunda yerinizi alın!
+                {lbPeriod === 'weekly' ? 'Bu hafta henüz XP kazanılmadı' : lbPeriod === 'monthly' ? 'Bu ay henüz XP kazanılmadı' : 'Henüz sıralama yok'}
               </div>
             </div>
           ) : (
@@ -336,6 +500,52 @@ export default function Gamification({ user, profile }) {
                   isMe={xp.user_id === myId}
                 />
               ))}
+            </div>
+          )}
+
+          {/* ── GEÇMİŞ LİDERLER ── */}
+          {leaderHistoryList.length > 0 && (
+            <div style={{ marginTop: 28 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span>📜</span> Geçmiş Liderler
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {leaderHistoryList.map((lh) => (
+                  <div key={lh.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                    borderRadius: 12, background: 'var(--bg-card, #fff)',
+                    border: '1px solid var(--border, #e5e7eb)',
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: lh.period_type === 'weekly' ? '#dbeafe' : '#fef3c7',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 16,
+                    }}>
+                      {lh.period_type === 'weekly' ? '📅' : '🗓️'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+                        {lh.user_name || 'Bilinmiyor'}
+                        {lh.user_unit && <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>({lh.user_unit})</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {formatPeriodLabel(lh.period_type, lh.period_label)}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '3px 10px', borderRadius: 16, fontSize: 12, fontWeight: 800,
+                      color: lh.period_type === 'weekly' ? '#3b82f6' : '#f59e0b',
+                      background: lh.period_type === 'weekly' ? '#eff6ff' : '#fffbeb',
+                    }}>
+                      {lh.total_xp.toLocaleString('tr-TR')} XP
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
