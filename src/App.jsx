@@ -22,6 +22,7 @@ import Admin from './pages/Admin';
 import Gamification from './pages/Gamification';
 import FundOpportunities from './pages/FundOpportunities';
 import FormsManager from './pages/FormsManager';
+import PublicFormFill from './pages/PublicFormFill';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import AIChatPanel from './components/AIChatPanel';
@@ -247,6 +248,13 @@ export default function App() {
       setLinkedAgendaId(opts.agendaId || null);
     }
   };
+
+  // ── Public form route: #form/SLUG → login gerektirmez ──
+  const hashPath = window.location.hash.replace('#', '').trim();
+  const publicFormMatch = hashPath.match(/^form\/(.+)$/);
+  if (publicFormMatch) {
+    return <PublicFormFill slug={publicFormMatch[1]} />;
+  }
 
   if (loading) return (
     <div className="app-loading">
