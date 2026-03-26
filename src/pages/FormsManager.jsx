@@ -542,9 +542,18 @@ export default function FormsManager({ user, profile }) {
   const loadForms = useCallback(async () => {
     setLoading(true);
     const { data } = await getForms();
+    // Auto-fix: public formlar draft ise otomatik aktif yap (anon RLS gereksinimi)
+    if (data) {
+      for (const f of data) {
+        if (f.visibility === 'public' && f.status === 'draft' && f.created_by === user?.id) {
+          await updateForm(f.id, { status: 'active' });
+          f.status = 'active';
+        }
+      }
+    }
     setForms(data || []);
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadForms(); }, [loadForms]);
 
@@ -660,11 +669,14 @@ export default function FormsManager({ user, profile }) {
     if (!formTitle.trim()) return;
     setSaving(true);
 
+    // Public formlar draft olamaz — anon RLS politikası status='active' gerektirir
+    const effectiveStatus = (formVisibility === 'public' && formStatus === 'draft') ? 'active' : formStatus;
+
     const formRecord = {
       title: formTitle,
       description: formDesc,
       visibility: formVisibility,
-      status: formStatus,
+      status: effectiveStatus,
       allow_anonymous: formAllowAnon,
       allow_multiple_responses: formAllowMultiple,
       confirmation_message: formConfirmMsg,
@@ -1022,7 +1034,11 @@ export default function FormsManager({ user, profile }) {
                       background: formVisibility === key ? 'var(--primary-light)' : 'var(--bg-card)',
                     }}>
                       <input type="radio" name="vis" checked={formVisibility === key}
-                        onChange={() => setFormVisibility(key)} style={{ display: 'none' }} />
+                        onChange={() => {
+                          setFormVisibility(key);
+                          // Public form'lar otomatik olarak aktif yapılmalı (anon RLS gereksinimi)
+                          if (key === 'public' && formStatus === 'draft') setFormStatus('active');
+                        }} style={{ display: 'none' }} />
                       <span>{cfg.icon}</span>
                       <div>
                         <div style={{ fontWeight: 600, color: formVisibility === key ? 'var(--primary)' : 'var(--text)' }}>{cfg.label}</div>
@@ -1041,6 +1057,11 @@ export default function FormsManager({ user, profile }) {
                     <option key={k} value={k}>{v.icon} {v.label}</option>
                   ))}
                 </select>
+                {formVisibility === 'public' && formStatus === 'draft' && (
+                  <div style={{ fontSize: 11, color: 'var(--orange)', marginTop: 4 }}>
+                    ⚠️ Public formların çalışması için durumu "Aktif" yapmalısınız
+                  </div>
+                )}
               </div>
 
               {/* Options */}
@@ -1191,6 +1212,13 @@ export default function FormsManager({ user, profile }) {
                         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: 'var(--gray-light)', color: 'var(--text-muted)' }}>{vc.icon} {vc.label}</span>
                       </div>
                     </div>
+
+                    {/* Public + draft uyarısı */}
+                    {form.visibility === 'public' && form.status === 'draft' && (
+                      <div style={{ fontSize: 11, color: 'var(--orange)', background: 'var(--orange-pale)', padding: '6px 10px', borderRadius: 8, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        ⚠️ Public link çalışmaz — formu <strong>"Aktif"</strong> yapın
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 10 }}>
                       📊 {form.response_count || 0} yanıt · {new Date(form.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}

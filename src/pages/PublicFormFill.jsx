@@ -246,17 +246,30 @@ export default function PublicFormFill({ slug }) {
     setLoading(true);
     setError(null);
 
-    // Fetch public form by slug (anon RLS allows this)
+    // Fetch public form by slug (anon RLS allows visibility='public' AND status='active')
     const { data: formData, error: formErr } = await supabase
       .from('forms')
       .select('*')
       .eq('public_slug', slug)
-      .eq('status', 'active')
-      .eq('visibility', 'public')
       .single();
 
     if (formErr || !formData) {
+      console.error('Public form fetch error:', formErr?.message, 'slug:', slug);
+      // Form bulunamadı — ya slug yanlış, ya RLS engelledi (draft/internal form), ya da silinmiş
       setError('Form bulunamadı veya artık aktif değil.');
+      setLoading(false);
+      return;
+    }
+
+    // RLS anon politikası zaten sadece public+active olanları döndürür
+    // Ama authenticated kullanıcı tüm formları görebilir — ek kontrol yap
+    if (formData.visibility !== 'public') {
+      setError('Bu form herkese açık değil.');
+      setLoading(false);
+      return;
+    }
+    if (formData.status !== 'active') {
+      setError('Bu form şu anda aktif değil. Form sahibi ile iletişime geçin.');
       setLoading(false);
       return;
     }
