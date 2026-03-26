@@ -685,12 +685,19 @@ export default function FormsManager({ user, profile }) {
     let formId = activeForm?.id;
 
     if (activeForm) {
-      await updateForm(activeForm.id, formRecord);
+      const { error: updErr } = await updateForm(activeForm.id, formRecord);
+      if (updErr) console.error('Form update error:', updErr);
     } else {
       formRecord.created_by = user.id;
       formRecord.created_by_name = profile?.full_name || user.email;
       if (formVisibility === 'public') formRecord.public_slug = generateSlug();
-      const { data } = await createForm(formRecord);
+      const { data, error: crtErr } = await createForm(formRecord);
+      if (crtErr) {
+        console.error('Form create error:', crtErr);
+        alert('Form oluşturulurken hata: ' + crtErr.message);
+        setSaving(false);
+        return;
+      }
       if (data?.[0]) {
         formId = data[0].id;
         setActiveForm(data[0]);
@@ -705,7 +712,6 @@ export default function FormsManager({ user, profile }) {
     // Save fields
     if (formId && fields.length > 0) {
       const fieldsToSave = fields.map((f, i) => ({
-        id: f._new ? undefined : f.id,
         form_id: formId,
         field_type: f.field_type,
         label: f.label,
@@ -714,12 +720,21 @@ export default function FormsManager({ user, profile }) {
         options: f.options || null,
         validation: f.validation || null,
         conditional: f.conditional || null,
-        properties: f.properties || null,
+        properties: (f.properties && Object.keys(f.properties).length > 0) ? f.properties : null,
         sort_order: i,
       }));
-      // Delete removed fields and upsert
-      await deleteFormFieldsByFormId(formId);
-      await upsertFormFields(fieldsToSave);
+      // Mevcut alanları sil ve yeniden ekle
+      const { error: delErr } = await deleteFormFieldsByFormId(formId);
+      if (delErr) console.error('Field delete error:', delErr);
+      const { data: savedFields, error: insErr } = await upsertFormFields(fieldsToSave);
+      if (insErr) {
+        console.error('Field insert error:', insErr);
+        alert('Sorular kaydedilirken hata oluştu: ' + insErr.message);
+      } else {
+        console.log('Fields saved successfully:', savedFields?.length, 'fields');
+      }
+    } else if (formId) {
+      console.log('No fields to save for form', formId);
     }
 
     setSaving(false);
@@ -740,15 +755,25 @@ export default function FormsManager({ user, profile }) {
       is_anonymous: activeForm.allow_anonymous && !user,
     };
 
-    const answerRows = Object.entries(answers).map(([fieldId, val]) => ({
-      field_id: fieldId,
-      value: val,
-    }));
+    // answers objesindeki key'ler field.id (DB UUID) — sadece gerçek soru alanlarını gönder
+    const questionFieldIds = fields
+      .filter(f => !['section_header', 'description_text'].includes(f.field_type))
+      .map(f => f.id);
+
+    const answerRows = Object.entries(answers)
+      .filter(([fieldId]) => questionFieldIds.includes(fieldId))
+      .map(([fieldId, val]) => ({
+        field_id: fieldId,
+        value: val !== undefined && val !== null ? val : null,
+      }));
 
     const { error } = await submitFormResponse(response, answerRows);
     setSaving(false);
 
-    if (!error) {
+    if (error) {
+      console.error('Submit response error:', error);
+      alert('Yanıt gönderilirken hata oluştu: ' + error.message);
+    } else {
       setSubmitted(true);
     }
   };

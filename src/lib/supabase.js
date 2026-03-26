@@ -1238,7 +1238,10 @@ export const getFormFields = async (formId) => {
 };
 
 export const upsertFormFields = async (fields) => {
-  const { data, error } = await supabase.from('form_fields').upsert(fields).select();
+  // id olmadan insert et — DB auto-generate etsin (upsert undefined id ile sorun çıkarır)
+  const cleanFields = fields.map(({ id, ...rest }) => rest);
+  const { data, error } = await supabase.from('form_fields').insert(cleanFields).select();
+  if (error) console.error('upsertFormFields error:', error.message, error.details);
   return { data, error };
 };
 
