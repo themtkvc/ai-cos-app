@@ -21,6 +21,7 @@ const ALL_NAV = [
   { id: 'notes',            icon: '📝', label: 'Notlarım' },
   { id: 'documents',        icon: '📄', label: 'Dokümanlar' },
   { id: 'funds',            icon: '💰', label: 'Fon Fırsatları' },
+  { id: 'forms',            icon: '📋', label: 'Formlar' },
   { id: 'gamification',     icon: '🏆', label: 'Oyunlaştırma' },
 ];
 

@@ -1192,3 +1192,107 @@ export const deleteFundOpportunity = async (id) => {
     .eq('id', id);
   return { data, error };
 };
+
+// ── FORMS MODULE ──
+
+export const getForms = async () => {
+  const { data, error } = await supabase.from('forms')
+    .select('*').order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const getFormById = async (id) => {
+  const { data, error } = await supabase.from('forms')
+    .select('*').eq('id', id).single();
+  return { data, error };
+};
+
+export const getFormBySlug = async (slug) => {
+  const { data, error } = await supabase.from('forms')
+    .select('*').eq('public_slug', slug).eq('status', 'active').single();
+  return { data, error };
+};
+
+export const createForm = async (record) => {
+  const { data, error } = await supabase.from('forms').insert(record).select();
+  return { data, error };
+};
+
+export const updateForm = async (id, updates) => {
+  const { data, error } = await supabase.from('forms')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+export const deleteForm = async (id) => {
+  const { data, error } = await supabase.from('forms').delete().eq('id', id);
+  return { data, error };
+};
+
+// Form Fields
+export const getFormFields = async (formId) => {
+  const { data, error } = await supabase.from('form_fields')
+    .select('*').eq('form_id', formId).order('sort_order');
+  return { data, error };
+};
+
+export const upsertFormFields = async (fields) => {
+  const { data, error } = await supabase.from('form_fields').upsert(fields).select();
+  return { data, error };
+};
+
+export const deleteFormField = async (fieldId) => {
+  const { data, error } = await supabase.from('form_fields').delete().eq('id', fieldId);
+  return { data, error };
+};
+
+export const deleteFormFieldsByFormId = async (formId) => {
+  const { data, error } = await supabase.from('form_fields').delete().eq('form_id', formId);
+  return { data, error };
+};
+
+// Form Responses
+export const getFormResponses = async (formId) => {
+  const { data, error } = await supabase.from('form_responses')
+    .select('*').eq('form_id', formId).order('submitted_at', { ascending: false });
+  return { data, error };
+};
+
+export const getFormResponseData = async (responseId) => {
+  const { data, error } = await supabase.from('form_response_data')
+    .select('*').eq('response_id', responseId);
+  return { data, error };
+};
+
+export const getAllFormResponseData = async (formId) => {
+  const { data, error } = await supabase.from('form_responses')
+    .select('id, respondent_name, respondent_email, submitted_at, is_anonymous, form_response_data(field_id, value)')
+    .eq('form_id', formId)
+    .order('submitted_at', { ascending: false });
+  return { data, error };
+};
+
+export const submitFormResponse = async (response, answers) => {
+  // 1) Insert response
+  const { data: respData, error: respErr } = await supabase.from('form_responses')
+    .insert(response).select();
+  if (respErr || !respData?.[0]) return { data: null, error: respErr };
+
+  const responseId = respData[0].id;
+
+  // 2) Insert all answer data
+  const answerRows = answers.map(a => ({
+    response_id: responseId,
+    field_id: a.field_id,
+    value: a.value,
+  }));
+
+  if (answerRows.length > 0) {
+    const { error: dataErr } = await supabase.from('form_response_data')
+      .insert(answerRows);
+    if (dataErr) return { data: null, error: dataErr };
+  }
+
+  return { data: respData[0], error: null };
+};
