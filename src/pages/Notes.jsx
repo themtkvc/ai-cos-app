@@ -472,21 +472,22 @@ function NoteCard({ note, onClick, onPin }) {
       </div>
 
       {/* Footer: category + date */}
-      {(note.category || checkTotal > 0) && (
-        <div style={{ padding: '6px 14px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {note.category && (
-            <span style={{
-              padding: '2px 8px', borderRadius: 10, fontSize: 10.5, fontWeight: 600,
-              background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)',
-            }}>{note.category}</span>
-          )}
-          {checkTotal > 0 && (
-            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
-              {checkDone}/{checkTotal} tamamlandı
-            </span>
-          )}
-        </div>
-      )}
+      <div style={{ padding: '6px 14px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {note.category && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 10, fontSize: 10.5, fontWeight: 600,
+            background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)',
+          }}>{note.category}</span>
+        )}
+        {checkTotal > 0 && (
+          <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+            {checkDone}/{checkTotal} tamamlandı
+          </span>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: 9.5, color: 'var(--text-muted)', opacity: 0.6 }}>
+          {new Date(note.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+        </span>
+      </div>
     </div>
   );
 }
