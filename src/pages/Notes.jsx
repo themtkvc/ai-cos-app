@@ -146,17 +146,74 @@ function CategoryPicker({ value, onChange, categories }) {
   );
 }
 
+// ── Fotoğraf yükleme sabitleri ────────────────────────────────────────────────
+const MAX_IMAGES = 2;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+// ── Fotoğraf yükleme yardımcı fonksiyonları ──────────────────────────────────
+const uploadNoteImage = async (userId, file) => {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { data, error } = await supabase.storage.from('note-images').upload(fileName, file, {
+    cacheControl: '3600', upsert: false,
+  });
+  if (error) throw error;
+  const { data: urlData } = supabase.storage.from('note-images').getPublicUrl(data.path);
+  return urlData.publicUrl;
+};
+
+const deleteNoteImage = async (url) => {
+  try {
+    const path = url.split('/note-images/')[1];
+    if (path) await supabase.storage.from('note-images').remove([path]);
+  } catch (e) { console.error('Image delete error:', e); }
+};
+
+// ── Fotoğraf önizleme bileşeni ──────────────────────────────────────────────
+function ImagePreview({ images, onRemove, compact }) {
+  if (!images || images.length === 0) return null;
+  return (
+    <div style={{
+      display: 'flex', gap: 8, padding: compact ? 0 : '8px 12px',
+      flexWrap: 'wrap',
+    }}>
+      {images.map((url, i) => (
+        <div key={i} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+          <img src={url} alt="" style={{
+            width: compact ? 80 : 120, height: compact ? 60 : 90,
+            objectFit: 'cover', borderRadius: 10, display: 'block',
+            border: '1px solid var(--border)',
+          }} />
+          {onRemove && (
+            <button onClick={() => onRemove(i)}
+              style={{
+                position: 'absolute', top: 4, right: 4, width: 22, height: 22,
+                borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)',
+                color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+              }}>✕</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Not düzenleme modalı ─────────────────────────────────────────────────────
-function NoteEditor({ note, onSave, onClose, onDelete }) {
+function NoteEditor({ note, onSave, onClose, onDelete, userId }) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [color, setColor] = useState(note?.color || 'default');
   const [category, setCategory] = useState(note?.category || '');
   const [checklist, setChecklist] = useState(note?.checklist || []);
+  const [images, setImages] = useState(note?.images || []);
   const [showChecklist, setShowChecklist] = useState((note?.checklist || []).length > 0);
   const [showColors, setShowColors] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const editorRef = useRef(null);
+  const fileInputRef = useRef(null);
   const colorObj = getColor(color);
 
   useEffect(() => {
@@ -165,13 +222,65 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
     }
   }, []);
 
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      alert(`En fazla ${MAX_IMAGES} fotoğraf ekleyebilirsiniz.`);
+      return;
+    }
+
+    const toUpload = files.slice(0, remaining);
+
+    for (const file of toUpload) {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        alert(`Desteklenmeyen dosya türü: ${file.name}. Sadece JPG, PNG, GIF ve WebP kabul edilir.`);
+        continue;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        alert(`${file.name} dosyası 5 MB'den büyük. Lütfen daha küçük bir dosya seçin.`);
+        continue;
+      }
+      setUploading(true);
+      try {
+        const url = await uploadNoteImage(userId, file);
+        setImages(prev => [...prev, url]);
+      } catch (err) {
+        console.error('Upload error:', err);
+        alert('Fotoğraf yüklenirken hata oluştu.');
+      }
+      setUploading(false);
+    }
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveImage = async (index) => {
+    const url = images[index];
+    // Yeni eklenen (henüz kaydedilmemiş) görsel ise storage'dan sil
+    if (!(note?.images || []).includes(url)) {
+      await deleteNoteImage(url);
+    }
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     const html = editorRef.current?.innerHTML || '';
-    if (!title.trim() && !html.trim() && checklist.length === 0) return;
+    if (!title.trim() && !html.trim() && checklist.length === 0 && images.length === 0) return;
     setSaving(true);
+    // Silinen görselleri storage'dan temizle
+    const oldImages = note?.images || [];
+    for (const oldUrl of oldImages) {
+      if (!images.includes(oldUrl)) {
+        await deleteNoteImage(oldUrl);
+      }
+    }
     await onSave({
       ...note, title: title.trim(), content: html, color, category,
       checklist: showChecklist ? checklist : [],
+      images,
     });
     setSaving(false);
     onClose();
@@ -207,9 +316,16 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
           data-placeholder="Not yazın..."
           style={{
             flex: 1, padding: '12px 16px', outline: 'none', fontSize: 14,
-            lineHeight: 1.7, minHeight: 150, maxHeight: 350, overflowY: 'auto',
+            lineHeight: 1.7, minHeight: 150, maxHeight: 300, overflowY: 'auto',
             color: 'var(--text)', background: 'transparent',
           }} />
+
+        {/* Image previews */}
+        {images.length > 0 && (
+          <div style={{ borderTop: '1px solid var(--border)' }}>
+            <ImagePreview images={images} onRemove={handleRemoveImage} />
+          </div>
+        )}
 
         {/* Checklist */}
         {showChecklist && <Checklist items={checklist} onChange={setChecklist} />}
@@ -220,12 +336,32 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
         {/* Category */}
         <CategoryPicker value={category} onChange={setCategory} categories={DEFAULT_CATEGORIES} />
 
+        {/* Hidden file input */}
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+          multiple style={{ display: 'none' }}
+          onChange={handleImageUpload} />
+
         {/* Bottom bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 12px', borderTop: '1px solid var(--border)',
         }}>
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <button title={images.length >= MAX_IMAGES ? `En fazla ${MAX_IMAGES} fotoğraf` : 'Fotoğraf ekle'}
+              onClick={() => { if (images.length < MAX_IMAGES) fileInputRef.current?.click(); }}
+              disabled={uploading || images.length >= MAX_IMAGES}
+              style={{
+                ...iconBtnStyle,
+                opacity: images.length >= MAX_IMAGES ? 0.3 : 1,
+                cursor: images.length >= MAX_IMAGES ? 'not-allowed' : 'pointer',
+              }}>
+              {uploading ? '⏳' : '📷'}
+            </button>
+            {images.length > 0 && (
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', marginLeft: 2 }}>
+                {images.length}/{MAX_IMAGES}
+              </span>
+            )}
             <button title="Renk" onClick={() => setShowColors(!showColors)}
               style={{ ...iconBtnStyle, background: showColors ? 'var(--bg-hover)' : 'transparent' }}>
               🎨
@@ -246,7 +382,7 @@ function NoteEditor({ note, onSave, onClose, onDelete }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={onClose} style={secondaryBtnStyle}>İptal</button>
-            <button onClick={handleSave} disabled={saving} style={primaryBtnStyle}>
+            <button onClick={handleSave} disabled={saving || uploading} style={primaryBtnStyle}>
               {saving ? 'Kaydediliyor…' : 'Kaydet'}
             </button>
           </div>
@@ -288,6 +424,20 @@ function NoteCard({ note, onClick, onPin }) {
       >
         📌
       </button>
+
+      {/* Image thumbnails */}
+      {(note.images || []).length > 0 && (
+        <div style={{
+          display: 'flex', gap: 0, borderRadius: '12px 12px 0 0', overflow: 'hidden',
+        }}>
+          {(note.images || []).map((url, i) => (
+            <img key={i} src={url} alt="" style={{
+              flex: 1, height: (note.images || []).length === 1 ? 140 : 100,
+              objectFit: 'cover', display: 'block',
+            }} />
+          ))}
+        </div>
+      )}
 
       <div style={{ padding: '12px 14px' }}>
         {/* Title */}
@@ -370,6 +520,7 @@ export default function Notes({ user }) {
     const payload = {
       title: note.title, content: note.content, color: note.color,
       category: note.category, checklist: note.checklist,
+      images: note.images || [],
       user_id: user.id, updated_at: new Date().toISOString(),
     };
     if (note.id) {
@@ -555,6 +706,7 @@ export default function Notes({ user }) {
           onSave={saveNote}
           onClose={() => setEditing(null)}
           onDelete={deleteNote}
+          userId={user.id}
         />
       )}
 
