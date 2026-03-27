@@ -236,6 +236,11 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{task.assigned_to_name}</span>
           </div>
         )}
+        {task.created_at && (
+          <span style={{ fontSize: 9.5, color: 'var(--text-muted)', opacity: 0.55, marginLeft: 'auto' }}>
+            {new Date(task.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+          </span>
+        )}
       </div>
 
       {task.completion_status === 'revision_requested' && task.revision_note && (
