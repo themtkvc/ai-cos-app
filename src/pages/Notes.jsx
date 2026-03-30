@@ -22,35 +22,91 @@ const DEFAULT_CATEGORIES = ['Toplantı', 'Proje', 'Kişisel', 'Fikir', 'Takip', 
 
 // ── Toolbar bileşeni ─────────────────────────────────────────────────────────
 function Toolbar({ editorRef }) {
+  const [activeHeading, setActiveHeading] = useState(null);
+
   const exec = (cmd, val = null) => {
     document.execCommand(cmd, false, val);
     editorRef.current?.focus();
   };
+
+  // Başlık döngüsü: H1 → H2 → H3 → Normal (P)
+  const cycleHeading = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const node = sel.anchorNode;
+    const block = node?.nodeType === 3 ? node.parentElement : node;
+    const tag = block?.closest?.('h1, h2, h3, p, div')?.tagName?.toLowerCase() || '';
+
+    let nextTag, nextLabel;
+    if (tag !== 'h1' && tag !== 'h2' && tag !== 'h3') {
+      nextTag = '<h1>'; nextLabel = 'H1';
+    } else if (tag === 'h1') {
+      nextTag = '<h2>'; nextLabel = 'H2';
+    } else if (tag === 'h2') {
+      nextTag = '<h3>'; nextLabel = 'H3';
+    } else {
+      nextTag = '<p>'; nextLabel = null;
+    }
+
+    document.execCommand('formatBlock', false, nextTag);
+    setActiveHeading(nextLabel);
+    editorRef.current?.focus();
+  };
+
+  // Seçili bloğun başlık durumunu kontrol et
+  const checkHeading = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) { setActiveHeading(null); return; }
+    const node = sel.anchorNode;
+    const block = node?.nodeType === 3 ? node.parentElement : node;
+    const tag = block?.closest?.('h1, h2, h3')?.tagName?.toLowerCase() || '';
+    if (tag === 'h1') setActiveHeading('H1');
+    else if (tag === 'h2') setActiveHeading('H2');
+    else if (tag === 'h3') setActiveHeading('H3');
+    else setActiveHeading(null);
+  };
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', checkHeading);
+    return () => document.removeEventListener('selectionchange', checkHeading);
+  }, []);
+
   const btns = [
+    { cmd: 'undo', icon: '↩', style: { fontSize: 15 }, title: 'Geri Al (Ctrl+Z)' },
+    { cmd: 'redo', icon: '↪', style: { fontSize: 15 }, title: 'İleri Al (Ctrl+Y)' },
+    null,
     { cmd: 'bold',          icon: 'B',    style: { fontWeight: 700 }, title: 'Kalın' },
     { cmd: 'italic',        icon: 'I',    style: { fontStyle: 'italic' }, title: 'İtalik' },
     { cmd: 'underline',     icon: 'U',    style: { textDecoration: 'underline' }, title: 'Altı çizili' },
     { cmd: 'strikeThrough', icon: 'S',    style: { textDecoration: 'line-through' }, title: 'Üstü çizili' },
-    null, // separator
-    { cmd: 'formatBlock', val: '<h2>', icon: 'H', style: { fontWeight: 700, fontSize: 13 }, title: 'Başlık' },
+    null,
+    { cmd: '_heading', icon: activeHeading || 'H', style: { fontWeight: 700, fontSize: 13 }, title: 'Başlık (H1→H2→H3→Normal)', isHeading: true },
     { cmd: 'insertUnorderedList', icon: '•', style: { fontSize: 16, lineHeight: 1 }, title: 'Madde listesi' },
     { cmd: 'insertOrderedList',   icon: '1.', style: { fontSize: 12, fontWeight: 600 }, title: 'Numaralı liste' },
   ];
+
   return (
     <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
       {btns.map((b, i) => b === null ? (
         <div key={i} style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 4px', alignSelf: 'center' }} />
       ) : (
         <button key={b.cmd + (b.val || '')} title={b.title}
-          onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
+          onMouseDown={e => {
+            e.preventDefault();
+            if (b.isHeading) cycleHeading();
+            else exec(b.cmd, b.val);
+          }}
           style={{
             ...b.style, width: 28, height: 28, border: 'none', borderRadius: 6,
-            background: 'transparent', cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', fontSize: 13,
-            color: 'var(--text-secondary)', transition: 'background 0.1s',
+            background: b.isHeading && activeHeading ? 'var(--bg-hover)' : 'transparent',
+            cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', fontSize: b.style?.fontSize || 13,
+            color: b.isHeading && activeHeading ? 'var(--navy, #1a3a5c)' : 'var(--text-secondary)',
+            transition: 'background 0.1s',
+            fontWeight: b.style?.fontWeight || 'normal',
           }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          onMouseLeave={e => e.currentTarget.style.background = (b.isHeading && activeHeading) ? 'var(--bg-hover)' : 'transparent'}
         >{b.icon}</button>
       ))}
     </div>
