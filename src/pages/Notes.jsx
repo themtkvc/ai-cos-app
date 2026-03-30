@@ -23,33 +23,18 @@ const DEFAULT_CATEGORIES = ['Toplantı', 'Proje', 'Kişisel', 'Fikir', 'Takip', 
 // ── Toolbar bileşeni ─────────────────────────────────────────────────────────
 function Toolbar({ editorRef }) {
   const [activeHeading, setActiveHeading] = useState(null);
+  const [showHeadingMenu, setShowHeadingMenu] = useState(false);
+  const headingRef = useRef(null);
 
   const exec = (cmd, val = null) => {
     document.execCommand(cmd, false, val);
     editorRef.current?.focus();
   };
 
-  // Başlık döngüsü: H1 → H2 → H3 → Normal (P)
-  const cycleHeading = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const node = sel.anchorNode;
-    const block = node?.nodeType === 3 ? node.parentElement : node;
-    const tag = block?.closest?.('h1, h2, h3, p, div')?.tagName?.toLowerCase() || '';
-
-    let nextTag, nextLabel;
-    if (tag !== 'h1' && tag !== 'h2' && tag !== 'h3') {
-      nextTag = '<h1>'; nextLabel = 'H1';
-    } else if (tag === 'h1') {
-      nextTag = '<h2>'; nextLabel = 'H2';
-    } else if (tag === 'h2') {
-      nextTag = '<h3>'; nextLabel = 'H3';
-    } else {
-      nextTag = '<p>'; nextLabel = null;
-    }
-
-    document.execCommand('formatBlock', false, nextTag);
-    setActiveHeading(nextLabel);
+  const applyHeading = (tag) => {
+    document.execCommand('formatBlock', false, tag);
+    setActiveHeading(tag === '<p>' ? null : tag.replace(/[<>]/g, '').toUpperCase());
+    setShowHeadingMenu(false);
     editorRef.current?.focus();
   };
 
@@ -71,6 +56,23 @@ function Toolbar({ editorRef }) {
     return () => document.removeEventListener('selectionchange', checkHeading);
   }, []);
 
+  // Dropdown dışına tıklayınca kapat
+  useEffect(() => {
+    if (!showHeadingMenu) return;
+    const close = (e) => {
+      if (headingRef.current && !headingRef.current.contains(e.target)) setShowHeadingMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showHeadingMenu]);
+
+  const HEADING_OPTIONS = [
+    { tag: '<h1>', label: 'Başlık 1', preview: 'H1', style: { fontSize: 18, fontWeight: 800 } },
+    { tag: '<h2>', label: 'Başlık 2', preview: 'H2', style: { fontSize: 16, fontWeight: 700 } },
+    { tag: '<h3>', label: 'Başlık 3', preview: 'H3', style: { fontSize: 14, fontWeight: 600 } },
+    { tag: '<p>',  label: 'Normal metin', preview: 'P', style: { fontSize: 13, fontWeight: 400 } },
+  ];
+
   const btns = [
     { cmd: 'undo', icon: '↩', style: { fontSize: 15 }, title: 'Geri Al (Ctrl+Z)' },
     { cmd: 'redo', icon: '↪', style: { fontSize: 15 }, title: 'İleri Al (Ctrl+Y)' },
@@ -80,35 +82,91 @@ function Toolbar({ editorRef }) {
     { cmd: 'underline',     icon: 'U',    style: { textDecoration: 'underline' }, title: 'Altı çizili' },
     { cmd: 'strikeThrough', icon: 'S',    style: { textDecoration: 'line-through' }, title: 'Üstü çizili' },
     null,
-    { cmd: '_heading', icon: activeHeading || 'H', style: { fontWeight: 700, fontSize: 13 }, title: 'Başlık (H1→H2→H3→Normal)', isHeading: true },
+    { cmd: '_heading_menu', isHeadingMenu: true },
     { cmd: 'insertUnorderedList', icon: '•', style: { fontSize: 16, lineHeight: 1 }, title: 'Madde listesi' },
     { cmd: 'insertOrderedList',   icon: '1.', style: { fontSize: 12, fontWeight: 600 }, title: 'Numaralı liste' },
   ];
 
+  const toolBtnStyle = (extra = {}) => ({
+    width: 28, height: 28, border: 'none', borderRadius: 6,
+    background: 'transparent', cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', fontSize: 13,
+    color: 'var(--text-secondary)', transition: 'background 0.1s',
+    ...extra,
+  });
+
   return (
-    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-      {btns.map((b, i) => b === null ? (
-        <div key={i} style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 4px', alignSelf: 'center' }} />
-      ) : (
-        <button key={b.cmd + (b.val || '')} title={b.title}
-          onMouseDown={e => {
-            e.preventDefault();
-            if (b.isHeading) cycleHeading();
-            else exec(b.cmd, b.val);
-          }}
-          style={{
-            ...b.style, width: 28, height: 28, border: 'none', borderRadius: 6,
-            background: b.isHeading && activeHeading ? 'var(--bg-hover)' : 'transparent',
-            cursor: 'pointer', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', fontSize: b.style?.fontSize || 13,
-            color: b.isHeading && activeHeading ? 'var(--navy, #1a3a5c)' : 'var(--text-secondary)',
-            transition: 'background 0.1s',
-            fontWeight: b.style?.fontWeight || 'normal',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = (b.isHeading && activeHeading) ? 'var(--bg-hover)' : 'transparent'}
-        >{b.icon}</button>
-      ))}
+    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
+      {btns.map((b, i) => {
+        if (b === null) {
+          return <div key={i} style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 4px', alignSelf: 'center' }} />;
+        }
+
+        if (b.isHeadingMenu) {
+          return (
+            <div key="heading-menu" ref={headingRef} style={{ position: 'relative' }}>
+              <button
+                title="Başlık seçenekleri"
+                onMouseDown={e => { e.preventDefault(); setShowHeadingMenu(!showHeadingMenu); }}
+                style={toolBtnStyle({
+                  fontWeight: 700,
+                  gap: 2,
+                  width: 'auto',
+                  padding: '0 6px',
+                  background: (activeHeading || showHeadingMenu) ? 'var(--bg-hover)' : 'transparent',
+                  color: activeHeading ? 'var(--navy, #1a3a5c)' : 'var(--text-secondary)',
+                })}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = (activeHeading || showHeadingMenu) ? 'var(--bg-hover)' : 'transparent'}
+              >
+                <span>{activeHeading || 'H'}</span>
+                <span style={{ fontSize: 9, marginLeft: 1, opacity: 0.6 }}>▾</span>
+              </button>
+
+              {showHeadingMenu && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: 4,
+                  background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+                  borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  padding: 4, zIndex: 100, minWidth: 160,
+                }}>
+                  {HEADING_OPTIONS.map(opt => {
+                    const isActive = (activeHeading === opt.preview) || (!activeHeading && opt.tag === '<p>');
+                    return (
+                      <button key={opt.tag}
+                        onMouseDown={e => { e.preventDefault(); applyHeading(opt.tag); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', padding: '8px 12px', border: 'none',
+                          borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                          background: isActive ? 'var(--bg-hover, #f3f4f6)' : 'transparent',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
+                        onMouseLeave={e => e.currentTarget.style.background = isActive ? 'var(--bg-hover, #f3f4f6)' : 'transparent'}
+                      >
+                        <span style={{
+                          ...opt.style, color: 'var(--text)', lineHeight: 1.2,
+                        }}>{opt.label}</span>
+                        {isActive && <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--navy, #1a3a5c)' }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <button key={b.cmd + (b.val || '')} title={b.title}
+            onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
+            style={toolBtnStyle({ ...b.style, fontWeight: b.style?.fontWeight || 'normal', fontSize: b.style?.fontSize || 13 })}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >{b.icon}</button>
+        );
+      })}
     </div>
   );
 }
