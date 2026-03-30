@@ -242,7 +242,7 @@ body {
   font-size: 12px; color: var(--text); font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sidebar-user-role { font-size: 10.5px; color: var(--text-light); margin-top: 1px; }
+.sidebar-user-role { font-size: 10.5px; color: var(--text-secondary, #6b7280); margin-top: 1px; }
 .sign-out-btn {
   background: none; border: none; cursor: pointer;
   color: var(--text-light); padding: 4px;
