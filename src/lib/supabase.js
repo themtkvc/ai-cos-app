@@ -1085,26 +1085,32 @@ export const updateXPSetting = async (action, xpAmount) => {
 };
 
 export const awardXP = async (userId, action, description, referenceId) => {
-  const settings = await getXPSettings();
-  const xp = settings[action] ?? XP_VALUES_DEFAULT[action];
-  if (!xp) { console.warn('[awardXP] Unknown action:', action); return { data: null, error: null }; }
-  const { data, error } = await supabase.rpc('award_xp', {
-    p_user_id: userId, p_action: action, p_xp_amount: xp,
-    p_description: description || null, p_reference_id: referenceId || null,
-  });
-  if (error) console.error('[awardXP] ERROR:', error);
-  return { data, error };
+  try {
+    const settings = await getXPSettings();
+    const xp = settings[action] ?? XP_VALUES_DEFAULT[action];
+    if (!xp) { console.warn('[awardXP] Unknown action:', action); return { data: null, error: null }; }
+    const { data, error } = await supabase.rpc('award_xp', {
+      p_user_id: userId, p_action: action, p_xp_amount: xp,
+      p_description: description || null, p_reference_id: referenceId ? String(referenceId) : null,
+    });
+    if (error) console.error('[awardXP] ERROR:', error.message, { userId, action, xp });
+    else console.log('[awardXP] OK:', action, '+' + xp + 'XP', data);
+    return { data, error };
+  } catch (e) { console.error('[awardXP] EXCEPTION:', e); return { data: null, error: e }; }
 };
 
 // Özel miktarla XP ver (DailyLog fazla mesai gibi hesaplanmış değerler için)
 export const awardXPCustom = async (userId, action, xpAmount, description, referenceId) => {
-  if (!xpAmount || xpAmount <= 0) return { data: null, error: null };
-  const { data, error } = await supabase.rpc('award_xp', {
-    p_user_id: userId, p_action: action, p_xp_amount: xpAmount,
-    p_description: description || null, p_reference_id: referenceId || null,
-  });
-  if (error) console.error('[awardXPCustom] ERROR:', error);
-  return { data, error };
+  try {
+    if (!xpAmount || xpAmount <= 0) return { data: null, error: null };
+    const { data, error } = await supabase.rpc('award_xp', {
+      p_user_id: userId, p_action: action, p_xp_amount: xpAmount,
+      p_description: description || null, p_reference_id: referenceId ? String(referenceId) : null,
+    });
+    if (error) console.error('[awardXPCustom] ERROR:', error.message, { userId, action, xpAmount });
+    else console.log('[awardXPCustom] OK:', action, '+' + xpAmount + 'XP', data);
+    return { data, error };
+  } catch (e) { console.error('[awardXPCustom] EXCEPTION:', e); return { data: null, error: e }; }
 };
 
 export const getLeaderboard = async () => {
