@@ -1022,13 +1022,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, profile, allProfiles, 
               <div style={{ marginBottom:14 }}>
                 <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
-                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  const p = (allProfiles||[]).find(x=>x.user_id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
                   style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
-                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  {(allProfiles||[]).map(p=><option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
                 </select>
               </div>
 
@@ -1105,13 +1105,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, profile, allProfiles, 
               <div style={{ marginBottom:14 }}>
                 <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
-                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  const p = (allProfiles||[]).find(x=>x.user_id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
                   style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
-                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  {(allProfiles||[]).map(p=><option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
                 </select>
               </div>
             </>
@@ -1131,13 +1131,13 @@ function FormModal({ type, initial, orgs: orgsProp, user, profile, allProfiles, 
               <div style={{ marginBottom:14 }}>
                 <label style={{ display:'block', fontSize:11.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.05em', marginBottom:5, textTransform:'uppercase' }}>Takip Sorumlusu</label>
                 <select value={form.assigned_to||''} onChange={e=>{
-                  const p = (allProfiles||[]).find(x=>x.id===e.target.value);
+                  const p = (allProfiles||[]).find(x=>x.user_id===e.target.value);
                   set('assigned_to', e.target.value || '');
                   set('assigned_to_name', p ? p.full_name : '');
                 }}
                   style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid var(--border)', fontSize:13.5, fontFamily:'inherit', background:'var(--bg-card)', outline:'none' }}>
                   <option value=''>Seçin…</option>
-                  {(allProfiles||[]).map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  {(allProfiles||[]).map(p=><option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
                 </select>
               </div>
             </>
