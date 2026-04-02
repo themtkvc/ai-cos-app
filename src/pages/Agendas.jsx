@@ -1271,7 +1271,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
 
   const handleSaveAgenda = async (data) => {
     if (editAgenda) {
-      await updateAgenda(editAgenda.id, data);
+      const { error } = await updateAgenda(editAgenda.id, data);
+      if (error) { alert('Gündem güncellenemedi: ' + error.message); return; }
       // Gündem atama değişikliği bildirimi + mail
       if (data.assigned_to && data.assigned_to !== editAgenda.assigned_to && data.assigned_to !== myId) {
         try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: editAgenda.id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
@@ -1292,6 +1293,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         unit: isMineTab ? null : (data.unit || myUnit || (data.assigned_to ? (allProfiles.find(p => p.user_id === data.assigned_to)?.unit || null) : null)),
         is_personal: isMineTab,
       });
+      if (result?.error) { alert('Gündem oluşturulamadı: ' + result.error.message); return; }
       // Yeni gündem atama bildirimi + mail
       if (data.assigned_to && data.assigned_to !== myId && result?.data?.[0]?.id) {
         try { await createNotification({ userId: data.assigned_to, type: 'agenda_assigned', title: `"${data.title}" gündemi size atandı`, body: '', linkType: 'agenda', linkId: result.data[0].id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }

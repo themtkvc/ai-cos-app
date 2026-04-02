@@ -617,7 +617,7 @@ export const getAgendasV2 = async (userId = null, unit = null) => {
   // Birime göre filtrele (direktör değilse sadece kendi birimi)
   // assigned_to=userId veya created_by=userId olan gündemler birim filtresini bypass eder
   if (unit && userId) {
-    query = query.or(`unit.eq.${unit},assigned_to.eq.${userId},created_by.eq.${userId}`);
+    query = query.or(`unit.eq."${unit}",assigned_to.eq.${userId},created_by.eq.${userId}`);
   } else if (unit) {
     query = query.eq('unit', unit);
   }
