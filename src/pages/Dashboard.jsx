@@ -616,7 +616,7 @@ export default function Dashboard({ user, profile, onNavigate }) {
             </div>
             <span style={{fontSize:12, color:'var(--text-muted)'}}>
               {(todayLog.work_items || []).length} iş kalemi
-              {todayLog.is_submitted ? ' · 📤 Gönderildi' : ' · 📝 Taslak'}
+              {todayLog.submitted ? ' · 📤 Gönderildi' : ' · 📝 Taslak'}
             </span>
           </div>
         ) : (
