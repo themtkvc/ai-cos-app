@@ -211,6 +211,78 @@ function LeaveBadge({ status }) {
   );
 }
 
+// ── GÜN BAŞLIĞI ──────────────────────────────────────────────────────────────
+const DAYS_FULL = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+
+function DayHeader({ dateStr, totalMins, entryCount, isFirst }) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dayName = DAYS_FULL[d.getDay()];
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  const hLabel = h > 0 ? (m > 0 ? `${h}s ${m}dk` : `${h}s`) : m > 0 ? `${m}dk` : '0s';
+  const pct = Math.min(100, Math.round((totalMins / 480) * 100));
+  const isGood = totalMins >= 480;
+  const isPartial = totalMins > 0 && totalMins < 480;
+
+  return (
+    <tr>
+      <td colSpan={3} style={{
+        padding: isFirst ? '14px 24px 8px' : '18px 24px 8px',
+        borderTop: isFirst ? 'none' : '2px solid var(--border)',
+        background: '#f8fafc',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, borderRadius: 8,
+              background: isGood ? '#dcfce7' : isPartial ? '#fef3c7' : '#f3f4f6',
+              fontSize: 14, fontWeight: 800,
+              color: isGood ? '#15803d' : isPartial ? '#a16207' : '#9ca3af',
+            }}>
+              {d.getDate()}
+            </span>
+            <div>
+              <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)' }}>
+                {dayName}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-light)', marginLeft: 8 }}>
+                {fmtDateShort(dateStr)}
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Mini ilerleme çubuğu */}
+            <div style={{
+              width: 60, height: 6, borderRadius: 3,
+              background: '#e5e7eb', overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${pct}%`, height: '100%', borderRadius: 3,
+                background: isGood ? '#22c55e' : isPartial ? '#f59e0b' : '#d1d5db',
+                transition: 'width 0.3s',
+              }} />
+            </div>
+            <span style={{
+              fontWeight: 800, fontSize: 14,
+              color: isGood ? '#15803d' : isPartial ? '#a16207' : '#9ca3af',
+              minWidth: 50, textAlign: 'right',
+            }}>
+              {hLabel}
+            </span>
+            <span style={{
+              fontSize: 11, color: 'var(--text-light)',
+              background: '#f3f4f6', borderRadius: 4, padding: '2px 6px',
+            }}>
+              {entryCount} kayıt
+            </span>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── BLOCK GÖRÜNÜMÜ — KİŞİ KARTI ──────────────────────────────────────────────
 function PersonBlock({ person, rows, searchQ }) {
   const totalMins    = rows.reduce((s, r) => s + (r.mins || 0), 0);
@@ -226,6 +298,19 @@ function PersonBlock({ person, rows, searchQ }) {
     : rows;
 
   if (visibleRows.length === 0) return null;
+
+  // Günlere göre grupla (tarih sırasıyla: yeni → eski)
+  const dayGroups = [];
+  let currentDate = null;
+  let currentGroup = null;
+  visibleRows.forEach(row => {
+    if (row.log_date !== currentDate) {
+      currentDate = row.log_date;
+      currentGroup = { date: row.log_date, rows: [] };
+      dayGroups.push(currentGroup);
+    }
+    currentGroup.rows.push(row);
+  });
 
   return (
     <div style={{
@@ -253,51 +338,50 @@ function PersonBlock({ person, rows, searchQ }) {
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>Toplam Saat</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{fmtH(totalMins)}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>{totalEntries} kayıt</div>
+          <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>{totalEntries} kayıt · {dayGroups.length} gün</div>
         </div>
       </div>
 
-      {/* Tablo */}
+      {/* Tablo — gün gruplarıyla */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--bg-badge)' }}>
-              {['Tarih','Yapılan İş','Proje/Konu','Süre'].map((col, i) => (
-                <th key={col} style={{
-                  padding: '10px 24px', textAlign: i === 3 ? 'right' : 'left',
-                  fontSize: 12.5, fontWeight: 600, color: 'var(--text-light)',
-                  background: '#fafafa',
-                  width: i === 0 ? '18%' : i === 1 ? '42%' : i === 2 ? '28%' : '12%',
-                }}>{col}</th>
-              ))}
-            </tr>
-          </thead>
           <tbody>
-            {visibleRows.map((row, idx) => (
-              <tr key={idx} style={{
-                borderBottom: idx < visibleRows.length - 1 ? '1px solid var(--bg)' : 'none',
-              }}>
-                <td style={{ padding: '12px 24px', fontSize: 13.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontWeight: 600 }}>{fmtDayShort(row.log_date)}</span>
-                  {' '}
-                  <span>{fmtDateShort(row.log_date)}</span>
-                </td>
-                <td style={{ padding: '12px 24px', fontSize: 13.5, color: 'var(--text)' }}>
-                  {row.isLeave ? <LeaveBadge status={row.status} /> : (
-                    <>
-                      {row.title}
-                      {row.isOt && <OtBadge />}
-                    </>
-                  )}
-                </td>
-                <td style={{ padding: '12px 24px' }}>
-                  {!row.isLeave && <CategoryBadge label={row.category} />}
-                </td>
-                <td style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 700, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                  {row.isLeave ? '—' : fmtH(row.mins)}
-                </td>
-              </tr>
-            ))}
+            {dayGroups.map((group, gIdx) => {
+              const dayMins = group.rows.reduce((s, r) => s + (r.mins || 0), 0);
+              return (
+                <React.Fragment key={group.date}>
+                  {/* Gün başlığı */}
+                  <DayHeader
+                    dateStr={group.date}
+                    totalMins={dayMins}
+                    entryCount={group.rows.filter(r => !r.isLeave && !r.isEmpty).length || group.rows.length}
+                    isFirst={gIdx === 0}
+                  />
+                  {/* O günün iş kalemleri */}
+                  {group.rows.map((row, idx) => (
+                    <tr key={idx} style={{
+                      borderBottom: idx < group.rows.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      background: 'white',
+                    }}>
+                      <td style={{ padding: '10px 24px 10px 66px', fontSize: 13.5, color: 'var(--text)' }}>
+                        {row.isLeave ? <LeaveBadge status={row.status} /> : (
+                          <>
+                            {row.title}
+                            {row.isOt && <OtBadge />}
+                          </>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 24px' }}>
+                        {!row.isLeave && <CategoryBadge label={row.category} />}
+                      </td>
+                      <td style={{ padding: '10px 24px', textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {row.isLeave ? '—' : fmtH(row.mins)}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -311,7 +395,7 @@ function ListView({ persons, searchQ }) {
   persons.forEach(p => {
     p.rows.forEach(r => allRows.push({ ...r, person: p }));
   });
-  allRows.sort((a, b) => b.log_date.localeCompare(a.log_date));
+  allRows.sort((a, b) => b.log_date.localeCompare(a.log_date) || a.person.full_name.localeCompare(b.person.full_name));
 
   const visible = searchQ
     ? allRows.filter(r =>
@@ -323,50 +407,114 @@ function ListView({ persons, searchQ }) {
 
   if (visible.length === 0) return <EmptyState />;
 
+  // Günlere göre grupla
+  const dayGroups = [];
+  let curDate = null;
+  let curGroup = null;
+  visible.forEach(row => {
+    if (row.log_date !== curDate) {
+      curDate = row.log_date;
+      curGroup = { date: row.log_date, rows: [] };
+      dayGroups.push(curGroup);
+    }
+    curGroup.rows.push(row);
+  });
+
   return (
     <div style={{
       background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border)',
       overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
     }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--bg-badge)' }}>
-            {['Personel','Tarih','Yapılan İş','Proje/Konu','Süre'].map((col, i) => (
-              <th key={col} style={{
-                padding: '12px 20px', textAlign: i === 4 ? 'right' : 'left',
-                fontSize: 12.5, fontWeight: 600, color: 'var(--text-light)',
-              }}>{col}</th>
-            ))}
-          </tr>
-        </thead>
         <tbody>
-          {visible.map((row, idx) => (
-            <tr key={idx} style={{ borderBottom: '1px solid var(--bg)' }}>
-              <td style={{ padding: '11px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={30} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.person.full_name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
-                  </div>
-                </div>
-              </td>
-              <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                <span style={{ fontWeight: 600 }}>{fmtDayShort(row.log_date)}</span>{' '}{fmtDateShort(row.log_date)}
-              </td>
-              <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--text)' }}>
-                {row.isLeave ? <LeaveBadge status={row.status} /> : (
-                  <>{row.title}{row.isOt && <OtBadge />}</>
+          {dayGroups.map((group, gIdx) => {
+            const dayMins = group.rows.reduce((s, r) => s + (r.mins || 0), 0);
+            const d = new Date(group.date + 'T12:00:00');
+            const dayName = DAYS_FULL[d.getDay()];
+            const h = Math.floor(dayMins / 60);
+            const m = dayMins % 60;
+            const hLabel = h > 0 ? (m > 0 ? `${h}s ${m}dk` : `${h}s`) : m > 0 ? `${m}dk` : '0s';
+            const uniquePersons = [...new Set(group.rows.map(r => r.person.user_id))].length;
+
+            return (
+              <React.Fragment key={group.date}>
+                {/* Gün başlığı */}
+                <tr>
+                  <td colSpan={4} style={{
+                    padding: gIdx === 0 ? '14px 20px 10px' : '20px 20px 10px',
+                    borderTop: gIdx === 0 ? 'none' : '2.5px solid var(--border)',
+                    background: '#f8fafc',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 36, height: 36, borderRadius: 10,
+                          background: dayMins >= 480 ? '#dcfce7' : dayMins > 0 ? '#fef3c7' : '#f3f4f6',
+                          fontSize: 15, fontWeight: 800,
+                          color: dayMins >= 480 ? '#15803d' : dayMins > 0 ? '#a16207' : '#9ca3af',
+                        }}>
+                          {d.getDate()}
+                        </span>
+                        <div>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{dayName}</span>
+                          <span style={{ fontSize: 12.5, color: 'var(--text-light)', marginLeft: 8 }}>{fmtDateShort(group.date)}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-light)' }}>
+                          {uniquePersons} kişi · {group.rows.filter(r => !r.isLeave && !r.isEmpty).length} kayıt
+                        </span>
+                        <span style={{
+                          fontWeight: 800, fontSize: 14, padding: '3px 10px', borderRadius: 6,
+                          background: dayMins >= 480 ? '#dcfce7' : dayMins > 0 ? '#fef3c7' : '#f3f4f6',
+                          color: dayMins >= 480 ? '#15803d' : dayMins > 0 ? '#a16207' : '#9ca3af',
+                        }}>
+                          {hLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {/* Sütun başlıkları (ilk gün için) */}
+                {gIdx === 0 && (
+                  <tr style={{ background: '#fafafa', borderBottom: '1px solid var(--bg-badge)' }}>
+                    {['Personel','Yapılan İş','Proje/Konu','Süre'].map((col, i) => (
+                      <th key={col} style={{
+                        padding: '8px 20px', textAlign: i === 3 ? 'right' : 'left',
+                        fontSize: 11.5, fontWeight: 600, color: 'var(--text-light)',
+                      }}>{col}</th>
+                    ))}
+                  </tr>
                 )}
-              </td>
-              <td style={{ padding: '11px 20px' }}>
-                {!row.isLeave && <CategoryBadge label={row.category} />}
-              </td>
-              <td style={{ padding: '11px 20px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
-                {row.isLeave ? '—' : fmtH(row.mins)}
-              </td>
-            </tr>
-          ))}
+                {/* Satırlar */}
+                {group.rows.map((row, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: 'white' }}>
+                    <td style={{ padding: '11px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={30} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.person.full_name}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--text)' }}>
+                      {row.isLeave ? <LeaveBadge status={row.status} /> : (
+                        <>{row.title}{row.isOt && <OtBadge />}</>
+                      )}
+                    </td>
+                    <td style={{ padding: '11px 20px' }}>
+                      {!row.isLeave && <CategoryBadge label={row.category} />}
+                    </td>
+                    <td style={{ padding: '11px 20px', textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--text-muted)' }}>
+                      {row.isLeave ? '—' : fmtH(row.mins)}
+                    </td>
+                  </tr>
+                ))}
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -379,7 +527,7 @@ function KartView({ persons, searchQ }) {
   persons.forEach(p => {
     p.rows.forEach(r => allRows.push({ ...r, person: p }));
   });
-  allRows.sort((a, b) => b.log_date.localeCompare(a.log_date));
+  allRows.sort((a, b) => b.log_date.localeCompare(a.log_date) || a.person.full_name.localeCompare(b.person.full_name));
 
   const visible = searchQ
     ? allRows.filter(r =>
@@ -391,36 +539,89 @@ function KartView({ persons, searchQ }) {
 
   if (visible.length === 0) return <EmptyState />;
 
+  // Günlere göre grupla
+  const dayGroups = [];
+  let curDate = null;
+  let curGroup = null;
+  visible.forEach(row => {
+    if (row.log_date !== curDate) {
+      curDate = row.log_date;
+      curGroup = { date: row.log_date, rows: [] };
+      dayGroups.push(curGroup);
+    }
+    curGroup.rows.push(row);
+  });
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-      {visible.map((row, idx) => (
-        <div key={idx} style={{
-          background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
-          padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={32} />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{row.person.full_name}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {dayGroups.map((group, gIdx) => {
+        const dayMins = group.rows.reduce((s, r) => s + (r.mins || 0), 0);
+        const d = new Date(group.date + 'T12:00:00');
+        const dayName = DAYS_FULL[d.getDay()];
+        const h = Math.floor(dayMins / 60);
+        const m = dayMins % 60;
+        const hLabel = h > 0 ? (m > 0 ? `${h}s ${m}dk` : `${h}s`) : m > 0 ? `${m}dk` : '0s';
+
+        return (
+          <div key={group.date}>
+            {/* Gün başlığı */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 4px', marginBottom: 10,
+              borderBottom: '2px solid var(--border)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 36, height: 36, borderRadius: 10,
+                  background: dayMins >= 480 ? '#dcfce7' : dayMins > 0 ? '#fef3c7' : '#f3f4f6',
+                  fontSize: 15, fontWeight: 800,
+                  color: dayMins >= 480 ? '#15803d' : dayMins > 0 ? '#a16207' : '#9ca3af',
+                }}>
+                  {d.getDate()}
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{dayName}</span>
+                <span style={{ fontSize: 12.5, color: 'var(--text-light)' }}>{fmtDateShort(group.date)}</span>
+              </div>
+              <span style={{
+                fontWeight: 800, fontSize: 14, padding: '4px 12px', borderRadius: 8,
+                background: dayMins >= 480 ? '#dcfce7' : dayMins > 0 ? '#fef3c7' : '#f3f4f6',
+                color: dayMins >= 480 ? '#15803d' : dayMins > 0 ? '#a16207' : '#9ca3af',
+              }}>
+                {hLabel}
+              </span>
             </div>
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
-              {fmtDayShort(row.log_date)} {fmtDateShort(row.log_date)}
+            {/* O günün kartları */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+              {group.rows.map((row, idx) => (
+                <div key={idx} style={{
+                  background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
+                  padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <Avatar name={row.person.full_name} avatarUrl={row.person.avatar_url} size={32} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{row.person.full_name}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{row.person.unit}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)', marginBottom: 8 }}>
+                    {row.isLeave ? <LeaveBadge status={row.status} /> : (
+                      <>{row.title}{row.isOt && <OtBadge />}</>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <CategoryBadge label={row.isLeave ? null : row.category} />
+                    <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
+                      {row.isLeave ? '—' : fmtH(row.mins)}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text)', marginBottom: 8 }}>
-            {row.isLeave ? <LeaveBadge status={row.status} /> : (
-              <>{row.title}{row.isOt && <OtBadge />}</>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <CategoryBadge label={row.isLeave ? null : row.category} />
-            <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
-              {row.isLeave ? '—' : fmtH(row.mins)}
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
