@@ -3,6 +3,8 @@ import { getDashboardLogs } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDateShort, fmtDayShort, toLocalDateStr } from '../lib/constants';
 
 const NON_WORK = ['saglik_izni','egitim_izni','yillik_izin','calismiyor'];
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const STATUS_LABELS = {
   ofis:        'Ofisten',
   ev:          'Evden',
