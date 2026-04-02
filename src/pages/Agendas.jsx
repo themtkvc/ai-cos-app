@@ -803,6 +803,10 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
     const p = (allProfiles || []).find(pr => pr.user_id === userId);
     set('assigned_to', userId);
     set('assigned_to_name', p?.full_name || '');
+    // Direktör birim seçmediyse, atanan kişinin birimini otomatik doldur
+    if (p?.unit && !form.unit) {
+      set('unit', p.unit);
+    }
   };
 
   const handleSubmit = async () => {
@@ -1285,7 +1289,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         ...data,
         created_by: myId,
         created_by_name: myName,
-        unit: isMineTab ? null : (myUnit || data.unit || null),
+        unit: isMineTab ? null : (data.unit || myUnit || (data.assigned_to ? (allProfiles.find(p => p.user_id === data.assigned_to)?.unit || null) : null)),
         is_personal: isMineTab,
       });
       // Yeni gündem atama bildirimi + mail

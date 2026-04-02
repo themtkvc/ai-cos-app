@@ -622,6 +622,32 @@ export const getAgendasV2 = async (userId = null, unit = null) => {
     query = query.eq('unit', unit);
   }
   const { data, error } = await query;
+
+  // Ayrıca: kullanıcının görev atanmış olduğu ama birim/assigned_to ile eşleşmeyen gündemleri de getir
+  if (userId && !error) {
+    const { data: taskRows } = await supabase
+      .from('agenda_tasks')
+      .select('agenda_id')
+      .eq('assigned_to', userId);
+    if (taskRows && taskRows.length > 0) {
+      const existingIds = new Set((data || []).map(a => a.id));
+      const missingIds = [...new Set(taskRows.map(t => t.agenda_id))].filter(id => !existingIds.has(id));
+      if (missingIds.length > 0) {
+        const { data: extra } = await supabase
+          .from('agendas')
+          .select(`
+            *,
+            agenda_types ( id, name, icon, color, fields ),
+            agenda_tasks ( id, title, assigned_to, assigned_to_name, priority, status, completion_status, due_date, created_by )
+          `)
+          .in('id', missingIds);
+        if (extra && extra.length > 0) {
+          data.push(...extra);
+        }
+      }
+    }
+  }
+
   return { data, error };
 };
 
