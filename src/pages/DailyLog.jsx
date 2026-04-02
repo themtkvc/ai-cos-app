@@ -271,6 +271,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
   const [myTasks, setMyTasks]           = useState([]);
 
   const autoSaveTimer = useRef(null);
+  const loadingRef = useRef(false); // Yükleme sırasında auto-save'i engelle
 
   // ── KRITIK: Her render sonrası güncel state değerlerini tut
   // Bu sayede closure'lar eski state'i yakalamaz (stale closure bug fix)
@@ -290,6 +291,15 @@ export default function DailyLog({ user, profile, linkedTask }) {
 
   // ── Log yükle
   const loadLog = useCallback(async (dateStr) => {
+    // ── KRITIK: Yükleme başlamadan önce mevcut auto-save timer'ı iptal et
+    // Bu, eski tarihin verisiyle yeni tarihin kaydının üzerine yazılmasını engeller
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    loadingRef.current = true; // Auto-save engeli aç
+    setAutoSaveState('idle');
+
     const { data } = await getDailyLog(user.id, dateStr);
     if (data) {
       setStatus(data.work_status || 'ofis');
@@ -311,6 +321,11 @@ export default function DailyLog({ user, profile, linkedTask }) {
       setEditing(false);
       setDraft(false);
     }
+
+    // ── Kısa gecikme ile loading bayrağını kapat
+    // Bu, loadLog'un tetiklediği state değişikliklerinin auto-save'i
+    // yanlışlıkla tetiklemesini önler (React batching sonrası)
+    setTimeout(() => { loadingRef.current = false; }, 100);
   }, [user.id]);
 
   // ── Hafta loglarını yükle
@@ -338,11 +353,33 @@ export default function DailyLog({ user, profile, linkedTask }) {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     autoSaveTimer.current = setTimeout(async () => {
+      // ── KRITIK GÜVENLİK: Yükleme sırasında auto-save yapma
+      // loadLog devam ederken stateRef eski/boş veri içerebilir
+      if (loadingRef.current) {
+        setAutoSaveState('idle');
+        return;
+      }
+
       // Closure'dan değil, ref'ten oku — her zaman güncel değer
       const { submitted: sub, editing: ed, status: st, dayPeriod: dp, items: it, overtime: ot, notes: n, selectedDate: sd } = stateRef.current;
 
       // Gönderilmiş & düzenleme modunda değilse kaydetme
       if (sub && !ed) {
+        setAutoSaveState('idle');
+        return;
+      }
+
+      // ── KRITIK GÜVENLİK: Kaydetmeden önce DB'deki mevcut kaydı kontrol et
+      // Eğer DB'de submitted=true ise, boş veriyle üzerine yazma
+      try {
+        const { data: existing } = await getDailyLog(user.id, sd);
+        if (existing?.submitted) {
+          console.warn('[AutoSave] DB kaydı submitted=true, auto-save iptal:', sd);
+          setAutoSaveState('idle');
+          return;
+        }
+      } catch (e) {
+        console.error('[AutoSave] DB kontrol hatası:', e);
         setAutoSaveState('idle');
         return;
       }
@@ -363,6 +400,8 @@ export default function DailyLog({ user, profile, linkedTask }) {
   useEffect(() => {
     // isReadOnly ise tetikleme (anlık kontrol için stateRef değil, render-time değeri)
     if (isReadOnly) return;
+    // Yükleme sırasındaki state değişikliklerini auto-save'den hariç tut
+    if (loadingRef.current) return;
     triggerAutoSave();
     setAutoSaveState('saving');
   }, [status, dayPeriod, items, overtime, notes]);
