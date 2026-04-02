@@ -887,11 +887,11 @@ const _getUid = async () => {
 };
 
 // ── ORGANIZATIONS ──
-export const createNetworkOrg = async (data) => {
+export const createNetworkOrg = async (data, creatorName = null) => {
   const uid = await _getUid();
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_organizations')
-    .insert({ ...data, created_by: uid }).select().single();
+    .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
   return { data: d, error };
 };
 export const updateNetworkOrg = async (id, data) => {
@@ -905,11 +905,11 @@ export const deleteNetworkOrg = async (id) => {
 };
 
 // ── CONTACTS ──
-export const createNetworkContact = async (data) => {
+export const createNetworkContact = async (data, creatorName = null) => {
   const uid = await _getUid();
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_contacts')
-    .insert({ ...data, created_by: uid }).select().single();
+    .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
   return { data: d, error };
 };
 export const updateNetworkContact = async (id, data) => {
@@ -923,11 +923,11 @@ export const deleteNetworkContact = async (id) => {
 };
 
 // ── EVENTS ──
-export const createNetworkEvent = async (data) => {
+export const createNetworkEvent = async (data, creatorName = null) => {
   const uid = await _getUid();
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_events')
-    .insert({ ...data, created_by: uid }).select().single();
+    .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
   return { data: d, error };
 };
 export const updateNetworkEvent = async (id, data) => {

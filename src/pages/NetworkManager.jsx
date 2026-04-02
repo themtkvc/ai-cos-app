@@ -572,6 +572,8 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
             {type==='contact' && item.country && <InfoRow icon={getFlag(item.country)} label="Ülke" val={item.city ? `${item.country}, ${item.city}` : item.country} />}
             {type==='contact' && item.first_contact_date && <InfoRow icon="📅" label="İlk İletişim" val={fmtDate(item.first_contact_date)} />}
             {item.assigned_to_name && <InfoRow icon="👤" label="Takip Sorumlusu" val={item.assigned_to_name} />}
+            {(item.created_by_name || item.created_by) && <InfoRow icon="✏️" label="Kaydı Oluşturan" val={item.created_by_name || (allProfiles||[]).find(p=>p.user_id===item.created_by)?.full_name || '—'} />}
+            {item.created_at && <InfoRow icon="📅" label="Oluşturulma Tarihi" val={new Date(item.created_at).toLocaleDateString('tr-TR')} />}
             {type==='contact' && item.referral_info && <InfoRow icon="🔀" label="Aracı Bilgisi" val={item.referral_info} />}
           </div>
 
@@ -737,7 +739,7 @@ function InfoRow({ icon, label, val, href }) {
 }
 
 // ── FORM MODAL ────────────────────────────────────────────────────────────────
-function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, onClose }) {
+function FormModal({ type, initial, orgs: orgsProp, user, profile, allProfiles, onSave, onClose }) {
   const isEdit   = !!initial?.id;
   const fileRef  = useRef();
   const [saving, setSaving] = useState(false);
@@ -756,7 +758,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
   const handleCreateOrg = async () => {
     if (!newOrgName.trim()) return;
     setCreatingOrg(true);
-    const result = await createNetworkOrg({ name: newOrgName.trim(), org_type: newOrgType, unit: user?.unit });
+    const result = await createNetworkOrg({ name: newOrgName.trim(), org_type: newOrgType, unit: profile?.unit || user?.unit }, profile?.full_name);
     if (result.data) {
       const newOrg = result.data;
       setOrgs(prev => [...prev, newOrg].sort((a,b)=>a.name.localeCompare(b.name)));
@@ -846,7 +848,7 @@ function FormModal({ type, initial, orgs: orgsProp, user, allProfiles, onSave, o
 
     const result = await (isEdit
       ? (type==='contact' ? updateNetworkContact(initial.id, payload) : type==='organization' ? updateNetworkOrg(initial.id, payload) : updateNetworkEvent(initial.id, payload))
-      : (type==='contact' ? createNetworkContact({ ...payload, unit: user?.unit }) : type==='organization' ? createNetworkOrg({ ...payload, unit: user?.unit }) : createNetworkEvent({ ...payload, unit: user?.unit })));
+      : (type==='contact' ? createNetworkContact({ ...payload, unit: profile?.unit || user?.unit }, profile?.full_name) : type==='organization' ? createNetworkOrg({ ...payload, unit: profile?.unit || user?.unit }, profile?.full_name) : createNetworkEvent({ ...payload, unit: profile?.unit || user?.unit }, profile?.full_name)));
 
     if (result.error) { setError(result.error.message); setSaving(false); return; }
     onSave(result.data);
@@ -1810,7 +1812,7 @@ export default function NetworkManager({ user, profile }) {
       {showForm && (
         <FormModal
           type={formType} initial={editItem}
-          orgs={data.organizations} user={user}
+          orgs={data.organizations} user={user} profile={profile}
           allProfiles={allProfiles}
           onSave={handleFormSave}
           onClose={()=>{ setShowForm(false); setEditItem(null); }}

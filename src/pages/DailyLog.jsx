@@ -259,6 +259,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
   const [weekOffset, setWeekOffset]     = useState(0);
   const [weekLogs, setWeekLogs]         = useState({});
   const [status, setStatus]             = useState('ofis');
+  const [dayPeriod, setDayPeriod]       = useState('tam_gun'); // 'tam_gun' | 'ogleden_once' | 'ogleden_sonra'
   const [items, setItems]               = useState([newItem(linkedTask?.id || null)]);
   const [overtime, setOvertime]         = useState([]);
   const [notes, setNotes]               = useState('');
@@ -275,11 +276,12 @@ export default function DailyLog({ user, profile, linkedTask }) {
   // Bu sayede closure'lar eski state'i yakalamaz (stale closure bug fix)
   const stateRef = useRef({});
   useEffect(() => {
-    stateRef.current = { submitted, editing, status, items, overtime, notes, selectedDate };
+    stateRef.current = { submitted, editing, status, dayPeriod, items, overtime, notes, selectedDate };
   });
 
   const isNonWork = NON_WORK_STATUSES.includes(status);
   const isReadOnly = submitted && !editing;
+  const targetMin = dayPeriod === 'tam_gun' ? 480 : 240; // Yarım gün = 4 saat
 
   // ── Hafta günleri
   const refDate = new Date();
@@ -291,6 +293,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
     const { data } = await getDailyLog(user.id, dateStr);
     if (data) {
       setStatus(data.work_status || 'ofis');
+      setDayPeriod(data.day_period || 'tam_gun');
       setItems(data.work_items?.length ? data.work_items.map(migrateItem) : [newItem()]);
       setOvertime((data.overtime_items || []).map(migrateItem));
       setNotes(data.notes || '');
@@ -300,6 +303,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
       setDraft(!data.submitted && !!data.work_items?.length);
     } else {
       setStatus('ofis');
+      setDayPeriod('tam_gun');
       setItems([newItem()]);
       setOvertime([]);
       setNotes('');
@@ -335,7 +339,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
 
     autoSaveTimer.current = setTimeout(async () => {
       // Closure'dan değil, ref'ten oku — her zaman güncel değer
-      const { submitted: sub, editing: ed, status: st, items: it, overtime: ot, notes: n, selectedDate: sd } = stateRef.current;
+      const { submitted: sub, editing: ed, status: st, dayPeriod: dp, items: it, overtime: ot, notes: n, selectedDate: sd } = stateRef.current;
 
       // Gönderilmiş & düzenleme modunda değilse kaydetme
       if (sub && !ed) {
@@ -347,7 +351,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
       const totalMin = [...it, ...ot].reduce((s, x) => s + calcItemMinutes(x), 0);
       const { error } = await upsertDailyLog({
         user_id: user.id, log_date: sd,
-        work_status: st, work_items: it, overtime_items: ot,
+        work_status: st, day_period: dp, work_items: it, overtime_items: ot,
         total_minutes: totalMin, notes: n, submitted: false,
       });
       setAutoSaveState(error ? 'error' : 'saved');
@@ -361,7 +365,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
     if (isReadOnly) return;
     triggerAutoSave();
     setAutoSaveState('saving');
-  }, [status, items, overtime, notes]);
+  }, [status, dayPeriod, items, overtime, notes]);
 
   // ── Gönder / Güncelle
   const handleSubmit = async () => {
@@ -369,7 +373,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
     const totalMin = [...items, ...overtime].reduce((s, x) => s + calcItemMinutes(x), 0);
     const { error } = await submitDailyLog({
       user_id: user.id, log_date: selectedDate,
-      work_status: status, work_items: items, overtime_items: overtime,
+      work_status: status, day_period: dayPeriod, work_items: items, overtime_items: overtime,
       total_minutes: totalMin, notes,
     });
     setSubmitting(false);
@@ -643,10 +647,36 @@ export default function DailyLog({ user, profile, linkedTask }) {
             </button>
           ))}
         </div>
+
+        {/* GÜN PERİYODU */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {[
+            { value: 'tam_gun',        label: 'Tam Gün',          icon: '☀️' },
+            { value: 'ogleden_once',    label: 'Öğleden Önce',     icon: '🌅' },
+            { value: 'ogleden_sonra',   label: 'Öğleden Sonra',    icon: '🌇' },
+          ].map(p => (
+            <button key={p.value}
+              disabled={isReadOnly}
+              onClick={() => !isReadOnly && setDayPeriod(p.value)}
+              style={{
+                flex: 1, padding: '8px 6px', borderRadius: 8, cursor: isReadOnly ? 'default' : 'pointer',
+                border: `2px solid ${dayPeriod === p.value ? 'var(--primary)' : 'var(--border)'}`,
+                background: dayPeriod === p.value ? 'var(--primary-light)' : 'var(--surface)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                fontFamily: 'var(--font-body)', transition: 'all 0.15s',
+                opacity: isReadOnly ? 0.65 : 1,
+                pointerEvents: isReadOnly ? 'none' : 'auto',
+              }}>
+              <span style={{ fontSize: 14 }}>{p.icon}</span>
+              <span style={{ fontSize: 11, fontWeight: dayPeriod === p.value ? 700 : 500, color: dayPeriod === p.value ? 'var(--primary)' : 'var(--text-muted)' }}>
+                {p.label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* İŞ KALEMLERİ */}
-      {!isNonWork && (
+      {/* İŞ KALEMLERİ — tüm durumlarda göster (izin günlerinde isteğe bağlı) */}
         <>
           <div className="card" style={{
             marginBottom: 16,
@@ -727,13 +757,13 @@ export default function DailyLog({ user, profile, linkedTask }) {
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Toplam:</span>
               <span style={{
                 fontSize: 17, fontWeight: 700,
-                color: totalMin >= 480 ? 'var(--green)' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
+                color: totalMin >= targetMin ? 'var(--green)' : totalMin > 0 ? 'var(--navy)' : 'var(--text-muted)',
                 fontFamily: 'var(--font-display)',
               }}>
                 {totalMin > 0 ? fmtMins(totalMin) : '—'}
               </span>
-              {totalMin > 0 && totalMin < 480 && (
-                <span style={{ fontSize: 11, color: 'var(--orange)' }}>({fmtMins(480 - totalMin)} eksik)</span>
+              {totalMin > 0 && totalMin < targetMin && !isNonWork && (
+                <span style={{ fontSize: 11, color: 'var(--orange)' }}>({fmtMins(targetMin - totalMin)} eksik)</span>
               )}
             </div>
           </div>
@@ -779,20 +809,21 @@ export default function DailyLog({ user, profile, linkedTask }) {
             </div>
           )}
         </>
-      )}
 
-      {/* İZİN / ÇALIŞMIYOR */}
+      {/* İZİN / ÇALIŞMIYOR — durum bilgisi */}
       {isNonWork && (
-        <div className="card" style={{ marginBottom: 16, textAlign: 'center', padding: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>
+        <div className="card" style={{ marginBottom: 16, textAlign: 'center', padding: '24px 20px' }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>
             {WORK_STATUS.find(s => s.value === status)?.icon}
           </div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--navy)', marginBottom: 6 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)', marginBottom: 4 }}>
             {WORK_STATUS.find(s => s.value === status)?.label}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Bu gün için iş kalemi girilmez.
-          </div>
+          {items.filter(i => i.description?.trim()).length === 0 && !isReadOnly && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+              Yine de bir iş yaptıysanız aşağıya iş kalemi ekleyebilirsiniz.
+            </div>
+          )}
         </div>
       )}
 
