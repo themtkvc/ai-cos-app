@@ -397,6 +397,36 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
 
   const [logRefresh, setLogRefresh] = useState(0);
 
+  // Notlar (çok kullanıcılı)
+  const [eventNotes, setEventNotes] = useState([]);
+  const [noteText, setNoteText] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const noteTextRef = useRef(null);
+
+  const loadEventNotes = async (eid) => {
+    const { data } = await supabase
+      .from('event_notes')
+      .select('*, user_profiles(full_name, unit)')
+      .eq('event_id', eid)
+      .order('created_at', { ascending: true });
+    setEventNotes(data || []);
+  };
+
+  const saveEventNote = async () => {
+    const content = noteText.trim();
+    if (!content || !event?.id) return;
+    setNoteSaving(true);
+    await supabase.from('event_notes').insert({
+      event_id: event.id,
+      user_id: user?.id,
+      content,
+    });
+    setNoteText('');
+    setNoteSaving(false);
+    loadEventNotes(event.id);
+    noteTextRef.current?.focus();
+  };
+
   // Personel + birim listesini yükle
   useEffect(() => {
     supabase.from('user_profiles').select('user_id, full_name, unit').order('full_name')
@@ -445,6 +475,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     });
     loadParticipants(event.id);
     loadDocuments(event.id);
+    loadEventNotes(event.id);
   }, [event]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -671,6 +702,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
             ['info','📋 Bilgiler'],
             ['participants',`👥 Katılımcılar (${participants.length})`],
             ['documents',`📄 Dokümanlar (${docs.length})`],
+            ['notes', `💬 Notlar${eventNotes.length ? ` (${eventNotes.length})` : ''}`],
             ['log','🕒 Aktivite'],
           ].map(([id, label]) => (
             <button key={id} onClick={() => setActiveTab(id)} style={{
@@ -1029,6 +1061,103 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
             </button>
           </Panel>
         </div>
+      )}
+
+      {/* ── NOTLAR (çok kullanıcılı) ─────────────────────────────────────────── */}
+      {!isNew && activeTab === 'notes' && (
+        <Panel>
+          <SectionTitle>Notlar</SectionTitle>
+
+          {/* Not akışı */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 0,
+            maxHeight: 460, overflowY: 'auto',
+            border: '1px solid var(--border)', borderRadius: 10,
+            marginBottom: 16,
+          }}>
+            {eventNotes.length === 0 ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                Henüz not düşülmedi. İlk notu sen ekle!
+              </div>
+            ) : (
+              eventNotes.map((n, idx) => {
+                const isMe = n.user_id === user?.id;
+                const name = n.user_profiles?.full_name || 'Bilinmeyen';
+                const unit = n.user_profiles?.unit;
+                const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                return (
+                  <div key={n.id} style={{
+                    display: 'flex', gap: 12, padding: '14px 16px',
+                    background: isMe ? 'rgba(26,60,94,0.03)' : 'transparent',
+                    borderBottom: idx < eventNotes.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    {/* Avatar */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                      background: isMe ? 'var(--navy,#1A3C5E)' : '#6B7280',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, fontWeight: 700,
+                    }}>{initials}</div>
+
+                    {/* İçerik */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>
+                          {name}{isMe ? ' (sen)' : ''}
+                        </span>
+                        {unit && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--border)', borderRadius: 8, padding: '1px 7px' }}>
+                            {unit}
+                          </span>
+                        )}
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', opacity: 0.7, whiteSpace: 'nowrap' }}>
+                          {new Date(n.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13.5, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {n.content}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Yeni not girişi */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+            <textarea
+              ref={noteTextRef}
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEventNote(); }
+              }}
+              placeholder="Bir not düş… (Enter ile gönder, Shift+Enter satır sonu)"
+              rows={2}
+              style={{
+                flex: 1, padding: '10px 14px', borderRadius: 10,
+                border: '1.5px solid var(--border)', fontSize: 13.5,
+                lineHeight: 1.6, resize: 'none', outline: 'none',
+                fontFamily: 'inherit', color: 'var(--text)',
+                background: 'var(--bg,#F9FAFB)',
+              }}
+            />
+            <button
+              onClick={saveEventNote}
+              disabled={noteSaving || !noteText.trim()}
+              style={{
+                padding: '10px 20px', borderRadius: 10, border: 'none',
+                background: 'var(--navy,#1A3C5E)', color: '#fff',
+                fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                opacity: noteSaving || !noteText.trim() ? 0.45 : 1,
+                whiteSpace: 'nowrap', height: 44,
+              }}
+            >
+              {noteSaving ? '⏳' : '↑ Gönder'}
+            </button>
+          </div>
+        </Panel>
       )}
 
       {/* ── AKTİVİTE ─────────────────────────────────────────────────────────── */}
