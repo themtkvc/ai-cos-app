@@ -718,8 +718,7 @@ export default function Notes({ user }) {
 
   // Hızlı notları kronolojik liste olarak al
   const quickNotes = notes
-    .filter(n => n.category === 'Hızlı' && !n.is_archived)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    .filter(n => n.category === 'Hızlı' && !n.is_archived);
 
   return (
     <div style={{ maxWidth: 1300, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 24, alignItems: 'flex-start' }}>
