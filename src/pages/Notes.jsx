@@ -888,17 +888,10 @@ export default function Notes({ user }) {
           }}>
             <span style={{ fontSize: 16 }}>⚡</span>
             <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Hızlı Notlar</span>
-            {quickNotes.length > 0 && (
-              <span style={{
-                marginLeft: 'auto', fontSize: 11, fontWeight: 600,
-                background: 'var(--navy, #1A3C5E)', color: '#fff',
-                borderRadius: 10, padding: '1px 7px',
-              }}>{quickNotes.length}</span>
-            )}
           </div>
 
           {/* Giriş alanı */}
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border, #E5E7EB)' }}>
+          <div style={{ padding: '12px 14px' }}>
             <textarea
               ref={quickTextRef}
               value={quickText}
@@ -939,46 +932,6 @@ export default function Notes({ user }) {
             </div>
           </div>
 
-          {/* Not akışı */}
-          <div style={{
-            maxHeight: 520, overflowY: 'auto',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            {quickNotes.length === 0 ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                Henüz hızlı not yok
-              </div>
-            ) : (
-              quickNotes.map((note, idx) => (
-                <div
-                  key={note.id}
-                  onClick={() => setEditing(note)}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: idx < quickNotes.length - 1 ? '1px solid var(--border, #F3F4F6)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg, #F9FAFB)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <div
-                    style={{
-                      fontSize: 13, color: 'var(--text)', lineHeight: 1.55,
-                      display: '-webkit-box', WebkitLineClamp: 4,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: note.content }}
-                  />
-                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5, opacity: 0.7 }}>
-                    {new Date(note.created_at).toLocaleString('tr-TR', {
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </div>
       </div>
 
