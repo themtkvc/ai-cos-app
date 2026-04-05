@@ -324,12 +324,21 @@ function ActivityLog({ eventId, refresh }) {
   const [logs, setLogs] = useState([]);
   useEffect(() => {
     if (!eventId) return;
-    supabase.from('event_activity_log')
-      .select('*, user_profiles(full_name)')
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: false })
-      .limit(40)
-      .then(({ data }) => setLogs(data || []));
+    (async () => {
+      const { data } = await supabase.from('event_activity_log')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (!data) return;
+      const ids = [...new Set(data.map(l => l.user_id).filter(Boolean))];
+      let nameMap = {};
+      if (ids.length) {
+        const { data: profiles } = await supabase.from('user_profiles').select('user_id,full_name').in('user_id', ids);
+        (profiles || []).forEach(p => { nameMap[p.user_id] = p.full_name; });
+      }
+      setLogs(data.map(l => ({ ...l, _name: nameMap[l.user_id] || 'Sistem' })));
+    })();
   }, [eventId, refresh]);
 
   if (!logs.length) return <div style={{ fontSize:13,color:'var(--text-muted)',textAlign:'center',padding:20 }}>Henüz aktivite yok.</div>;
@@ -340,7 +349,7 @@ function ActivityLog({ eventId, refresh }) {
           <div style={{ width:8,height:8,borderRadius:'50%',background:'var(--navy)',marginTop:5,flexShrink:0 }} />
           <div style={{ flex:1 }}>
             <div style={{ fontSize:13,color:'var(--text)' }}>
-              <span style={{ fontWeight:600 }}>{l.user_profiles?.full_name||'Sistem'}</span>
+              <span style={{ fontWeight:600 }}>{l._name}</span>
               {' '}{l.action}
               {l.detail && <span style={{ color:'var(--text-muted)' }}> — {l.detail}</span>}
             </div>
@@ -404,12 +413,23 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
   const noteTextRef = useRef(null);
 
   const loadEventNotes = async (eid) => {
+    if (!eid) return;
     const { data } = await supabase
       .from('event_notes')
-      .select('*, user_profiles(full_name, unit)')
+      .select('*')
       .eq('event_id', eid)
       .order('created_at', { ascending: true });
-    setEventNotes(data || []);
+    if (!data) return;
+    const ids = [...new Set(data.map(n => n.user_id).filter(Boolean))];
+    let profileMap = {};
+    if (ids.length) {
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id,full_name,unit').in('user_id', ids);
+      (profiles || []).forEach(p => { profileMap[p.user_id] = p; });
+    }
+    setEventNotes(data.map(n => ({
+      ...n,
+      user_profiles: profileMap[n.user_id] || null,
+    })));
   };
 
   const saveEventNote = async () => {
@@ -484,11 +504,20 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     if (!eid) return;
     const { data } = await supabase
       .from('event_participants')
-      .select('*, user_profiles(full_name, unit)')
+      .select('*')
       .eq('event_id', eid)
       .order('created_at');
-    setParticipants((data || []).map(p => ({
-      ...p, full_name: p.user_profiles?.full_name || null, unit: p.user_profiles?.unit || null,
+    if (!data) return;
+    const ids = [...new Set(data.map(p => p.user_id).filter(Boolean))];
+    let profileMap = {};
+    if (ids.length) {
+      const { data: profiles } = await supabase.from('user_profiles').select('user_id,full_name,unit').in('user_id', ids);
+      (profiles || []).forEach(p => { profileMap[p.user_id] = p; });
+    }
+    setParticipants(data.map(p => ({
+      ...p,
+      full_name: profileMap[p.user_id]?.full_name || null,
+      unit: profileMap[p.user_id]?.unit || null,
     })));
   };
 
