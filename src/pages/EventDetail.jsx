@@ -368,6 +368,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     start_date: '', end_date: '', start_time: '', end_time: '',
     unit: '', owner_id: '', budget: '', budget_currency: 'TRY',
     objectives: '', outcomes: '', notes: '', cover_image_url: '',
+    website_url: '', registration_deadline: '',
   });
 
   // Veritabanından yüklenen listeler
@@ -438,6 +439,8 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       outcomes: event.outcomes || '',
       notes: event.notes || '',
       cover_image_url: event.cover_image_url || '',
+      website_url: event.website_url || '',
+      registration_deadline: event.registration_deadline || '',
     });
     loadParticipants(event.id);
     loadDocuments(event.id);
@@ -496,8 +499,10 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       objectives:      nullIfEmpty(form.objectives),
       outcomes:        nullIfEmpty(form.outcomes),
       notes:           nullIfEmpty(form.notes),
-      cover_image_url: nullIfEmpty(form.cover_image_url),
-      created_by:      event?.created_by || user?.id || null,
+      cover_image_url:        nullIfEmpty(form.cover_image_url),
+      website_url:            nullIfEmpty(form.website_url),
+      registration_deadline:  nullIfEmpty(form.registration_deadline),
+      created_by:             event?.created_by || user?.id || null,
     };
 
     let eventId = event?.id;
@@ -856,6 +861,30 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
                   </select>
                 </Field>
               </div>
+            </Panel>
+
+            {/* Web & Kayıt */}
+            <Panel>
+              <SectionTitle>Web & Kayıt</SectionTitle>
+              <Field>
+                <Label>Etkinlik Web Sitesi</Label>
+                <input
+                  type="url"
+                  value={form.website_url}
+                  onChange={e => set('website_url', e.target.value)}
+                  placeholder="https://etkinlik.org"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field>
+                <Label>Son Kayıt Tarihi</Label>
+                <input
+                  type="date"
+                  value={form.registration_deadline}
+                  onChange={e => set('registration_deadline', e.target.value)}
+                  style={inputStyle}
+                />
+              </Field>
             </Panel>
 
             {/* Notlar */}

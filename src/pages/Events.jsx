@@ -146,6 +146,14 @@ function EventCard({ event, onClick }) {
         )}
       </div>
 
+      {/* Son kayıt tarihi */}
+      {event.registration_deadline && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#D97706', fontWeight: 600 }}>
+          <span>⏰</span>
+          <span>Son kayıt: {new Date(event.registration_deadline).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+        </div>
+      )}
+
       {/* Alt: owner + katılımcı sayısı */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border, #E5E7EB)', fontSize: 12, color: '#9CA3AF', marginTop: 'auto' }}>
         <span>{event.owner_name ? `${event.owner_name}` : '—'}</span>
