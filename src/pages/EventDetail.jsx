@@ -473,11 +473,31 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     if (!form.title.trim() || !form.start_date) return;
     setSaving(true);
 
+    // Boş string → null dönüşümü (date/time/uuid alanları için zorunlu)
+    const nullIfEmpty = (v) => (v === '' || v === undefined ? null : v);
+
     const payload = {
-      ...form,
-      budget: form.budget ? parseFloat(form.budget) : null,
-      owner_id: form.owner_id || user.id,
-      created_by: event?.created_by || user.id,
+      title:           form.title.trim(),
+      description:     nullIfEmpty(form.description),
+      event_type:      form.event_type || 'conference',
+      status:          form.status || 'planned',
+      location_name:   nullIfEmpty(form.location_name),
+      location_type:   nullIfEmpty(form.location_type),
+      country:         nullIfEmpty(form.country),
+      city:            nullIfEmpty(form.city),
+      start_date:      form.start_date,
+      end_date:        nullIfEmpty(form.end_date),
+      start_time:      nullIfEmpty(form.start_time),
+      end_time:        nullIfEmpty(form.end_time),
+      unit:            nullIfEmpty(form.unit),
+      owner_id:        nullIfEmpty(form.owner_id) || user?.id || null,
+      budget:          form.budget ? parseFloat(form.budget) : null,
+      budget_currency: form.budget_currency || 'TRY',
+      objectives:      nullIfEmpty(form.objectives),
+      outcomes:        nullIfEmpty(form.outcomes),
+      notes:           nullIfEmpty(form.notes),
+      cover_image_url: nullIfEmpty(form.cover_image_url),
+      created_by:      event?.created_by || user?.id || null,
     };
 
     let eventId = event?.id;
@@ -493,7 +513,8 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
           payload.cover_image_url = publicUrl;
         }
       }
-      const { data } = await supabase.from('events').insert(payload).select().single();
+      const { data, error: insertErr } = await supabase.from('events').insert(payload).select().single();
+      if (insertErr) { console.error('Event insert error:', insertErr); setSaving(false); alert('Kayıt hatası: ' + insertErr.message); return; }
       eventId = data?.id;
       if (eventId) {
         // Eğer görsel temp path ile yüklendiyse event ID'li path'e taşı (upsert)
