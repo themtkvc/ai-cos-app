@@ -69,6 +69,7 @@ function formatDateRange(start, end) {
 }
 
 function EventCard({ event, onClick }) {
+  const typeColor = (EVENT_TYPES[event.event_type] || EVENT_TYPES.other).color;
   return (
     <div
       onClick={() => onClick(event)}
@@ -76,12 +77,11 @@ function EventCard({ event, onClick }) {
         background: 'var(--card-bg, #fff)',
         border: '1px solid var(--border, #E5E7EB)',
         borderRadius: 12,
-        padding: '20px',
+        overflow: 'hidden',
         cursor: 'pointer',
         transition: 'box-shadow 0.15s, transform 0.15s',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
       }}
       onMouseEnter={e => {
         e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.10)';
@@ -92,6 +92,24 @@ function EventCard({ event, onClick }) {
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
+      {/* Kapak görseli veya renkli banner */}
+      {event.cover_image_url ? (
+        <div style={{ width: '100%', height: 140, overflow: 'hidden', flexShrink: 0 }}>
+          <img
+            src={event.cover_image_url}
+            alt={event.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+      ) : (
+        <div style={{
+          width: '100%', height: 6, flexShrink: 0,
+          background: typeColor,
+        }} />
+      )}
+
+      {/* İçerik */}
+      <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
       {/* Üst: başlık + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text, #111)', lineHeight: 1.4, flex: 1 }}>
@@ -129,10 +147,11 @@ function EventCard({ event, onClick }) {
       </div>
 
       {/* Alt: owner + katılımcı sayısı */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border, #E5E7EB)', fontSize: 12, color: '#9CA3AF' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border, #E5E7EB)', fontSize: 12, color: '#9CA3AF', marginTop: 'auto' }}>
         <span>{event.owner_name ? `${event.owner_name}` : '—'}</span>
         <span>{event._participant_count || 0} katılımcı</span>
       </div>
+      </div>{/* /content */}
     </div>
   );
 }
