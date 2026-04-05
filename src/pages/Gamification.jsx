@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting, getXPEventsByPeriod, getLeaderHistory, upsertLeaderHistory } from '../lib/supabase';
+import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting, getXPEventsByPeriod, getLeaderHistory, upsertLeaderHistory, getXPEventsByUser } from '../lib/supabase';
 
 // ── Seviye Hesaplama ──────────────────────────────────────────────────────────
 function calculateLevel(totalXp) {
@@ -23,19 +23,23 @@ function levelColor(level) {
 
 // ── XP Etkinlik İkonları ──────────────────────────────────────────────────────
 const ACTION_META = {
-  task_complete:    { icon: '✅', label: 'Görev Tamamlama' },
-  agenda_create:    { icon: '📋', label: 'Gündem Oluşturma' },
-  on_time_bonus:    { icon: '⏰', label: 'Zamanında Tamamlama' },
-  comment:          { icon: '💬', label: 'Yorum Yazma' },
-  collaboration:    { icon: '🤝', label: 'İşbirliği' },
-  network_contact:  { icon: '👤', label: 'Kişi Ekleme' },
-  network_org:      { icon: '🏢', label: 'Kurum Ekleme' },
-  network_event:    { icon: '📅', label: 'Etkinlik Ekleme' },
-  fund_opportunity: { icon: '💰', label: 'Fon Fırsatı' },
-  daily_log_entry:  { icon: '📝', label: 'İş Kaydı Ekleme' },
-  daily_log_hour:   { icon: '⏱️', label: 'Saat Başı Mesai' },
-  daily_log_fullday:{ icon: '🌟', label: 'Tam Gün (8 saat)' },
-  daily_log_overtime:{ icon: '🔥', label: 'Fazla Mesai (saat başı x2)' },
+  task_complete:      { icon: '✅', label: 'Görev Tamamlama' },
+  agenda_create:      { icon: '📋', label: 'Gündem Oluşturma' },
+  on_time_bonus:      { icon: '⏰', label: 'Zamanında Tamamlama' },
+  comment:            { icon: '💬', label: 'Yorum Yazma' },
+  collaboration:      { icon: '🤝', label: 'İşbirliği' },
+  network_contact:    { icon: '👤', label: 'Kişi Ekleme' },
+  network_org:        { icon: '🏢', label: 'Kurum Ekleme' },
+  network_event:      { icon: '📅', label: 'Network Etkinliği' },
+  fund_opportunity:   { icon: '💰', label: 'Fon Fırsatı' },
+  daily_log_entry:    { icon: '📝', label: 'İş Kaydı Ekleme' },
+  daily_log_hour:     { icon: '⏱️', label: 'Saat Başı Mesai' },
+  daily_log_fullday:  { icon: '🌟', label: 'Tam Gün (8 saat)' },
+  daily_log_overtime: { icon: '🔥', label: 'Fazla Mesai (saat başı x2)' },
+  // Etkinlik modülü
+  event_create:       { icon: '🗓️', label: 'Etkinlik Oluşturma' },
+  event_note:         { icon: '💬', label: 'Etkinliğe Not Ekleme' },
+  event_document:     { icon: '📄', label: 'Etkinliğe Belge Ekleme' },
 };
 
 // ── Dönem Hesaplamaları ───────────────────────────────────────────────────
@@ -225,6 +229,13 @@ export default function Gamification({ user, profile }) {
   const [lbScope, setLbScope] = useState('all');
   const [lbPeriod, setLbPeriod] = useState('all'); // 'all' | 'weekly' | 'monthly'
 
+  // Personel hareketleri filtre state
+  const [personnelUserId, setPersonnelUserId] = useState('');
+  const [personnelStart, setPersonnelStart] = useState('');
+  const [personnelEnd, setPersonnelEnd] = useState('');
+  const [personnelEvents, setPersonnelEvents] = useState([]);
+  const [personnelLoading, setPersonnelLoading] = useState(false);
+
   const myId = user?.id;
   const myUnit = profile?.unit;
   const isDirektor = profile?.role === 'direktor';
@@ -396,6 +407,7 @@ export default function Gamification({ user, profile }) {
           { id: 'leaderboard', label: '🏆 Liderlik Tablosu' },
           { id: 'badges', label: '🎖️ Rozetler' },
           { id: 'history', label: '📊 XP Geçmişi' },
+          ...(isDirektor ? [{ id: 'personnel', label: '👤 Personel Hareketleri' }] : []),
           ...(isDirektor ? [{ id: 'settings', label: '⚙️ Puan Ayarları' }] : []),
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -669,6 +681,145 @@ export default function Gamification({ user, profile }) {
         </div>
       )}
 
+      {/* ── PERSONEL HAREKETLERİ ── */}
+      {tab === 'personnel' && isDirektor && (
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Personelin tüm XP hareketlerini tarihe göre filtreleyin. Personeller bu ekranı göremez.
+          </div>
+
+          {/* Filtreler */}
+          <div style={{
+            display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
+            padding: '16px', borderRadius: 12, background: 'var(--bg-card)',
+            border: '1px solid var(--border)', marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 200px' }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Personel</label>
+              <select
+                value={personnelUserId}
+                onChange={e => setPersonnelUserId(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }}
+              >
+                <option value="">— Tüm Personel —</option>
+                {[...profiles].sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'tr')).map(p => (
+                  <option key={p.user_id} value={p.user_id}>
+                    {p.full_name}{p.unit ? ` (${p.unit})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Başlangıç</label>
+              <input type="date" value={personnelStart} onChange={e => setPersonnelStart(e.target.value)}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Bitiş</label>
+              <input type="date" value={personnelEnd} onChange={e => setPersonnelEnd(e.target.value)}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }} />
+            </div>
+
+            <button
+              onClick={async () => {
+                setPersonnelLoading(true);
+                const { data } = await getXPEventsByUser(personnelUserId || null, personnelStart || null, personnelEnd || null);
+                setPersonnelEvents(data || []);
+                setPersonnelLoading(false);
+              }}
+              style={{
+                padding: '9px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'var(--navy, #1A3C5E)', color: '#fff', fontWeight: 700, fontSize: 13,
+                alignSelf: 'flex-end',
+              }}
+            >
+              {personnelLoading ? '⏳ Yükleniyor…' : '🔍 Filtrele'}
+            </button>
+          </div>
+
+          {/* Özet istatistik */}
+          {personnelEvents.length > 0 && (() => {
+            const totalXP = personnelEvents.reduce((s, e) => s + (e.xp_amount || 0), 0);
+            const actionCounts = personnelEvents.reduce((acc, e) => { acc[e.action] = (acc[e.action] || 0) + 1; return acc; }, {});
+            const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
+            return (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Toplam İşlem', value: personnelEvents.length, icon: '📊' },
+                  { label: 'Toplam XP', value: totalXP.toLocaleString('tr-TR') + ' XP', icon: '⚡' },
+                  { label: 'En Sık İşlem', value: topAction ? (ACTION_META[topAction[0]]?.label || topAction[0]) + ` (${topAction[1]}x)` : '—', icon: '🏆' },
+                ].map(stat => (
+                  <div key={stat.label} style={{
+                    flex: '1 1 140px', padding: '12px 16px', borderRadius: 12,
+                    background: 'var(--bg-card)', border: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <span style={{ fontSize: 22 }}>{stat.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{stat.label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{stat.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Tablo */}
+          {personnelEvents.length === 0 && !personnelLoading ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)', fontSize: 13 }}>
+              Filtre uygulayarak personel hareketlerini görüntüleyin.
+            </div>
+          ) : (
+            <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              {/* Başlık satırı */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 140px 160px 80px',
+                padding: '10px 16px', background: 'var(--bg)',
+                fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <span>İşlem</span><span>Kişi</span><span>Tarih</span><span style={{ textAlign: 'right' }}>XP</span>
+              </div>
+              <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+                {personnelEvents.map((ev, i) => {
+                  const meta = ACTION_META[ev.action] || { icon: '🔵', label: ev.action };
+                  const person = profiles.find(p => p.user_id === ev.user_id);
+                  return (
+                    <div key={ev.id || i} style={{
+                      display: 'grid', gridTemplateColumns: '1fr 140px 160px 80px',
+                      padding: '10px 16px', alignItems: 'center',
+                      borderBottom: i < personnelEvents.length - 1 ? '1px solid var(--border)' : 'none',
+                      background: i % 2 === 0 ? 'var(--bg-card)' : 'transparent',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>{meta.icon}</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{meta.label}</div>
+                          {ev.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{ev.description}</div>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {person?.full_name || '—'}
+                        {person?.unit && <div style={{ fontSize: 10, opacity: 0.7 }}>{person.unit}</div>}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        {new Date(ev.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, color: '#6366f1' }}>
+                        +{ev.xp_amount}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── PUAN AYARLARI ── */}
       {tab === 'settings' && isDirektor && (
         <div>
@@ -677,13 +828,14 @@ export default function Gamification({ user, profile }) {
           </div>
 
           {/* Kategorilere göre grupla */}
-          {['task', 'social', 'network', 'dailylog', 'general'].map(cat => {
+          {['task', 'social', 'network', 'dailylog', 'events', 'general'].map(cat => {
             const catSettings = xpSettings.filter(s => s.category === cat);
             if (catSettings.length === 0) return null;
             const catLabel = cat === 'task' ? '📋 Görev & Gündem'
               : cat === 'social' ? '💬 Sosyal & İşbirliği'
               : cat === 'network' ? '🕸️ Network'
               : cat === 'dailylog' ? '📝 İş Kaydı'
+              : cat === 'events' ? '🗓️ Etkinlikler'
               : '📌 Genel';
             return (
               <div key={cat} style={{ marginBottom: 24 }}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, awardXP } from '../lib/supabase';
 import { WORLD_COUNTRIES } from '../lib/worldData';
 import {
   EVENT_TYPES, EVENT_STATUS, LOCATION_TYPES, PARTICIPANT_ROLES,
@@ -444,6 +444,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     setNoteText('');
     setNoteSaving(false);
     loadEventNotes(event.id);
+    awardXP(user?.id, 'event_note', `Etkinliğe not eklendi`, event.id);
     noteTextRef.current?.focus();
   };
 
@@ -596,6 +597,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
           await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', eventId);
         }
         await logActivity(eventId, 'etkinliği oluşturdu');
+        awardXP(user?.id, 'event_create', `Etkinlik oluşturuldu: ${payload.title}`, eventId);
       }
     } else {
       await supabase.from('events').update(payload).eq('id', event.id);
@@ -659,6 +661,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       doc_type: docType, uploaded_by: user.id,
     });
     await logActivity(event.id, 'döküman ekledi', docTitle);
+    awardXP(user?.id, 'event_document', `Etkinliğe belge eklendi: ${docTitle}`, event.id);
     await loadDocuments(event.id);
     setDocTitle(''); setDocUrl(''); setDocType('document');
     setAddingDoc(false);

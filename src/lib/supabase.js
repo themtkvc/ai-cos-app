@@ -1081,6 +1081,10 @@ export const XP_VALUES_DEFAULT = {
   daily_log_hour:      5,
   daily_log_fullday:  20,
   daily_log_overtime: 10,
+  // Etkinlik modülü
+  event_create:       30,
+  event_note:         10,
+  event_document:     10,
 };
 
 // Cache: DB'den okunan XP settings
@@ -1166,6 +1170,16 @@ export const getAllBadges = async () => {
 
 export const getUserBadges = async (userId) => {
   const { data, error } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', userId).order('earned_at', { ascending: false });
+  return { data, error };
+};
+
+// ── Personel XP geçmişi (direktör filtreli görünüm) ──
+export const getXPEventsByUser = async (userId, startDate, endDate) => {
+  let query = supabase.from('xp_events').select('*').order('created_at', { ascending: false }).limit(500);
+  if (userId) query = query.eq('user_id', userId);
+  if (startDate) query = query.gte('created_at', startDate);
+  if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
+  const { data, error } = await query;
   return { data, error };
 };
 
