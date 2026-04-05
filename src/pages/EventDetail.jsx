@@ -368,7 +368,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     start_date: '', end_date: '', start_time: '', end_time: '',
     unit: '', owner_id: '', budget: '', budget_currency: 'TRY',
     objectives: '', outcomes: '', notes: '', cover_image_url: '',
-    website_url: '', registration_deadline: '',
+    website_url: '', registration_deadline: '', registration_link: '',
   });
 
   // Veritabanından yüklenen listeler
@@ -441,6 +441,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       cover_image_url: event.cover_image_url || '',
       website_url: event.website_url || '',
       registration_deadline: event.registration_deadline || '',
+      registration_link: event.registration_link || '',
     });
     loadParticipants(event.id);
     loadDocuments(event.id);
@@ -502,6 +503,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       cover_image_url:        nullIfEmpty(form.cover_image_url),
       website_url:            nullIfEmpty(form.website_url),
       registration_deadline:  nullIfEmpty(form.registration_deadline),
+      registration_link:      nullIfEmpty(form.registration_link),
       created_by:             event?.created_by || user?.id || null,
     };
 
@@ -882,6 +884,16 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
                   type="date"
                   value={form.registration_deadline}
                   onChange={e => set('registration_deadline', e.target.value)}
+                  style={inputStyle}
+                />
+              </Field>
+              <Field>
+                <Label>Kayıt Linki</Label>
+                <input
+                  type="url"
+                  value={form.registration_link}
+                  onChange={e => set('registration_link', e.target.value)}
+                  placeholder="https://kayit.etkinlik.org"
                   style={inputStyle}
                 />
               </Field>

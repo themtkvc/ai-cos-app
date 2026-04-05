@@ -616,6 +616,11 @@ export default function Notes({ user }) {
   const [filterColor, setFilterColor] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
+  // ── Hızlı not state ────────────────────────────────────────────────────────
+  const [quickText, setQuickText] = useState('');
+  const [quickSaving, setQuickSaving] = useState(false);
+  const quickTextRef = useRef(null);
+
   // ── Notları yükle ──────────────────────────────────────────────────────────
   const loadNotes = useCallback(async () => {
     const { data, error } = await supabase
@@ -666,6 +671,27 @@ export default function Notes({ user }) {
     loadNotes();
   };
 
+  // ── Hızlı not kaydet ─────────────────────────────────────────────────────
+  const saveQuickNote = async () => {
+    const text = quickText.trim();
+    if (!text) return;
+    setQuickSaving(true);
+    await supabase.from('notes').insert({
+      user_id: user.id,
+      title: '',
+      content: text.replace(/\n/g, '<br>'),
+      color: 'default',
+      category: 'Hızlı',
+      checklist: [],
+      images: [],
+      updated_at: new Date().toISOString(),
+    });
+    setQuickText('');
+    setQuickSaving(false);
+    loadNotes();
+    quickTextRef.current?.focus();
+  };
+
   // ── Filtreleme ─────────────────────────────────────────────────────────────
   const filtered = notes.filter(n => {
     if (n.is_archived !== showArchived) return false;
@@ -690,8 +716,16 @@ export default function Notes({ user }) {
     );
   }
 
+  // Hızlı notları kronolojik liste olarak al
+  const quickNotes = notes
+    .filter(n => n.category === 'Hızlı' && !n.is_archived)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px' }}>
+    <div style={{ maxWidth: 1300, margin: '0 auto', padding: '0 16px', display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+
+      {/* ── Sol: ana notlar ─────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -836,6 +870,119 @@ export default function Notes({ user }) {
           pointer-events: none;
         }
       `}</style>
+      </div>{/* /sol */}
+
+      {/* ── Sağ: hızlı notlar paneli ─────────────────────────────────────── */}
+      <div style={{
+        width: 280, flexShrink: 0, position: 'sticky', top: 24,
+      }}>
+        <div style={{
+          background: 'var(--card-bg, #fff)',
+          border: '1px solid var(--border, #E5E7EB)',
+          borderRadius: 14, overflow: 'hidden',
+        }}>
+          {/* Panel başlık */}
+          <div style={{
+            padding: '14px 16px 10px',
+            borderBottom: '1px solid var(--border, #E5E7EB)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 16 }}>⚡</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Hızlı Notlar</span>
+            {quickNotes.length > 0 && (
+              <span style={{
+                marginLeft: 'auto', fontSize: 11, fontWeight: 600,
+                background: 'var(--navy, #1A3C5E)', color: '#fff',
+                borderRadius: 10, padding: '1px 7px',
+              }}>{quickNotes.length}</span>
+            )}
+          </div>
+
+          {/* Giriş alanı */}
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border, #E5E7EB)' }}>
+            <textarea
+              ref={quickTextRef}
+              value={quickText}
+              onChange={e => setQuickText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  saveQuickNote();
+                }
+              }}
+              placeholder="Kısa bir not yaz, Enter ile gönder…"
+              rows={3}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                border: '1.5px solid var(--border, #E5E7EB)',
+                borderRadius: 10, padding: '9px 12px',
+                fontSize: 13, lineHeight: 1.6,
+                color: 'var(--text)', background: 'var(--bg, #F9FAFB)',
+                resize: 'none', outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {quickText.length > 0 ? `${quickText.length} karakter` : 'Shift+Enter: satır sonu'}
+              </span>
+              <button
+                onClick={saveQuickNote}
+                disabled={quickSaving || !quickText.trim()}
+                style={{
+                  ...primaryBtnStyle,
+                  padding: '6px 16px', fontSize: 13,
+                  opacity: quickSaving || !quickText.trim() ? 0.45 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {quickSaving ? '⏳' : '↑'} Gönder
+              </button>
+            </div>
+          </div>
+
+          {/* Not akışı */}
+          <div style={{
+            maxHeight: 520, overflowY: 'auto',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {quickNotes.length === 0 ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                Henüz hızlı not yok
+              </div>
+            ) : (
+              quickNotes.map((note, idx) => (
+                <div
+                  key={note.id}
+                  onClick={() => setEditing(note)}
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: idx < quickNotes.length - 1 ? '1px solid var(--border, #F3F4F6)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg, #F9FAFB)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div
+                    style={{
+                      fontSize: 13, color: 'var(--text)', lineHeight: 1.55,
+                      display: '-webkit-box', WebkitLineClamp: 4,
+                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: note.content }}
+                  />
+                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 5, opacity: 0.7 }}>
+                    {new Date(note.created_at).toLocaleString('tr-TR', {
+                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
