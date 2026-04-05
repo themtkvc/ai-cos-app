@@ -197,12 +197,14 @@ export default function Donors({ user, profile, onNavigate }) {
     setSaving(true);
     try {
       if (editDonorId) {
-        await updateDonor(editDonorId, donorForm);
+        const { error: updateErr } = await updateDonor(editDonorId, donorForm);
+        if (updateErr) throw updateErr;
       } else {
-        const { data } = await createDonor({
+        const { data, error: createErr } = await createDonor({
           ...donorForm,
           user_id: user.id
         });
+        if (createErr) throw createErr;
         if (data?.[0]) setSelected(data[0]);
       }
       await load();

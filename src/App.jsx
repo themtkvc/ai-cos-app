@@ -22,6 +22,7 @@ import Admin from './pages/Admin';
 import Gamification from './pages/Gamification';
 import FundOpportunities from './pages/FundOpportunities';
 import FormsManager from './pages/FormsManager';
+import Events from './pages/Events';
 import PublicFormFill from './pages/PublicFormFill';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -38,11 +39,11 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','profile'],
-  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','profile'],
-  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','funds','forms','notes','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
+  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','profile'],
+  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
+  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','funds','forms','notes','events','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
@@ -296,6 +297,7 @@ export default function App() {
     funds:        FundOpportunities,
     forms:        FormsManager,
     gamification: Gamification,
+    events:       Events,
     admin:     Admin,
     users:     Admin,
   };
@@ -322,6 +324,7 @@ export default function App() {
     funds:        '💰 Fon Fırsatları',
     forms:        '📋 Formlar',
     gamification: '🏆 Oyunlaştırma',
+    events:       '📅 Etkinlikler',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',

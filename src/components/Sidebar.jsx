@@ -23,6 +23,7 @@ const ALL_NAV = [
   { id: 'funds',            icon: '💰', label: 'Fon Fırsatları' },
   { id: 'forms',            icon: '📋', label: 'Formlar' },
   { id: 'gamification',     icon: '🏆', label: 'Oyunlaştırma' },
+  { id: 'events',           icon: '📅', label: 'Etkinlikler' },
 ];
 
 const ADMIN_NAV = [

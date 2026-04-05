@@ -219,15 +219,22 @@ export default function DonationTracker({ user, profile, onNavigate }) {
   const handleFile = useCallback((file) => {
     setFileName(file.name);
     const reader = new FileReader();
+    const isCsv = /\.csv$/i.test(file.name);
     reader.onload = (e) => {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+      const wb = isCsv
+        ? XLSX.read(e.target.result, { type: 'string', cellDates: false })
+        : XLSX.read(e.target.result, { type: 'array', cellDates: false });
       setWorkbook(wb);
       setSheets(wb.SheetNames);
       const first = wb.SheetNames[0];
       setActiveSheet(first);
       parseSheet(wb, first);
     };
-    reader.readAsArrayBuffer(file);
+    if (isCsv) {
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   }, [parseSheet]);
 
   const changeSheet = (name) => {
