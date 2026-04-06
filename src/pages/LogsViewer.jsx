@@ -34,6 +34,69 @@ function thisMonth() {
   return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
 }
 
+// ── GEZİNME BAZLI TARİH HESAPLAMA ────────────────────────────────────────────
+function getDayByOffset(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return toLocalDateStr(d);
+}
+
+function getWeekByOffset(offset) {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diff + offset * 7);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { start: toLocalDateStr(mon), end: toLocalDateStr(sun) };
+}
+
+function getMonthByOffset(offset) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const end   = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
+}
+
+function fmtPeriodLabel(mode, offset, rangeStart, rangeEnd) {
+  const shortMonths = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const longMonths  = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                       'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const dayNames    = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+
+  if (mode === 'gun') {
+    const d = new Date(getDayByOffset(offset) + 'T12:00:00');
+    if (offset === 0) return `Bugün · ${d.getDate()} ${longMonths[d.getMonth()]} ${d.getFullYear()} ${dayNames[d.getDay()]}`;
+    if (offset === -1) return `Dün · ${d.getDate()} ${longMonths[d.getMonth()]} ${d.getFullYear()} ${dayNames[d.getDay()]}`;
+    return `${d.getDate()} ${longMonths[d.getMonth()]} ${d.getFullYear()} ${dayNames[d.getDay()]}`;
+  }
+  if (mode === 'hafta') {
+    const w = getWeekByOffset(offset);
+    const s = new Date(w.start + 'T12:00:00');
+    const e = new Date(w.end   + 'T12:00:00');
+    const sameYear = s.getFullYear() === e.getFullYear();
+    const sameMonth = sameYear && s.getMonth() === e.getMonth();
+    if (offset === 0) {
+      return `Bu Hafta · ${s.getDate()} ${shortMonths[s.getMonth()]}${!sameYear ? ' '+s.getFullYear() : ''} – ${e.getDate()} ${shortMonths[e.getMonth()]} ${e.getFullYear()}`;
+    }
+    return `${s.getDate()} ${shortMonths[s.getMonth()]}${!sameYear ? ' '+s.getFullYear() : ''} – ${e.getDate()} ${shortMonths[e.getMonth()]} ${e.getFullYear()}`;
+  }
+  if (mode === 'ay') {
+    const m = getMonthByOffset(offset);
+    const d = new Date(m.start + 'T12:00:00');
+    if (offset === 0) return `Bu Ay · ${longMonths[d.getMonth()]} ${d.getFullYear()}`;
+    return `${longMonths[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  if (mode === 'aralik' && rangeStart && rangeEnd) {
+    const s = new Date(rangeStart + 'T12:00:00');
+    const e = new Date(rangeEnd   + 'T12:00:00');
+    const sameYear = s.getFullYear() === e.getFullYear();
+    return `${s.getDate()} ${shortMonths[s.getMonth()]}${!sameYear ? ' '+s.getFullYear():''} – ${e.getDate()} ${shortMonths[e.getMonth()]} ${e.getFullYear()}`;
+  }
+  return 'Tarih Aralığı Seç';
+}
+
 // ── SÜRE HESAPLAMA ───────────────────────────────────────────────────────────
 function itemMins(item) {
   if (!item) return 0;
@@ -686,8 +749,11 @@ function ViewBtn({ id, label, icon, active, onClick }) {
 
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
 export default function LogsViewer({ user, profile }) {
-  const [timePeriod, setTimePeriod]   = useState('week'); // 'today'|'week'|'month'|'custom'
-  const [customDate, setCustomDate]   = useState('');
+  const [periodMode, setPeriodMode]   = useState('hafta'); // 'gun'|'hafta'|'ay'|'aralik'
+  const [periodOffset, setPeriodOffset] = useState(0);     // 0=şimdiki, -1=önceki, ...
+  const [rangeStart, setRangeStart]   = useState('');
+  const [rangeEnd, setRangeEnd]       = useState('');
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [viewMode, setViewMode]       = useState('block'); // 'block'|'liste'|'kart'
   const [searchText, setSearchText]   = useState('');
   const [searchQ, setSearchQ]         = useState('');
@@ -712,20 +778,25 @@ export default function LogsViewer({ user, profile }) {
 
   // Tarih aralığı
   const { startDate, endDate, dateLabel } = useMemo(() => {
-    if (timePeriod === 'today') {
-      const t = today();
-      return { startDate: t, endDate: t, dateLabel: t };
+    if (periodMode === 'gun') {
+      const d = getDayByOffset(periodOffset);
+      return { startDate: d, endDate: d, dateLabel: d };
     }
-    if (timePeriod === 'month') {
-      const m = thisMonth();
+    if (periodMode === 'hafta') {
+      const w = getWeekByOffset(periodOffset);
+      return { startDate: w.start, endDate: w.end, dateLabel: `${w.start}_${w.end}` };
+    }
+    if (periodMode === 'ay') {
+      const m = getMonthByOffset(periodOffset);
       return { startDate: m.start, endDate: m.end, dateLabel: `${m.start}_${m.end}` };
     }
-    if (timePeriod === 'custom' && customDate) {
-      return { startDate: customDate, endDate: customDate, dateLabel: customDate };
+    if (periodMode === 'aralik' && rangeStart && rangeEnd) {
+      return { startDate: rangeStart, endDate: rangeEnd, dateLabel: `${rangeStart}_${rangeEnd}` };
     }
-    const w = thisWeek();
-    return { startDate: w.start, endDate: w.end, dateLabel: `${w.start}_${w.end}` };
-  }, [timePeriod, customDate]);
+    // aralik henüz seçilmemişse bugünü göster
+    const t = today();
+    return { startDate: t, endDate: t, dateLabel: t };
+  }, [periodMode, periodOffset, rangeStart, rangeEnd]);
 
   // Veri yükle
   const loadLogs = useCallback(async () => {
@@ -803,13 +874,7 @@ export default function LogsViewer({ user, profile }) {
   }, [filteredPersons]);
 
   // Dönemi etiket
-  const periodLabel = timePeriod === 'today'
-    ? `Bugün · ${fmtDateShort(startDate)}`
-    : timePeriod === 'month'
-    ? `Bu Ay · ${MONTHS_TR[new Date(startDate + 'T12:00:00').getMonth()]} ${new Date(startDate + 'T12:00:00').getFullYear()}`
-    : timePeriod === 'custom' && customDate
-    ? fmtDateShort(customDate)
-    : `Bu Hafta · ${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}`;
+  const periodLabel = fmtPeriodLabel(periodMode, periodOffset, rangeStart, rangeEnd);
 
   return (
     <div style={{ padding: '28px 32px', background: '#f7f8fa', minHeight: '100vh' }}>
@@ -872,53 +937,85 @@ export default function LogsViewer({ user, profile }) {
             />
           </div>
 
-          {/* Zaman filtreleri */}
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[
-              { id: 'today', label: 'Bugün' },
-              { id: 'week',  label: 'Bu Hafta' },
-              { id: 'month', label: 'Bu Ay' },
-            ].map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTimePeriod(t.id)}
-                style={{
-                  padding: '8px 16px', borderRadius: 8, border: '1.5px solid',
-                  borderColor: timePeriod === t.id ? '#111827' : '#e5e7eb',
-                  background: timePeriod === t.id ? '#111827' : 'white',
-                  color: timePeriod === t.id ? 'white' : '#374151',
-                  fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-                  transition: 'all 0.12s',
-                }}
-              >{t.label}</button>
-            ))}
-            {/* Tarih Seç */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setTimePeriod('custom')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', borderRadius: 8, border: '1.5px solid',
-                  borderColor: timePeriod === 'custom' ? '#111827' : '#e5e7eb',
-                  background: timePeriod === 'custom' ? '#111827' : 'white',
-                  color: timePeriod === 'custom' ? 'white' : '#374151',
-                  fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >📅 Tarih Seç</button>
-              {timePeriod === 'custom' && (
+          {/* Dönem modu seçici + ileri/geri navigasyon */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Mod butonları */}
+            <div style={{ display: 'flex', gap: 2, background: '#f3f4f6', borderRadius: 9, padding: 3 }}>
+              {[
+                { id: 'gun',    label: 'Gün' },
+                { id: 'hafta',  label: 'Hafta' },
+                { id: 'ay',     label: 'Ay' },
+                { id: 'aralik', label: '📅 Tarih Aralığı' },
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setPeriodMode(t.id); setPeriodOffset(0); if (t.id === 'aralik') setShowRangePicker(true); else setShowRangePicker(false); }}
+                  style={{
+                    padding: '7px 14px', borderRadius: 7, border: 'none',
+                    background: periodMode === t.id ? '#111827' : 'transparent',
+                    color: periodMode === t.id ? 'white' : '#6b7280',
+                    fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit',
+                    transition: 'all 0.12s',
+                  }}
+                >{t.label}</button>
+              ))}
+            </div>
+
+            {/* İleri/Geri — aralik modunda gizle */}
+            {periodMode !== 'aralik' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f3f4f6', borderRadius: 9, padding: '3px 6px' }}>
+                <button
+                  onClick={() => setPeriodOffset(o => o - 1)}
+                  title="Önceki dönem"
+                  style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#374151', fontWeight: 700, fontFamily: 'inherit' }}
+                >‹</button>
+                <span style={{
+                  fontSize: 12.5, fontWeight: 600, color: '#111827',
+                  minWidth: 160, textAlign: 'center', padding: '0 4px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {fmtPeriodLabel(periodMode, periodOffset, rangeStart, rangeEnd)}
+                </span>
+                <button
+                  onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))}
+                  title="Sonraki dönem"
+                  disabled={periodOffset >= 0}
+                  style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'transparent', cursor: periodOffset >= 0 ? 'default' : 'pointer', fontSize: 14, color: periodOffset >= 0 ? '#d1d5db' : '#374151', fontWeight: 700, fontFamily: 'inherit' }}
+                >›</button>
+                {periodOffset !== 0 && (
+                  <button
+                    onClick={() => setPeriodOffset(0)}
+                    title="Bugüne dön"
+                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: 11, color: '#374151', fontWeight: 600, fontFamily: 'inherit' }}
+                  >Şimdi</button>
+                )}
+              </div>
+            )}
+
+            {/* Tarih aralığı seçici */}
+            {periodMode === 'aralik' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f3f4f6', borderRadius: 9, padding: '4px 10px' }}>
                 <input
                   type="date"
-                  value={customDate}
-                  onChange={e => setCustomDate(e.target.value)}
-                  style={{
-                    position: 'absolute', top: 42, right: 0, zIndex: 10,
-                    padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb',
-                    background: 'white', fontFamily: 'inherit', fontSize: 13, outline: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  }}
+                  value={rangeStart}
+                  onChange={e => setRangeStart(e.target.value)}
+                  style={{ padding: '5px 8px', borderRadius: 6, border: '1.5px solid #e5e7eb', fontSize: 12.5, fontFamily: 'inherit', outline: 'none', background: 'white' }}
                 />
-              )}
-            </div>
+                <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>–</span>
+                <input
+                  type="date"
+                  value={rangeEnd}
+                  min={rangeStart}
+                  onChange={e => setRangeEnd(e.target.value)}
+                  style={{ padding: '5px 8px', borderRadius: 6, border: '1.5px solid #e5e7eb', fontSize: 12.5, fontFamily: 'inherit', outline: 'none', background: 'white' }}
+                />
+                {rangeStart && rangeEnd && (
+                  <span style={{ fontSize: 11.5, color: '#6b7280', fontWeight: 500 }}>
+                    {fmtPeriodLabel('aralik', 0, rangeStart, rangeEnd)}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Personel filtre */}
@@ -961,6 +1058,7 @@ export default function LogsViewer({ user, profile }) {
           <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 500 }}>
             {!loading && `${periodLabel} · ${filteredPersons.length} personel · ${filteredPersons.reduce((s,p)=>s+p.rows.length,0)} kayıt`}
           </div>
+
           <div style={{ display: 'flex', gap: 2, background: '#f3f4f6', borderRadius: 10, padding: 3 }}>
             <ViewBtn id="liste" label="Liste" icon="☰"  active={viewMode==='liste'} onClick={setViewMode} />
             <ViewBtn id="kart"  label="Kart"  icon="⊞"  active={viewMode==='kart'}  onClick={setViewMode} />
