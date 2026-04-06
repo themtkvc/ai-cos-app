@@ -988,6 +988,48 @@ export const deleteNetworkConnection = async (id) => {
   return { error };
 };
 
+// ── NETWORK AKTİVİTE LOGU ──────────────────────────────────────────────────────
+/**
+ * Tüm network işlemlerini kalıcı olarak loglar.
+ * Loglar değiştirilemez / silinemez (RLS policy).
+ */
+export const logNetworkActivity = async ({
+  userId,
+  userName,
+  actionType,   // 'create' | 'update' | 'delete' | 'connect' | 'disconnect'
+  entityType,   // 'contact' | 'organization' | 'event' | 'connection'
+  entityId = null,
+  entityName = null,
+  detail = {},
+}) => {
+  try {
+    await supabase.from('network_activity_log').insert({
+      user_id:     userId   || null,
+      user_name:   userName || null,
+      action_type: actionType,
+      entity_type: entityType,
+      entity_id:   entityId   || null,
+      entity_name: entityName || null,
+      detail:      detail || {},
+    });
+  } catch (e) {
+    // Loglama hatası ana işlemi engellemesin
+    console.error('[NetworkLog] log yazılamadı:', e);
+  }
+};
+
+export const getNetworkActivityLog = async ({ limit = 200, offset = 0, actionType = null, entityType = null } = {}) => {
+  let q = supabase
+    .from('network_activity_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (actionType) q = q.eq('action_type', actionType);
+  if (entityType) q = q.eq('entity_type', entityType);
+  const { data, error } = await q;
+  return { data: data || [], error };
+};
+
 // ── CONTACT COMMUNICATIONS (İletişim Geçmişi) ──
 export const getContactComms = async (contactId) => {
   const { data, error } = await supabase.from('network_contact_comms')

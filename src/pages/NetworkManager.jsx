@@ -9,6 +9,7 @@ import {
   getContactComms, createContactComm, deleteContactComm,
   getAllProfiles,
   awardXP,
+  logNetworkActivity, getNetworkActivityLog,
 } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDisplayDate } from '../lib/constants';
 import { WORLD_COUNTRIES, getCountryFlag, CITIES_BY_COUNTRY } from '../lib/worldData';
@@ -1499,7 +1500,10 @@ export default function NetworkManager({ user, profile }) {
   const [data, setData]             = useState({ organizations:[], contacts:[], events:[], connections:[] });
   const [allProfiles, setAllProfiles] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [tab, setTab]               = useState('contacts');    // 'contacts'|'organizations'|'events'
+  const [tab, setTab]               = useState('contacts');    // 'contacts'|'organizations'|'events'|'activity'
+  const [activityLog, setActivityLog] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityFilter, setActivityFilter]   = useState({ actionType: '', entityType: '' });
   const [viewMode, setViewMode]     = useState('liste');       // 'liste'|'kart'|'odakli'
   const [searchQ, setSearchQ]       = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -1528,6 +1532,21 @@ export default function NetworkManager({ user, profile }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadActivity = useCallback(async (filter = {}) => {
+    setActivityLoading(true);
+    const { data } = await getNetworkActivityLog({
+      limit: 300,
+      actionType: filter.actionType || null,
+      entityType: filter.entityType || null,
+    });
+    setActivityLog(data);
+    setActivityLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'activity') loadActivity(activityFilter);
+  }, [tab, loadActivity]); // eslint-disable-line
 
   // Bağlantı sayısı
   const connCount = (type, id) =>
@@ -1579,6 +1598,19 @@ export default function NetworkManager({ user, profile }) {
     if (selectedItem?.id === savedItem?.id) {
       setSelectedItem(savedItem);
     }
+    // Aktivite logu
+    if (user?.id) {
+      const entityName = savedItem?.full_name || savedItem?.name || savedItem?.title || null;
+      await logNetworkActivity({
+        userId:     user.id,
+        userName:   profile?.full_name || profile?.name || user?.email || null,
+        actionType: isNew ? 'create' : 'update',
+        entityType: savedType,
+        entityId:   savedItem?.id || null,
+        entityName,
+        detail: isNew ? {} : { updated_fields: Object.keys(savedItem || {}) },
+      });
+    }
     // XP: sadece personel, sadece yeni kayıt
     if (isNew && profile?.role === 'personel' && user?.id) {
       try {
@@ -1598,6 +1630,23 @@ export default function NetworkManager({ user, profile }) {
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     const { type, id } = deleteConfirm;
+    // Silinecek kaydın adını önceden sakla (log için)
+    const deletedItem = data.contacts.find(c=>c.id===id)
+      || data.organizations.find(o=>o.id===id)
+      || data.events.find(e=>e.id===id);
+    const entityName = deletedItem?.full_name || deletedItem?.name || deletedItem?.title || null;
+    // Aktivite logu — silmeden ÖNCE yaz
+    if (user?.id) {
+      await logNetworkActivity({
+        userId:     user.id,
+        userName:   profile?.full_name || profile?.name || user?.email || null,
+        actionType: 'delete',
+        entityType: type,
+        entityId:   id,
+        entityName,
+        detail: { deleted_name: entityName },
+      });
+    }
     if (type==='contact')      await deleteNetworkContact(id);
     else if (type==='organization') await deleteNetworkOrg(id);
     else await deleteNetworkEvent(id);
@@ -1609,6 +1658,22 @@ export default function NetworkManager({ user, profile }) {
   const handleConnectionSave = async (conn) => {
     setShowConnModal(false);
     await load();
+    // Aktivite logu
+    if (conn && user?.id) {
+      const srcItem = [...data.contacts, ...data.organizations, ...data.events].find(x => x.id === conn.source_id);
+      const tgtItem = [...data.contacts, ...data.organizations, ...data.events].find(x => x.id === conn.target_id);
+      const srcName = srcItem?.full_name || srcItem?.name || srcItem?.title || conn.source_id;
+      const tgtName = tgtItem?.full_name || tgtItem?.name || tgtItem?.title || conn.target_id;
+      await logNetworkActivity({
+        userId:     user.id,
+        userName:   profile?.full_name || profile?.name || user?.email || null,
+        actionType: 'connect',
+        entityType: 'connection',
+        entityId:   conn.id || null,
+        entityName: `${srcName} → ${tgtName}`,
+        detail: { source_type: conn.source_type, target_type: conn.target_type, label: conn.label },
+      });
+    }
     // XP: ağ bağlantısı oluşturuldu
     if (conn && user?.id) {
       try {
@@ -1625,6 +1690,23 @@ export default function NetworkManager({ user, profile }) {
   };
 
   const handleRemoveConnection = async (connId) => {
+    // Bağlantı adını silmeden önce sakla
+    const conn = data.connections.find(c => c.id === connId);
+    if (conn && user?.id) {
+      const srcItem = [...data.contacts, ...data.organizations, ...data.events].find(x => x.id === conn.source_id);
+      const tgtItem = [...data.contacts, ...data.organizations, ...data.events].find(x => x.id === conn.target_id);
+      const srcName = srcItem?.full_name || srcItem?.name || srcItem?.title || conn.source_id;
+      const tgtName = tgtItem?.full_name || tgtItem?.name || tgtItem?.title || conn.target_id;
+      await logNetworkActivity({
+        userId:     user.id,
+        userName:   profile?.full_name || profile?.name || user?.email || null,
+        actionType: 'disconnect',
+        entityType: 'connection',
+        entityId:   connId,
+        entityName: `${srcName} → ${tgtName}`,
+        detail: { source_type: conn.source_type, target_type: conn.target_type, label: conn.label },
+      });
+    }
     await deleteNetworkConnection(connId);
     setData(prev => ({
       ...prev,
@@ -1708,40 +1790,164 @@ export default function NetworkManager({ user, profile }) {
             <button style={tabStyle('contacts')}     onClick={()=>setTab('contacts')}>🧑 Kişiler <span style={{ fontSize:11, opacity:0.7 }}>({data.contacts.length})</span></button>
             <button style={tabStyle('organizations')} onClick={()=>setTab('organizations')}>🏢 Kurumlar <span style={{ fontSize:11, opacity:0.7 }}>({data.organizations.length})</span></button>
             <button style={tabStyle('events')}        onClick={()=>setTab('events')}>📅 Etkinlikler <span style={{ fontSize:11, opacity:0.7 }}>({data.events.length})</span></button>
+            <button style={tabStyle('activity')}      onClick={()=>setTab('activity')}>📋 Aktivite</button>
           </div>
 
-          {/* Arama */}
-          <div style={{ position:'relative', flex:'1 1 200px', minWidth:160 }}>
-            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:15 }}>🔍</span>
-            <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
-              placeholder="Ara…"
-              style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px 8px 32px',
-                borderRadius:8, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--bg-card)' }} />
-          </div>
+          {/* Arama — aktivite tabında gizle */}
+          {tab !== 'activity' && (
+            <div style={{ position:'relative', flex:'1 1 200px', minWidth:160 }}>
+              <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:15 }}>🔍</span>
+              <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
+                placeholder="Ara…"
+                style={{ width:'100%', boxSizing:'border-box', padding:'8px 10px 8px 32px',
+                  borderRadius:8, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', outline:'none', background:'var(--bg-card)' }} />
+            </div>
+          )}
 
-          {/* Görünüm toggle */}
-          <div style={{ display:'flex', gap:2, background:'var(--bg-badge)', borderRadius:10, padding:3 }}>
-            <button style={viewBtnStyle('liste')}  onClick={()=>setViewMode('liste')}>☰ Liste</button>
-            <button style={viewBtnStyle('kart')}   onClick={()=>setViewMode('kart')}>⊞ Kart</button>
-            <button style={viewBtnStyle('odakli')} onClick={()=>setViewMode('odakli')}>🕸 Odaklı</button>
-          </div>
+          {/* Görünüm toggle — aktivite tabında gizle */}
+          {tab !== 'activity' && (
+            <div style={{ display:'flex', gap:2, background:'var(--bg-badge)', borderRadius:10, padding:3 }}>
+              <button style={viewBtnStyle('liste')}  onClick={()=>setViewMode('liste')}>☰ Liste</button>
+              <button style={viewBtnStyle('kart')}   onClick={()=>setViewMode('kart')}>⊞ Kart</button>
+              <button style={viewBtnStyle('odakli')} onClick={()=>setViewMode('odakli')}>🕸 Odaklı</button>
+            </div>
+          )}
         </div>
 
-        <div style={{ fontSize:12.5, color:'var(--text-light)', marginTop:8, fontWeight:500 }}>
-          {currentItems.length} kayıt
-          {viewMode==='odakli' && tab==='contacts' && ' — Odaklı görünüm Kurumlar ve Etkinlikler tabında kullanılabilir'}
-        </div>
+        {tab !== 'activity' && (
+          <div style={{ fontSize:12.5, color:'var(--text-light)', marginTop:8, fontWeight:500 }}>
+            {currentItems.length} kayıt
+            {viewMode==='odakli' && tab==='contacts' && ' — Odaklı görünüm Kurumlar ve Etkinlikler tabında kullanılabilir'}
+          </div>
+        )}
       </div>
 
-      {/* İçerik */}
-      {loading && (
+      {/* ── AKTİVİTE SEKMESI ─────────────────────────────────────────────────── */}
+      {tab === 'activity' && (
+        <div style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
+          {/* Filtreler */}
+          <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:13, fontWeight:600, color:'var(--text-light)' }}>Filtrele:</span>
+            <select
+              value={activityFilter.actionType}
+              onChange={e => { const f={...activityFilter, actionType:e.target.value}; setActivityFilter(f); loadActivity(f); }}
+              style={{ padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', background:'var(--bg-card)', cursor:'pointer' }}
+            >
+              <option value="">Tüm işlemler</option>
+              <option value="create">➕ Ekleme</option>
+              <option value="update">✏️ Güncelleme</option>
+              <option value="delete">🗑 Silme</option>
+              <option value="connect">🔗 Bağlantı eklendi</option>
+              <option value="disconnect">🔓 Bağlantı kaldırıldı</option>
+            </select>
+            <select
+              value={activityFilter.entityType}
+              onChange={e => { const f={...activityFilter, entityType:e.target.value}; setActivityFilter(f); loadActivity(f); }}
+              style={{ padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'inherit', background:'var(--bg-card)', cursor:'pointer' }}
+            >
+              <option value="">Tüm kayıt türleri</option>
+              <option value="contact">🧑 Kişi</option>
+              <option value="organization">🏢 Kurum</option>
+              <option value="event">📅 Etkinlik</option>
+              <option value="connection">🔗 Bağlantı</option>
+            </select>
+            <button onClick={() => loadActivity(activityFilter)} style={{
+              padding:'6px 14px', borderRadius:8, border:'1.5px solid var(--border)',
+              background:'var(--bg-card)', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit',
+            }}>🔄 Yenile</button>
+            <span style={{ marginLeft:'auto', fontSize:12.5, color:'var(--text-light)' }}>{activityLog.length} kayıt</span>
+          </div>
+
+          {activityLoading ? (
+            <div style={{ textAlign:'center', padding:48, color:'var(--text-light)' }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>⏳</div>
+              <div style={{ fontSize:13, fontWeight:500 }}>Yükleniyor…</div>
+            </div>
+          ) : activityLog.length === 0 ? (
+            <div style={{ textAlign:'center', padding:48, color:'var(--text-light)' }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>📭</div>
+              <div style={{ fontSize:14, fontWeight:600 }}>Henüz aktivite kaydı yok</div>
+              <div style={{ fontSize:12.5, marginTop:4 }}>Kişi, kurum veya etkinlik eklendikçe buraya otomatik loglanır</div>
+            </div>
+          ) : (
+            <div>
+              {activityLog.map((log, i) => {
+                const actionMeta = {
+                  create:     { icon:'➕', color:'#16a34a', label:'Eklendi' },
+                  update:     { icon:'✏️', color:'#2563eb', label:'Güncellendi' },
+                  delete:     { icon:'🗑',  color:'#dc2626', label:'Silindi' },
+                  connect:    { icon:'🔗', color:'#7c3aed', label:'Bağlantı eklendi' },
+                  disconnect: { icon:'🔓', color:'#f97316', label:'Bağlantı kaldırıldı' },
+                }[log.action_type] || { icon:'📌', color:'#6b7280', label: log.action_type };
+                const entityMeta = {
+                  contact:      { icon:'🧑', label:'Kişi' },
+                  organization: { icon:'🏢', label:'Kurum' },
+                  event:        { icon:'📅', label:'Etkinlik' },
+                  connection:   { icon:'🔗', label:'Bağlantı' },
+                }[log.entity_type] || { icon:'📁', label: log.entity_type };
+                const dt = new Date(log.created_at);
+                const dateStr = dt.toLocaleDateString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric' });
+                const timeStr = dt.toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
+                return (
+                  <div key={log.id} style={{
+                    display:'flex', alignItems:'flex-start', gap:14,
+                    padding:'14px 20px',
+                    borderBottom: i < activityLog.length - 1 ? '1px solid var(--border)' : 'none',
+                    background: log.action_type === 'delete' ? '#fef2f220' : 'transparent',
+                  }}>
+                    {/* Aksiyon ikonu */}
+                    <div style={{
+                      width:36, height:36, borderRadius:'50%', flexShrink:0,
+                      background: actionMeta.color + '18',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:16, border:`1.5px solid ${actionMeta.color}30`,
+                    }}>{actionMeta.icon}</div>
+
+                    {/* İçerik */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <span style={{ fontWeight:700, fontSize:13.5, color:'var(--text)' }}>
+                          {log.user_name || 'Bilinmeyen kullanıcı'}
+                        </span>
+                        <span style={{
+                          fontSize:11.5, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                          background: actionMeta.color + '18', color: actionMeta.color,
+                        }}>{actionMeta.label}</span>
+                        <span style={{
+                          fontSize:11.5, fontWeight:600, padding:'2px 8px', borderRadius:20,
+                          background:'var(--bg-badge)', color:'var(--text-light)',
+                        }}>{entityMeta.icon} {entityMeta.label}</span>
+                      </div>
+                      <div style={{ fontSize:13, color:'var(--text-secondary)', marginTop:3 }}>
+                        {log.entity_name
+                          ? <span><strong>"{log.entity_name}"</strong></span>
+                          : <span style={{ color:'var(--text-light)', fontStyle:'italic' }}>kayıt adı yok</span>
+                        }
+                      </div>
+                    </div>
+
+                    {/* Tarih */}
+                    <div style={{ textAlign:'right', flexShrink:0 }}>
+                      <div style={{ fontSize:12.5, fontWeight:600, color:'var(--text-secondary)' }}>{dateStr}</div>
+                      <div style={{ fontSize:11.5, color:'var(--text-light)' }}>{timeStr}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* İçerik — aktivite sekmesi değilse göster */}
+      {tab !== 'activity' && loading && (
         <div style={{ textAlign:'center', padding:'60px', color:'var(--text-light)' }}>
           <div style={{ fontSize:36, marginBottom:10 }}>⏳</div>
           <div style={{ fontSize:14, fontWeight:500 }}>Yükleniyor…</div>
         </div>
       )}
 
-      {!loading && currentItems.length === 0 && (
+      {tab !== 'activity' && !loading && currentItems.length === 0 && (
         <div style={{ background:'var(--bg-card)', borderRadius:14, border:'1px solid var(--border)' }}>
           <EmptyState
             icon={tab==='contacts' ? '🧑' : tab==='organizations' ? '🏢' : '📅'}
@@ -1751,7 +1957,7 @@ export default function NetworkManager({ user, profile }) {
         </div>
       )}
 
-      {!loading && currentItems.length > 0 && (
+      {tab !== 'activity' && !loading && currentItems.length > 0 && (
         <>
           {/* Liste görünümü */}
           {viewMode==='liste' && (
