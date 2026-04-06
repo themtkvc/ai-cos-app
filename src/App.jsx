@@ -384,7 +384,7 @@ export default function App() {
         {/* AI Asistan Chat — sadece direktör */}
         {profile?.role === 'direktor' && (
           <>
-            <AIChatPanel user={user} profile={profile} isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+            <AIChatPanel user={user} profile={profile} activePage={activePage} isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
             {!aiChatOpen && (
               <button
                 onClick={() => setAiChatOpen(true)}

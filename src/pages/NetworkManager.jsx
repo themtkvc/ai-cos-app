@@ -1609,6 +1609,12 @@ export default function NetworkManager({ user, profile }) {
   const handleConnectionSave = async (conn) => {
     setShowConnModal(false);
     await load();
+    // XP: ağ bağlantısı oluşturuldu
+    if (conn && user?.id) {
+      try {
+        await awardXP(user.id, 'network_connect', `Ağ bağlantısı oluşturuldu`, conn?.id);
+      } catch (e) { console.error('[XP] network_connect error:', e); }
+    }
     // Seçili item'ın bağlantı listesi güncellensin
     if (selectedItem) {
       setData(prev => ({

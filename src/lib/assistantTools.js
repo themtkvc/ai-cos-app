@@ -175,6 +175,45 @@ export const ASSISTANT_TOOLS = [
       required: ['name'],
     },
   },
+  {
+    name: 'create_main_event',
+    description: 'Etkinlikler modülüne (ana etkinlik takvimi) yeni bir etkinlik ekler. Kullanıcı "etkinlik ekle", "etkinliğe ekle", "etkinlikler modülüne", "takvime ekle" dediğinde veya bir konferans/forum/toplantı linki ya da görseli paylaşıp eklenmesini istediğinde bu tool kullanılır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Etkinlik başlığı' },
+        event_type: { type: 'string', description: 'Tür: konferans, forum, toplanti, egitim, ziyaret, webinar, diger' },
+        status: { type: 'string', description: 'Durum: planned (varsayılan), ongoing, completed, cancelled' },
+        start_date: { type: 'string', description: 'Başlangıç tarihi (YYYY-MM-DD)' },
+        end_date: { type: 'string', description: 'Bitiş tarihi (YYYY-MM-DD)' },
+        start_time: { type: 'string', description: 'Başlangıç saati (HH:MM)' },
+        end_time: { type: 'string', description: 'Bitiş saati (HH:MM)' },
+        location_name: { type: 'string', description: 'Mekan adı veya adresi' },
+        location_type: { type: 'string', description: 'Konum türü: physical, online, hybrid' },
+        city: { type: 'string', description: 'Şehir' },
+        country: { type: 'string', description: 'Ülke' },
+        description: { type: 'string', description: 'Etkinlik açıklaması' },
+        objectives: { type: 'string', description: 'Hedefler' },
+        website_url: { type: 'string', description: 'Etkinlik web sitesi URL' },
+        registration_link: { type: 'string', description: 'Kayıt linki' },
+        registration_deadline: { type: 'string', description: 'Son kayıt tarihi (YYYY-MM-DD)' },
+      },
+      required: ['title', 'start_date'],
+    },
+  },
+  {
+    name: 'search_main_events',
+    description: 'Etkinlikler modülündeki etkinlikleri arar veya listeler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Başlıkta aranacak terim (opsiyonel)' },
+        status: { type: 'string', description: 'Durum filtresi: planned, ongoing, completed, cancelled' },
+        limit: { type: 'number', description: 'Max sonuç sayısı (varsayılan 10)' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ── Tool executor: Her tool çağrısını Supabase ile çalıştırır ──────────────
@@ -385,19 +424,61 @@ export async function executeTool(toolName, toolInput, context) {
     }
 
     case 'create_event': {
-      const { data, error } = await supabase.from('network_events').insert({
-        name: toolInput.name,
-        event_type: toolInput.event_type || 'other',
-        event_date: toolInput.event_date || null,
-        end_date: toolInput.end_date || null,
-        location: toolInput.location || null,
-        description: toolInput.description || null,
-        tags: toolInput.tags || [],
+      // Network etkinliği artık ana events tablosuna yazılıyor
+      const nullIfEmpty = (v) => (!v || v === '' ? null : v);
+      const { data, error } = await supabase.from('events').insert({
+        title:         toolInput.name,
+        event_type:    toolInput.event_type || 'diger',
+        status:        'planned',
+        start_date:    nullIfEmpty(toolInput.event_date) || new Date().toISOString().split('T')[0],
+        end_date:      nullIfEmpty(toolInput.end_date),
+        location_name: nullIfEmpty(toolInput.location),
+        description:   nullIfEmpty(toolInput.description),
+        unit:          userUnit,
+        owner_id:      userId,
+        created_by:    userId,
+      }).select().single();
+      if (error) return { error: error.message };
+      return { success: true, event: { id: data.id, name: data.title, event_date: data.start_date } };
+    }
+
+    case 'create_main_event': {
+      const nullIfEmpty = (v) => (!v || v === '' ? null : v);
+      const { data, error } = await supabase.from('events').insert({
+        title: toolInput.title,
+        event_type: toolInput.event_type || 'diger',
+        status: toolInput.status || 'planned',
+        start_date: toolInput.start_date,
+        end_date: nullIfEmpty(toolInput.end_date),
+        start_time: nullIfEmpty(toolInput.start_time),
+        end_time: nullIfEmpty(toolInput.end_time),
+        location_name: nullIfEmpty(toolInput.location_name),
+        location_type: nullIfEmpty(toolInput.location_type),
+        city: nullIfEmpty(toolInput.city),
+        country: nullIfEmpty(toolInput.country),
+        description: nullIfEmpty(toolInput.description),
+        objectives: nullIfEmpty(toolInput.objectives),
+        website_url: nullIfEmpty(toolInput.website_url),
+        registration_link: nullIfEmpty(toolInput.registration_link),
+        registration_deadline: nullIfEmpty(toolInput.registration_deadline),
         unit: userUnit,
+        owner_id: userId,
         created_by: userId,
       }).select().single();
       if (error) return { error: error.message };
-      return { success: true, event: { id: data.id, name: data.name, event_date: data.event_date } };
+      return { success: true, event: { id: data.id, title: data.title, start_date: data.start_date, status: data.status } };
+    }
+
+    case 'search_main_events': {
+      let query = supabase.from('events')
+        .select('id, title, event_type, status, start_date, end_date, location_name, city, country, website_url')
+        .order('start_date', { ascending: true })
+        .limit(toolInput.limit || 10);
+      if (toolInput.query) query = query.ilike('title', `%${toolInput.query}%`);
+      if (toolInput.status) query = query.eq('status', toolInput.status);
+      const { data, error } = await query;
+      if (error) return { error: error.message };
+      return { events: data, count: data?.length || 0 };
     }
 
     default:
@@ -411,9 +492,11 @@ Kullanıcılara gündem oluşturma, görev atama, network kişileri arama gibi k
 
 Yeteneklerin:
 - Gündem oluşturma, görev ekleme/atama/durum güncelleme
-- Network kişi ekleme, kurum ekleme, etkinlik ekleme
+- Network kişi ekleme, kurum ekleme, ağ etkinliği ekleme
+- 🗓️ Etkinlikler modülüne etkinlik ekleme ve arama (ana etkinlik takvimi)
 - Kişi arama, kurum arama, gündem arama
 - Personel listesi, genel özet istatistikler
+- 📷 Ekran görüntüsü veya link paylaşılırsa etkinlik bilgilerini çıkarıp ekleme
 - 📷 Ekran görüntülerinden (özellikle LinkedIn) kişi bilgilerini çıkarma ve network'e ekleme
 
 Kurallar:
@@ -427,6 +510,13 @@ Kurallar:
 - Bir işlem yaptıktan sonra kısa bir onay mesajı ver.
 - Belirsiz durumlarda önce soru sor.
 - Emoji kullanarak cevaplarını renklendir.
+
+🗓️ Etkinlikler Modülü:
+"Etkinlikler modülüne ekle", "etkinliğe ekle", "takvime ekle" gibi ifadelerde veya kullanıcı bir etkinlik linki/görseli paylaşıp eklenmesini istediğinde create_main_event kullanılır.
+- Ekran görüntüsünden veya linkten etkinlik adı, tarih, konum, website URL gibi bilgileri çıkar.
+- start_date zorunlu; bilgi yoksa kullanıcıya sor.
+- event_type değerleri: konferans, forum, toplanti, egitim, ziyaret, webinar, diger
+- Ekledikten sonra "Etkinlikler modülünde görüntüleyebilirsiniz" de.
 
 📷 Ekran Görüntüsü / LinkedIn Profili İşleme:
 Kullanıcı bir ekran görüntüsü (özellikle LinkedIn profili) gönderdiğinde:

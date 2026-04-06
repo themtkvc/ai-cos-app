@@ -33,11 +33,38 @@ const PRIORITIES = [
 ];
 
 const AGENDA_STATUSES = [
-  { value: 'aktif',      label: '🟢 Aktif' },
-  { value: 'devam',      label: '🔵 Devam Ediyor' },
-  { value: 'tamamlandi', label: '✅ Tamamlandı' },
-  { value: 'arsiv',      label: '📦 Arşiv' },
+  { value: 'aktif',         label: '🟢 Aktif' },
+  { value: 'devam',         label: '🔵 Devam Ediyor' },
+  { value: 'tamamlandi',    label: '✅ Tamamlandı' },
+  { value: 'onay_bekliyor', label: '⏳ Onay Bekliyor' },
+  { value: 'arsiv',         label: '📦 Arşiv' },
 ];
+
+// Rol + sahiplik bazlı izin verilen statü geçişleri
+function getAllowedStatuses(role, agenda, myId, allProfiles = []) {
+  const isOwn      = agenda.created_by === myId;
+  const isAssigned = agenda.assigned_to === myId;
+  // Gündem oluşturucusunun rolünü allProfiles'dan bul
+  const creatorProfile = allProfiles.find(p => p.user_id === agenda.created_by);
+  const creatorRole    = creatorProfile?.role || '';
+  const assignedByDirektor = isAssigned && (creatorRole === 'direktor' || creatorRole === 'direktor_yardimcisi');
+
+  if (role === 'direktor' || role === 'direktor_yardimcisi') {
+    return ['aktif', 'devam', 'tamamlandi', 'onay_bekliyor', 'arsiv'];
+  }
+  if (role === 'koordinator') {
+    if (isOwn) return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
+    // Direktör tarafından koordinatöre atanmış → sadece onaya gönder
+    if (assignedByDirektor) return ['onay_bekliyor'];
+    // Personelin gündemi → tamamlandı + arşiv
+    return ['tamamlandi', 'arsiv'];
+  }
+  if (role === 'personel') {
+    if (isOwn) return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
+    return [];
+  }
+  return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
+}
 
 const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[2];
 
@@ -344,7 +371,7 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
 }
 
 // ── GÜNDEM KARTININ DETAY GÖRÜNÜMERİ ─────────────────────────────────────────
-function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allProfiles, onClose, onRefresh, isMineTab = false }) {
+function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allProfiles, onClose, onRefresh, onStatusChange, isMineTab = false }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -497,6 +524,46 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
               📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
           )}
+
+          {/* Statü aksiyon butonları */}
+          {(() => {
+            const allowed = getAllowedStatuses(role, agenda, myId, allProfiles).filter(s => s !== agenda.status);
+            if (!allowed.length) return null;
+            const statusColors = {
+              aktif: '#22c55e', devam: '#3b82f6', tamamlandi: '#10b981',
+              onay_bekliyor: '#f59e0b', arsiv: '#6b7280',
+            };
+            return (
+              <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+                {allowed.map(s => {
+                  const meta = AGENDA_STATUSES.find(x => x.value === s);
+                  const color = statusColors[s] || '#6366f1';
+                  return (
+                    <button key={s} onClick={async () => {
+                      await updateAgenda(agenda.id, { status: s });
+                      // Direktöre bildirim: koordinatör onaya gönderdi
+                      if (s === 'onay_bekliyor') {
+                        const direktorProfile = profiles.find(p => p.role === 'direktor');
+                        if (direktorProfile) {
+                          try {
+                            await createNotification({ userId: direktorProfile.user_id, type: 'agenda_assigned', title: `"${agenda.title}" onay bekliyor`, body: `${myName || ''} tarafından onaya gönderildi`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myName || '' });
+                          } catch (e) { console.error('Notification error:', e); }
+                        }
+                      }
+                      onStatusChange?.(agenda.id, s);
+                      onRefresh?.();
+                    }} style={{
+                      padding: '5px 14px', borderRadius: 20, border: `1.5px solid ${color}`,
+                      background: color + '15', color: color, fontWeight: 700, fontSize: 12,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+                      {meta?.label || s}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Body scroll */}
@@ -872,7 +939,13 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
           <div className="form-group">
             <label className="form-label">Durum</label>
             <select className="form-select" value={form.status} onChange={e => set('status', e.target.value)}>
-              {AGENDA_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {AGENDA_STATUSES.filter(s => {
+                // Personel: arşiv ve onay_bekliyor seçemez (sadece oluşturma sırasında)
+                if (role === 'personel') return ['aktif', 'devam', 'tamamlandi'].includes(s.value);
+                // Koordinatör: onay_bekliyor modaldan değil, detail butonundan yönetilir
+                if (role === 'koordinator') return s.value !== 'onay_bekliyor';
+                return true;
+              }).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
         </div>
@@ -1162,6 +1235,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   const isAssignedTasksTab = isPersonel && personalTab === 'assigned_tasks';
   const isMyTasksTab       = isPersonel && personalTab === 'my_tasks';
   const isPendingApprovalTab = (isDirektor || isKoordinator) && personalTab === 'pending_approval';
+  const isArsivTab           = personalTab === 'arsiv';
 
   // Tab başlığı role göre
   const unitTabLabel = (isDirektor || isAsistan) ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -1205,6 +1279,20 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
 
   const filteredAgendas = useMemo(() => {
     return agendas.filter(a => {
+      // ── Arşiv sekmesi: sadece arsiv statülü gündemler ──
+      if (isArsivTab) {
+        if (a.status !== 'arsiv') return false;
+        if (a.is_personal && a.created_by !== myId) return false;
+        if (!canSeeAllUnits && a.unit && a.unit !== myUnit && a.created_by !== myId) return false;
+        if (searchQ) {
+          const q = searchQ.toLowerCase();
+          if (!a.title?.toLowerCase().includes(q) && !a.description?.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      }
+      // ── Diğer sekmeler: arşivlenmiş gündemleri gizle ──
+      if (a.status === 'arsiv') return false;
+
       if (isPendingApprovalTab) {
         // "Onay Bekleyenler" sekmesi: pending_review olan görev içeren gündemler
         if (a.is_personal) return false;
@@ -1255,11 +1343,11 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, isAssignedTasksTab, isMyTasksTab, isPendingApprovalTab, myId, myUnit, isKoordinator, isDirektor, allProfiles]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, isAssignedTasksTab, isMyTasksTab, isPendingApprovalTab, isArsivTab, myId, myUnit, isKoordinator, isDirektor, allProfiles]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
-    if (!canSeeAllUnits || isMineTab || isAssignedToMeTab || isAssignedByMeTab || filterUnit !== 'all') return null;
+    if (!canSeeAllUnits || isMineTab || isAssignedToMeTab || isAssignedByMeTab || isArsivTab || filterUnit !== 'all') return null;
     const groups = {};
     filteredAgendas.forEach(a => {
       const key = a.unit || '—';
@@ -1587,7 +1675,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                         : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
           </p>
         </div>
-        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isPendingApprovalTab && (
+        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isPendingApprovalTab && !isArsivTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1605,6 +1693,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               { id: 'assigned_tasks',  icon: '📌', label: 'Bana Atanan Görevler' },
               { id: 'my_tasks',        icon: '✅', label: 'Görevlerim' },
               { id: 'mine',            icon: '📋', label: 'Gündemlerim' },
+              { id: 'arsiv',           icon: '📦', label: 'Arşiv' },
             ] : [
               // Diğer roller için mevcut sekmeler
               { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
@@ -1612,6 +1701,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
               ...((isDirektor || isKoordinator) ? [{ id: 'pending_approval', icon: '⏳', label: 'Onay Bekleyenler' }] : []),
               { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
+              { id: 'arsiv',          icon: '📦',        label: 'Arşiv' },
             ]),
           ].map(tab => {
             const isActive = personalTab === tab.id;
@@ -1945,6 +2035,10 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
           isMineTab={detailIsMine}
           onClose={() => { setDetailAgenda(null); setDetailIsMine(false); }}
           onRefresh={loadAll}
+          onStatusChange={(agendaId, newStatus) => {
+            setDetailAgenda(prev => prev ? { ...prev, status: newStatus } : null);
+            setAgendas(prev => prev.map(a => a.id === agendaId ? { ...a, status: newStatus } : a));
+          }}
         />
       )}
     </div>

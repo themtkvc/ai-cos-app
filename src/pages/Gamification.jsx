@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting, getXPEventsByPeriod, getLeaderHistory, upsertLeaderHistory, getXPEventsByUser } from '../lib/supabase';
+import { getLeaderboard, getAllXPHistory, getAllBadges, getAllProfiles, getXPSettingsFull, updateXPSetting, getXPEventsByPeriod, getLeaderHistory, upsertLeaderHistory, getXPEventsByUser, getXPActionSummary } from '../lib/supabase';
 
 // ── Seviye Hesaplama ──────────────────────────────────────────────────────────
 function calculateLevel(totalXp) {
@@ -234,6 +234,7 @@ export default function Gamification({ user, profile }) {
   const [personnelStart, setPersonnelStart] = useState('');
   const [personnelEnd, setPersonnelEnd] = useState('');
   const [personnelEvents, setPersonnelEvents] = useState([]);
+  const [personnelSummary, setPersonnelSummary] = useState([]);
   const [personnelLoading, setPersonnelLoading] = useState(false);
 
   const myId = user?.id;
@@ -328,29 +329,37 @@ export default function Gamification({ user, profile }) {
     return m;
   }, [profiles]);
 
-  // Dönemsel leaderboard hesaplama
+  // Dönemsel leaderboard hesaplama — tüm personeller dahil, XP yoksa 0
   const filteredLB = useMemo(() => {
+    // Tüm personelleri base olarak al
+    const allPersonnel = profiles.filter(p => p.role === 'personel');
+
     let items;
     if (lbPeriod === 'weekly') {
-      // Haftalık: weeklyXP'den oluştur
-      items = Object.entries(weeklyXP)
-        .filter(([uid]) => profileMap[uid]?.role === 'personel')
-        .map(([user_id, total_xp]) => ({ user_id, total_xp }))
-        .sort((a, b) => b.total_xp - a.total_xp);
+      items = allPersonnel.map(p => ({
+        user_id: p.user_id,
+        total_xp: weeklyXP[p.user_id] || 0,
+      })).sort((a, b) => b.total_xp - a.total_xp);
     } else if (lbPeriod === 'monthly') {
-      items = Object.entries(monthlyXP)
-        .filter(([uid]) => profileMap[uid]?.role === 'personel')
-        .map(([user_id, total_xp]) => ({ user_id, total_xp }))
-        .sort((a, b) => b.total_xp - a.total_xp);
+      items = allPersonnel.map(p => ({
+        user_id: p.user_id,
+        total_xp: monthlyXP[p.user_id] || 0,
+      })).sort((a, b) => b.total_xp - a.total_xp);
     } else {
-      // Tüm zamanlar: mevcut leaderboard
-      items = leaderboard.filter(xp => profileMap[xp.user_id]?.role === 'personel');
+      // Tüm zamanlar: user_xp ile birleştir, eksik olanları 0 XP ile ekle
+      const xpMap = {};
+      leaderboard.forEach(x => { xpMap[x.user_id] = x.total_xp || 0; });
+      items = allPersonnel.map(p => ({
+        user_id: p.user_id,
+        total_xp: xpMap[p.user_id] || 0,
+        level: leaderboard.find(x => x.user_id === p.user_id)?.level,
+      })).sort((a, b) => b.total_xp - a.total_xp);
     }
     if (lbScope === 'unit' && myUnit) {
       items = items.filter(xp => profileMap[xp.user_id]?.unit === myUnit);
     }
     return items;
-  }, [leaderboard, profileMap, lbScope, lbPeriod, myUnit, weeklyXP, monthlyXP]);
+  }, [leaderboard, profiles, profileMap, lbScope, lbPeriod, myUnit, weeklyXP, monthlyXP]);
 
   // Rozet kataloğu — direktör tüm rozet koleksiyonunu görür
 
@@ -725,8 +734,15 @@ export default function Gamification({ user, profile }) {
             <button
               onClick={async () => {
                 setPersonnelLoading(true);
-                const { data } = await getXPEventsByUser(personnelUserId || null, personnelStart || null, personnelEnd || null);
-                setPersonnelEvents(data || []);
+                const uid = personnelUserId || null;
+                const start = personnelStart || null;
+                const end = personnelEnd || null;
+                const [evRes, sumRes] = await Promise.all([
+                  getXPEventsByUser(uid, start, end),
+                  getXPActionSummary(uid, start, end),
+                ]);
+                setPersonnelEvents(evRes.data || []);
+                setPersonnelSummary(sumRes.data || []);
                 setPersonnelLoading(false);
               }}
               style={{
@@ -739,35 +755,49 @@ export default function Gamification({ user, profile }) {
             </button>
           </div>
 
-          {/* Özet istatistik */}
-          {personnelEvents.length > 0 && (() => {
-            const totalXP = personnelEvents.reduce((s, e) => s + (e.xp_amount || 0), 0);
-            const actionCounts = personnelEvents.reduce((acc, e) => { acc[e.action] = (acc[e.action] || 0) + 1; return acc; }, {});
-            const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
+          {/* Eylem Özet Tablosu */}
+          {(personnelSummary.length > 0 || personnelEvents.length > 0) && (() => {
+            // personnelSummary doluysa onu kullan, yoksa personnelEvents'ten hesapla
+            const rows = personnelSummary.length > 0
+              ? personnelSummary
+              : Object.values(
+                  personnelEvents.reduce((acc, e) => {
+                    if (!acc[e.action]) acc[e.action] = { action: e.action, count: 0 };
+                    acc[e.action].count += 1;
+                    return acc;
+                  }, {})
+                ).sort((a, b) => b.count - a.count);
             return (
-              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                {[
-                  { label: 'Toplam İşlem', value: personnelEvents.length, icon: '📊' },
-                  { label: 'Toplam XP', value: totalXP.toLocaleString('tr-TR') + ' XP', icon: '⚡' },
-                  { label: 'En Sık İşlem', value: topAction ? (ACTION_META[topAction[0]]?.label || topAction[0]) + ` (${topAction[1]}x)` : '—', icon: '🏆' },
-                ].map(stat => (
-                  <div key={stat.label} style={{
-                    flex: '1 1 140px', padding: '12px 16px', borderRadius: 12,
-                    background: 'var(--bg-card)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}>
-                    <span style={{ fontSize: 22 }}>{stat.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{stat.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{stat.value}</div>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Eylem Özeti
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                  {rows.map((row, i) => {
+                    const meta = ACTION_META[row.action] || { icon: '🔵', label: row.action };
+                    return (
+                      <div key={row.action} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 16px',
+                        borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none',
+                        background: i % 2 === 0 ? 'var(--bg-card)' : 'transparent',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16 }}>{meta.icon}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{meta.label}</span>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)' }}>
+                          × {row.count}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })()}
 
-          {/* Tablo */}
+          {/* Detay Tablosu */}
           {personnelEvents.length === 0 && !personnelLoading ? (
             <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)', fontSize: 13 }}>
               Filtre uygulayarak personel hareketlerini görüntüleyin.

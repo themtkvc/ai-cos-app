@@ -1,36 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, awardXP } from '../lib/supabase';
-import { WORLD_COUNTRIES } from '../lib/worldData';
+import { WORLD_COUNTRIES, CITIES_BY_COUNTRY } from '../lib/worldData';
 import {
   EVENT_TYPES, EVENT_STATUS, LOCATION_TYPES, PARTICIPANT_ROLES,
 } from './Events';
 
-// ── Türkiye şehirleri (autocomplete için) ────────────────────────────────────
-const TR_CITIES = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Aksaray','Amasya','Ankara','Antalya','Ardahan',
-  'Artvin','Aydın','Balıkesir','Bartın','Batman','Bayburt','Bilecik','Bingöl','Bitlis',
-  'Bolu','Burdur','Bursa','Çanakkale','Çankırı','Çorum','Denizli','Diyarbakır','Düzce',
-  'Edirne','Elazığ','Erzincan','Erzurum','Eskişehir','Gaziantep','Giresun','Gümüşhane',
-  'Hakkari','Hatay','Iğdır','Isparta','İstanbul','İzmir','Kahramanmaraş','Karabük',
-  'Karaman','Kars','Kastamonu','Kayseri','Kilis','Kırıkkale','Kırklareli','Kırşehir',
-  'Kocaeli','Konya','Kütahya','Malatya','Manisa','Mardin','Mersin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Osmaniye','Rize','Sakarya','Samsun','Şanlıurfa','Siirt',
-  'Sinop','Sivas','Şırnak','Tekirdağ','Tokat','Trabzon','Tunceli','Uşak','Van',
-  'Yalova','Yozgat','Zonguldak',
-];
-
-// Uluslararası büyük şehirler
-const INTL_CITIES = [
-  'New York','Washington D.C.','Los Angeles','Chicago',
-  'Londra','Paris','Berlin','Madrid','Roma','Amsterdam','Brüksel','Viyana','Cenevre','Zürih',
-  'Moskova','Kiev','Varşova','Prag','Budapeşte','Bükreş','Sofya','Atina','Lizbon',
-  'Dubai','Abu Dhabi','Riyad','Doha','Kuwait City','Beyrut','Amman','Kahire','Tunus',
-  'Nairobi','Addis Ababa','Johannesburg','Lagos','Dakar','Accra',
-  'Pekin','Tokyo','Seul','Singapur','Bangkok','Mumbai','Delhi','Dakka','Karaçi',
-  'Cakarta','Manila','Kuala Lumpur',
-  'Bağdat','Tahran','Kabul','Kamala','Mogadişu','Hartum','Sana',
-  'New York (BM)','Cenevre (BM)','Viyana (BM)','Nairobi (BM)',
-];
+// Tüm şehirler düz liste (ülke seçilmemişse arama için)
+const ALL_CITIES_FLAT = Object.values(CITIES_BY_COUNTRY).flat();
 
 const DOC_TYPES = {
   document: 'Belge', report: 'Rapor',
@@ -602,6 +578,9 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     } else {
       await supabase.from('events').update(payload).eq('id', event.id);
       await logActivity(event.id, 'etkinliği güncelledi');
+      if (payload.status === 'completed' && event?.status !== 'completed') {
+        awardXP(user?.id, 'event_complete', `Etkinlik tamamlandı: ${payload.title}`, event.id);
+      }
     }
 
     setSaving(false);
@@ -617,6 +596,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       await supabase.from('event_participants').insert({ event_id: event.id, user_id: selectedUserId, role: 'attendee' });
       const person = allPersonnel.find(p => p.user_id === selectedUserId);
       await logActivity(event.id, 'katılımcı ekledi', person?.full_name);
+      awardXP(user?.id, 'event_participant', `Etkinliğe katılımcı eklendi: ${event?.title || ''}`, event.id);
       await loadParticipants(event.id);
     }
     setSelectedUserId('');
@@ -630,6 +610,7 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
       event_id: event.id, external_name: extName, external_org: extOrg, role: 'attendee',
     });
     await logActivity(event.id, 'dış katılımcı ekledi', `${extName}${extOrg ? ` (${extOrg})` : ''}`);
+    awardXP(user?.id, 'event_participant', `Etkinliğe dış katılımcı eklendi: ${extName}`, event.id);
     await loadParticipants(event.id);
     setExtName(''); setExtOrg('');
     setAddingP(false);
@@ -680,16 +661,32 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
   };
 
   // ── Şehir önerileri (ülkeye göre) ────────────────────────────────────────
-  const citySuggestions = form.country === 'Türkiye'
-    ? TR_CITIES
-    : form.country
-      ? INTL_CITIES
-      : [...TR_CITIES, ...INTL_CITIES];
+  // Ülke seçilmişse o ülkenin şehirleri, seçilmemişse tüm şehirler
+  const citySuggestions = form.country
+    ? (CITIES_BY_COUNTRY[form.country] || ALL_CITIES_FLAT)
+    : ALL_CITIES_FLAT;
 
   const typeCfg = EVENT_TYPES[form.event_type] || {};
   const statusCfg = EVENT_STATUS[form.status] || {};
   const availablePersonnel = allPersonnel.filter(p => !participants.find(x => x.user_id === p.user_id));
   const ownerProfile = allPersonnel.find(p => p.user_id === form.owner_id);
+
+  // Silme yetkisi: direktör veya İnsani İşler koordinatörü
+  const userRole = profile?.role || '';
+  const userUnit = profile?.unit || '';
+  const canDelete = !isNew && (
+    userRole === 'direktor' ||
+    (userRole === 'koordinator' && userUnit.includes('İnsani İşler'))
+  );
+
+  const handleDelete = async () => {
+    if (!window.confirm(`"${form.title || 'Bu etkinlik'}" silinecek. Tüm katılımcı, doküman ve notlar da kalıcı olarak silinir. Emin misiniz?`)) return;
+    setSaving(true);
+    await supabase.from('events').delete().eq('id', event.id);
+    setSaving(false);
+    onSaved?.();
+    onClose();
+  };
 
   // ── Birim autocomplete filtresi ───────────────────────────────────────────
   const filteredUnits = allUnits.filter(u =>
@@ -714,6 +711,20 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
             </div>
           )}
         </div>
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={saving}
+            title="Etkinliği kalıcı olarak sil"
+            style={{
+              padding:'10px 16px', borderRadius:10, border:'1.5px solid #DC2626', cursor:'pointer',
+              background:'#FEF2F2', color:'#DC2626', fontWeight:700, fontSize:14,
+              opacity: saving ? 0.5 : 1,
+            }}
+          >
+            🗑 Sil
+          </button>
+        )}
         <button
           onClick={handleSave}
           disabled={saving || !form.title.trim() || !form.start_date}
@@ -968,6 +979,27 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
               <SectionTitle>Notlar</SectionTitle>
               <textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="İç notlar, hatırlatmalar…" style={{ ...taStyle, marginBottom:0 }} />
             </Panel>
+
+            {/* Tehlikeli Alan — sadece yetkili roller */}
+            {canDelete && (
+              <Panel style={{ border:'1.5px solid #DC262640', background:'#FEF2F2' }}>
+                <SectionTitle>Tehlikeli Alan</SectionTitle>
+                <p style={{ fontSize:13, color:'#991B1B', marginBottom:14 }}>
+                  Bu etkinliği silmek <strong>geri alınamaz</strong>. Tüm katılımcı, doküman ve notlar kalıcı olarak silinir.
+                </p>
+                <button
+                  onClick={handleDelete}
+                  disabled={saving}
+                  style={{
+                    padding:'9px 20px', borderRadius:8, border:'1.5px solid #DC2626', cursor:'pointer',
+                    background:'#DC2626', color:'#fff', fontWeight:700, fontSize:13,
+                    opacity: saving ? 0.5 : 1,
+                  }}
+                >
+                  🗑 Etkinliği Kalıcı Olarak Sil
+                </button>
+              </Panel>
+            )}
           </div>
         </div>
       )}

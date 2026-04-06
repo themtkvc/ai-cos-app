@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks, awardXP, awardXPCustom, getXPSettings } from '../lib/supabase';
+import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks, awardXP, awardXPCustom, getXPSettings, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
@@ -455,6 +455,68 @@ export default function DailyLog({ user, profile, linkedTask }) {
             const otXP = (xpS.daily_log_overtime || 10) * overtimeHours; // zaten x2 değeri DB'de
             await awardXPCustom(user.id, 'daily_log_overtime', otXP, `${overtimeHours} saat fazla mesai (${selectedDate})`, selectedDate);
           }
+
+          // 5) Streak kontrolleri
+          try {
+            // Haftanın başını bul (Pazartesi)
+            const selD = new Date(selectedDate + 'T12:00:00');
+            const dayOfWeek = selD.getDay(); // 0=Pazar, 1=Pzt,...
+            const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+            const monday = new Date(selD);
+            monday.setDate(selD.getDate() + diffToMonday);
+            const weekStart = monday.toISOString().split('T')[0];
+            const weekEnd = selectedDate;
+
+            // Bu hafta kaç gün gönderilmiş?
+            const { data: weekSubmitted } = await supabase
+              .from('daily_logs')
+              .select('log_date')
+              .eq('user_id', user.id)
+              .eq('submitted', true)
+              .gte('log_date', weekStart)
+              .lte('log_date', weekEnd);
+
+            const weekDayCount = weekSubmitted?.length || 0;
+
+            // first_login_week: Bu hafta ilk gönderim (1 gün)
+            if (weekDayCount === 1) {
+              const { data: existingFLW } = await supabase
+                .from('xp_events').select('id').eq('user_id', user.id)
+                .eq('action', 'first_login_week').gte('created_at', weekStart + 'T00:00:00').limit(1);
+              if (!existingFLW || existingFLW.length === 0) {
+                await awardXP(user.id, 'first_login_week', `Haftanın ilk kaydı (${weekStart})`, weekStart);
+              }
+            }
+
+            // weekly_streak: Bu hafta 5 iş günü gönderildi
+            if (weekDayCount >= 5) {
+              const { data: existingWS } = await supabase
+                .from('xp_events').select('id').eq('user_id', user.id)
+                .eq('action', 'weekly_streak').gte('created_at', weekStart + 'T00:00:00').limit(1);
+              if (!existingWS || existingWS.length === 0) {
+                await awardXP(user.id, 'weekly_streak', `Haftalık seri tamamlandı (${weekStart})`, weekStart);
+              }
+            }
+
+            // monthly_streak: Bu ay 20+ gün gönderildi
+            const monthStart = selectedDate.slice(0, 7) + '-01';
+            const { data: monthSubmitted } = await supabase
+              .from('daily_logs')
+              .select('log_date')
+              .eq('user_id', user.id)
+              .eq('submitted', true)
+              .gte('log_date', monthStart)
+              .lte('log_date', selectedDate);
+            const monthDayCount = monthSubmitted?.length || 0;
+            if (monthDayCount >= 20) {
+              const { data: existingMS } = await supabase
+                .from('xp_events').select('id').eq('user_id', user.id)
+                .eq('action', 'monthly_streak').gte('created_at', monthStart + 'T00:00:00').limit(1);
+              if (!existingMS || existingMS.length === 0) {
+                await awardXP(user.id, 'monthly_streak', `Aylık seri tamamlandı (${monthStart.slice(0, 7)})`, monthStart);
+              }
+            }
+          } catch (streakErr) { console.error('[XP] Streak error:', streakErr); }
         } catch (e) { console.error('[XP] DailyLog error:', e); }
       }
     }

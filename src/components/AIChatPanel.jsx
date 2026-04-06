@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ASSISTANT_TOOLS, executeTool, ASSISTANT_SYSTEM_PROMPT } from '../lib/assistantTools';
 
 // ── Claude API çağrısı (Vercel proxy üzerinden) ────────────────────────────
-async function callClaude(messages, tools = null) {
+async function callClaude(messages, tools = null, systemPrompt = ASSISTANT_SYSTEM_PROMPT) {
   const body = {
     messages,
-    system: ASSISTANT_SYSTEM_PROMPT,
+    system: systemPrompt,
     max_tokens: 2048,
   };
   if (tools) body.tools = tools;
@@ -99,7 +99,23 @@ function ImagePreview({ src, onRemove }) {
 }
 
 // ── Ana Chat Panel Bileşeni ─────────────────────────────────────────────────
-export default function AIChatPanel({ user, profile, isOpen, onClose }) {
+const PAGE_LABELS = {
+  dashboard: 'Dashboard',
+  agendas: 'Gündemler',
+  deadlines: 'Görevler / Deadlines',
+  dailylog: 'Günlük İş Kayıtları',
+  documents: 'Dokümanlar',
+  network: 'Network Yönetimi',
+  events: 'Etkinlikler',
+  notes: 'Notlarım',
+  gamification: 'Oyunlaştırma',
+  chat: 'Mesajlaşma',
+  forms: 'Formlar',
+  reports: 'Birim Raporları',
+  orgchart: 'Org Şeması',
+};
+
+export default function AIChatPanel({ user, profile, activePage, isOpen, onClose }) {
   const [messages, setMessages] = useState([]);        // { role, content } — UI mesajları
   const [apiMessages, setApiMessages] = useState([]);   // Claude API mesaj geçmişi (tool sonuçları dahil)
   const [input, setInput] = useState('');
@@ -115,6 +131,10 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
     userName: profile?.full_name || user?.email || '',
     userUnit: profile?.unit || null,
   };
+
+  const pageLabel = PAGE_LABELS[activePage] || activePage || 'Bilinmiyor';
+  const dynamicSystemPrompt = ASSISTANT_SYSTEM_PROMPT +
+    `\n\n📍 Kullanıcının şu an açık olan modülü: "${pageLabel}". Bu bilgiyi dikkate al — örneğin kullanıcı "buraya ekle" veya "buradaki etkinliği..." dediğinde aktif modülü baz al.`;
 
   // Otomatik scroll
   useEffect(() => {
@@ -208,7 +228,7 @@ export default function AIChatPanel({ user, profile, isOpen, onClose }) {
       // Tool calling loop: Claude tool_use isterse, çalıştırıp sonucu gönder
       while (loopCount < 5) {
         loopCount++;
-        const response = await callClaude(currentMessages, ASSISTANT_TOOLS);
+        const response = await callClaude(currentMessages, ASSISTANT_TOOLS, dynamicSystemPrompt);
 
         // stop_reason kontrolü
         if (response.stop_reason === 'tool_use') {

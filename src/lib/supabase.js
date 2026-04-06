@@ -865,18 +865,25 @@ export const notifyTaskAssigned = async ({
 
 // Tüm network verisini tek seferde çek
 export const getNetworkAll = async () => {
-  const [orgs, contacts, events, connections] = await Promise.all([
+  const [orgs, contacts, eventsRes, connections] = await Promise.all([
     supabase.from('network_organizations').select('*').order('name'),
     supabase.from('network_contacts').select('*').order('full_name'),
-    supabase.from('network_events').select('*').order('event_date', { ascending: false }),
+    supabase.from('events').select('*').order('start_date', { ascending: false }),
     supabase.from('network_connections').select('*').order('created_at'),
   ]);
+  // events tablosu alan adlarını NetworkManager'ın beklediği biçime dönüştür
+  const mappedEvents = (eventsRes.data || []).map(e => ({
+    ...e,
+    name:       e.title,
+    event_date: e.start_date,
+    location:   e.location_name,
+  }));
   return {
-    organizations: orgs.data   || [],
+    organizations: orgs.data    || [],
     contacts:      contacts.data || [],
-    events:        events.data  || [],
+    events:        mappedEvents,
     connections:   connections.data || [],
-    error: orgs.error || contacts.error || events.error || connections.error,
+    error: orgs.error || contacts.error || eventsRes.error || connections.error,
   };
 };
 
@@ -922,21 +929,48 @@ export const deleteNetworkContact = async (id) => {
   return { error };
 };
 
-// ── EVENTS ──
+// ── EVENTS (artık ana events tablosundan) ──
+const nullIfEmpty = (v) => (!v || v === '' ? null : v);
 export const createNetworkEvent = async (data, creatorName = null) => {
   const uid = await _getUid();
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
-  const { data: d, error } = await supabase.from('network_events')
-    .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
+  // network_events alan adlarını events tablosu alanlarına dönüştür
+  const payload = {
+    title:         data.name || data.title,
+    event_type:    data.event_type || 'diger',
+    status:        'planned',
+    start_date:    nullIfEmpty(data.event_date || data.start_date) || new Date().toISOString().split('T')[0],
+    end_date:      nullIfEmpty(data.end_date),
+    location_name: nullIfEmpty(data.location || data.location_name),
+    description:   nullIfEmpty(data.description),
+    website_url:   nullIfEmpty(data.drive_url || data.website_url),
+    unit:          data.unit || null,
+    owner_id:      uid,
+    created_by:    uid,
+  };
+  const { data: d, error } = await supabase.from('events').insert(payload).select().single();
+  // NetworkManager'ın beklediği alan adlarına geri dönüştür
+  if (d) { d.name = d.title; d.event_date = d.start_date; d.location = d.location_name; }
   return { data: d, error };
 };
 export const updateNetworkEvent = async (id, data) => {
-  const { data: d, error } = await supabase.from('network_events')
-    .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  const payload = {};
+  if (data.name !== undefined)       payload.title         = data.name;
+  if (data.title !== undefined)      payload.title         = data.title;
+  if (data.event_type !== undefined) payload.event_type    = data.event_type;
+  if (data.event_date !== undefined) payload.start_date    = nullIfEmpty(data.event_date);
+  if (data.start_date !== undefined) payload.start_date    = nullIfEmpty(data.start_date);
+  if (data.end_date !== undefined)   payload.end_date      = nullIfEmpty(data.end_date);
+  if (data.location !== undefined)   payload.location_name = nullIfEmpty(data.location);
+  if (data.description !== undefined) payload.description  = nullIfEmpty(data.description);
+  if (data.drive_url !== undefined)  payload.website_url   = nullIfEmpty(data.drive_url);
+  payload.updated_at = new Date().toISOString();
+  const { data: d, error } = await supabase.from('events').update(payload).eq('id', id).select().single();
+  if (d) { d.name = d.title; d.event_date = d.start_date; d.location = d.location_name; }
   return { data: d, error };
 };
 export const deleteNetworkEvent = async (id) => {
-  const { error } = await supabase.from('network_events').delete().eq('id', id);
+  const { error } = await supabase.from('events').delete().eq('id', id);
   return { error };
 };
 
@@ -1082,9 +1116,19 @@ export const XP_VALUES_DEFAULT = {
   daily_log_fullday:  20,
   daily_log_overtime: 10,
   // Etkinlik modülü
-  event_create:       30,
-  event_note:         10,
-  event_document:     10,
+  event_create:        30,
+  event_note:          10,
+  event_document:      10,
+  event_participant:    5,
+  event_complete:      15,
+  // Network
+  network_connect:     10,
+  // Profil & giriş
+  profile_complete:    25,
+  first_login_week:     5,
+  // Seriler
+  weekly_streak:       50,
+  monthly_streak:     100,
 };
 
 // Cache: DB'den okunan XP settings
@@ -1175,12 +1219,31 @@ export const getUserBadges = async (userId) => {
 
 // ── Personel XP geçmişi (direktör filtreli görünüm) ──
 export const getXPEventsByUser = async (userId, startDate, endDate) => {
-  let query = supabase.from('xp_events').select('*').order('created_at', { ascending: false }).limit(500);
+  let query = supabase.from('xp_events').select('*').order('created_at', { ascending: false });
   if (userId) query = query.eq('user_id', userId);
   if (startDate) query = query.gte('created_at', startDate);
   if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
   const { data, error } = await query;
   return { data, error };
+};
+
+// Seçilen zaman aralığında kişi başına eylem özeti (action → count, toplam XP)
+export const getXPActionSummary = async (userId, startDate, endDate) => {
+  let query = supabase.from('xp_events')
+    .select('action, xp_amount');
+  if (userId) query = query.eq('user_id', userId);
+  if (startDate) query = query.gte('created_at', startDate);
+  if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
+  const { data, error } = await query;
+  if (error || !data) return { data: null, error };
+  // JS tarafında grupla
+  const map = {};
+  data.forEach(e => {
+    if (!map[e.action]) map[e.action] = { action: e.action, count: 0, total_xp: 0 };
+    map[e.action].count += 1;
+    map[e.action].total_xp += e.xp_amount || 0;
+  });
+  return { data: Object.values(map).sort((a, b) => b.count - a.count), error: null };
 };
 
 // ── Dönemsel XP (haftalık/aylık liderlik tablosu) ──

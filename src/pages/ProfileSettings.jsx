@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { updateUserProfile, updateAuthEmail, updateAuthPassword, uploadAvatar } from '../lib/supabase';
+import { updateUserProfile, updateAuthEmail, updateAuthPassword, uploadAvatar, awardXP, supabase } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 // ── AVATAR BILEŞENI (yeniden kullanılabilir) ──────────────────────────────────
@@ -92,6 +92,21 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
     if (error) { setErrors({ general: error.message }); return; }
     onProfileUpdate?.();
     showSuccess('Profil bilgileri kaydedildi.');
+    // Profil tamamlandıysa (ad, birim, telefon doluysa) tek seferlik XP ver
+    const isComplete = form.full_name.trim() && profile?.unit && form.phone.trim();
+    if (isComplete && user?.id) {
+      try {
+        const { data: existing } = await supabase
+          .from('xp_events')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('action', 'profile_complete')
+          .limit(1);
+        if (!existing || existing.length === 0) {
+          awardXP(user.id, 'profile_complete', 'Profil tamamlandı', user.id);
+        }
+      } catch (e) { console.error('[XP] profile_complete error:', e); }
+    }
   };
 
   // ── Profil Resmi Seç ──
