@@ -963,30 +963,64 @@ export default function LogsViewer({ user, profile }) {
 
             {/* İleri/Geri — aralik modunda gizle */}
             {periodMode !== 'aralik' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f3f4f6', borderRadius: 9, padding: '3px 6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', borderRadius: 10, padding: '4px 6px', border: '1.5px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <button
                   onClick={() => setPeriodOffset(o => o - 1)}
                   title="Önceki dönem"
-                  style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#374151', fontWeight: 700, fontFamily: 'inherit' }}
+                  style={{
+                    width: 34, height: 34, borderRadius: 8,
+                    border: '1.5px solid #e5e7eb', background: 'white',
+                    cursor: 'pointer', fontSize: 18, color: '#111827',
+                    fontWeight: 700, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                    transition: 'all 0.12s',
+                    lineHeight: 1,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background='#f3f4f6'; e.currentTarget.style.borderColor='#9ca3af'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background='white'; e.currentTarget.style.borderColor='#e5e7eb'; }}
                 >‹</button>
+
                 <span style={{
-                  fontSize: 12.5, fontWeight: 600, color: '#111827',
-                  minWidth: 160, textAlign: 'center', padding: '0 4px',
-                  whiteSpace: 'nowrap',
+                  fontSize: 13, fontWeight: 700, color: '#111827',
+                  minWidth: 170, textAlign: 'center', padding: '0 6px',
+                  whiteSpace: 'nowrap', userSelect: 'none',
                 }}>
                   {fmtPeriodLabel(periodMode, periodOffset, rangeStart, rangeEnd)}
                 </span>
+
                 <button
                   onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))}
                   title="Sonraki dönem"
                   disabled={periodOffset >= 0}
-                  style={{ padding: '5px 9px', borderRadius: 6, border: 'none', background: 'transparent', cursor: periodOffset >= 0 ? 'default' : 'pointer', fontSize: 14, color: periodOffset >= 0 ? '#d1d5db' : '#374151', fontWeight: 700, fontFamily: 'inherit' }}
+                  style={{
+                    width: 34, height: 34, borderRadius: 8,
+                    border: '1.5px solid',
+                    borderColor: periodOffset >= 0 ? '#f0f0f0' : '#e5e7eb',
+                    background: periodOffset >= 0 ? '#fafafa' : 'white',
+                    cursor: periodOffset >= 0 ? 'not-allowed' : 'pointer',
+                    fontSize: 18, color: periodOffset >= 0 ? '#d1d5db' : '#111827',
+                    fontWeight: 700, fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: periodOffset >= 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
+                    transition: 'all 0.12s',
+                    lineHeight: 1,
+                  }}
+                  onMouseEnter={e => { if (periodOffset < 0) { e.currentTarget.style.background='#f3f4f6'; e.currentTarget.style.borderColor='#9ca3af'; } }}
+                  onMouseLeave={e => { if (periodOffset < 0) { e.currentTarget.style.background='white'; e.currentTarget.style.borderColor='#e5e7eb'; } }}
                 >›</button>
+
                 {periodOffset !== 0 && (
                   <button
                     onClick={() => setPeriodOffset(0)}
                     title="Bugüne dön"
-                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontSize: 11, color: '#374151', fontWeight: 600, fontFamily: 'inherit' }}
+                    style={{
+                      padding: '5px 11px', borderRadius: 7,
+                      border: '1.5px solid #111827', background: '#111827',
+                      cursor: 'pointer', fontSize: 11.5, color: 'white',
+                      fontWeight: 700, fontFamily: 'inherit',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                    }}
                   >Şimdi</button>
                 )}
               </div>
