@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getDashboardLogs } from '../lib/supabase';
 import { ROLE_LABELS, avatarColor, fmtDateShort, fmtDayShort, toLocalDateStr } from '../lib/constants';
 
@@ -14,6 +14,152 @@ const STATUS_LABELS = {
   yillik_izin: 'Yıllık İzin',
   calismiyor:  'Çalışmıyor',
 };
+
+// ── PERSONEL AUTOCOMPLETE ─────────────────────────────────────────────────────
+function PersonAutocomplete({ persons, value, onChange }) {
+  const [inputText, setInputText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const wrapRef = useRef(null);
+  const listRef = useRef(null);
+
+  // Seçili kişi değiştiğinde input'u güncelle
+  useEffect(() => {
+    if (value) {
+      const p = persons.find(p => p.user_id === value);
+      setInputText(p ? p.full_name : '');
+    } else {
+      setInputText('');
+    }
+  }, [value, persons]);
+
+  // Dışarı tıklayınca kapat
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = inputText.trim()
+    ? persons.filter(p => p.full_name.toLowerCase().includes(inputText.toLowerCase().trim()))
+    : persons;
+
+  // Highlight edilen öğeyi görünür alanda tut
+  useEffect(() => {
+    if (highlightIdx >= 0 && listRef.current) {
+      const el = listRef.current.children[highlightIdx];
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIdx]);
+
+  const handleSelect = (p) => {
+    onChange(p ? p.user_id : '');
+    setInputText(p ? p.full_name : '');
+    setOpen(false);
+    setHighlightIdx(-1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) { setOpen(true); return; }
+    const items = [null, ...filtered]; // null = "Tüm Personel"
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIdx(prev => Math.min(prev + 1, items.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightIdx >= 0 && highlightIdx < items.length) {
+        handleSelect(items[highlightIdx]);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      // Seçili kişiyi geri yükle
+      if (value) {
+        const p = persons.find(p => p.user_id === value);
+        setInputText(p ? p.full_name : '');
+      } else {
+        setInputText('');
+      }
+    }
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', minWidth: 170 }}>
+      <input
+        type="text"
+        value={inputText}
+        placeholder="Tüm Personel"
+        onFocus={() => { setOpen(true); setHighlightIdx(-1); }}
+        onChange={e => {
+          setInputText(e.target.value);
+          setOpen(true);
+          setHighlightIdx(-1);
+          // Yazarken seçimi temizle (tümünü göster modu)
+          if (!e.target.value.trim()) onChange('');
+        }}
+        onKeyDown={handleKeyDown}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '8px 32px 8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb',
+          fontSize: 13, fontFamily: 'inherit', color: '#374151', background: 'white',
+          outline: 'none',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+        }}
+      />
+      {/* Temizle butonu */}
+      {value && (
+        <span
+          onClick={() => handleSelect(null)}
+          style={{
+            position: 'absolute', right: 26, top: '50%', transform: 'translateY(-50%)',
+            cursor: 'pointer', color: '#9ca3af', fontSize: 14, lineHeight: 1,
+            userSelect: 'none',
+          }}
+        >×</span>
+      )}
+      {open && (
+        <div ref={listRef} style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+          background: 'white', border: '1px solid #e5e7eb', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto',
+          zIndex: 50,
+        }}>
+          {/* Tüm Personel seçeneği */}
+          <div
+            onClick={() => handleSelect(null)}
+            style={{
+              padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: '#6b7280',
+              background: highlightIdx === 0 ? '#f3f4f6' : 'transparent',
+            }}
+            onMouseEnter={() => setHighlightIdx(0)}
+          >Tüm Personel</div>
+          {filtered.map((p, i) => (
+            <div
+              key={p.user_id}
+              onClick={() => handleSelect(p)}
+              onMouseEnter={() => setHighlightIdx(i + 1)}
+              style={{
+                padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                background: highlightIdx === i + 1 ? '#f3f4f6' : 'transparent',
+                color: '#374151', fontWeight: p.user_id === value ? 600 : 400,
+              }}
+            >{p.full_name}</div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: '12px', fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>
+              Sonuç bulunamadı
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── TARİH YARDIMCILARI ────────────────────────────────────────────────────────
 function today() { return toLocalDateStr(new Date()); }
@@ -1052,21 +1198,12 @@ export default function LogsViewer({ user, profile }) {
             )}
           </div>
 
-          {/* Personel filtre */}
-          <select
+          {/* Personel filtre — autocomplete */}
+          <PersonAutocomplete
+            persons={allPersons}
             value={personFilter}
-            onChange={e => setPersonFilter(e.target.value)}
-            style={{
-              padding: '8px 32px 8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb',
-              fontSize: 13, fontFamily: 'inherit', color: '#374151', background: 'white',
-              cursor: 'pointer', outline: 'none', appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-            }}
-          >
-            <option value="">Tüm Personel</option>
-            {allPersons.map(p => <option key={p.user_id} value={p.user_id}>{p.full_name}</option>)}
-          </select>
+            onChange={setPersonFilter}
+          />
 
           {/* Departman filtre (direktör seviyesi için) */}
           {(isDirectorLevel) && allUnits.length > 1 && (
