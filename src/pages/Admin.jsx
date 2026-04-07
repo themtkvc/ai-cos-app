@@ -258,15 +258,25 @@ function UserManagement({ currentUser, notify }) {
           <>
             <button className="btn btn-outline btn-sm" onClick={() => startEdit(p)}>✏️</button>
             {p.user_id !== currentUser.id && p.role !== 'direktor' && (
-              <button className="btn btn-outline btn-sm"
-                title="Kullanıcıyı sil"
+              <button
+                title="Kullanıcıyı kalıcı olarak sil"
                 onClick={() => handleDelete(p)}
                 disabled={deletingId === p.user_id}
                 style={{
-                  color: 'var(--red)', borderColor: 'var(--red)22',
-                  opacity: deletingId === p.user_id ? 0.5 : 1,
-                }}>
-                {deletingId === p.user_id ? '⏳' : '🗑'}
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 7,
+                  border: '1.5px solid #fca5a5',
+                  background: deletingId === p.user_id ? '#fef2f2' : 'white',
+                  color: '#dc2626',
+                  fontSize: 12.5, fontWeight: 700, cursor: deletingId === p.user_id ? 'default' : 'pointer',
+                  opacity: deletingId === p.user_id ? 0.6 : 1,
+                  fontFamily: 'inherit',
+                  transition: 'all 0.12s',
+                }}
+                onMouseEnter={e => { if (!deletingId) { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#ef4444'; } }}
+                onMouseLeave={e => { if (!deletingId) { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#fca5a5'; } }}
+              >
+                {deletingId === p.user_id ? '⏳ Siliniyor…' : '🗑 Sil'}
               </button>
             )}
           </>
