@@ -1450,3 +1450,38 @@ export const submitFormResponse = async (response, answers) => {
 
   return { data: respData[0], error: null };
 };
+
+// ── DIRECTOR AGENDAS ──────────────────────────────────────────────────────────
+export const getDirectorAgendas = async () => {
+  const { data, error } = await supabase
+    .from('director_agendas')
+    .select('*')
+    .order('section')
+    .order('position')
+    .order('created_at');
+  return { data: data || [], error };
+};
+
+export const createDirectorAgenda = async (payload) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from('user_profiles').select('full_name').eq('user_id', user?.id).single();
+  const { data, error } = await supabase
+    .from('director_agendas')
+    .insert({ ...payload, created_by: user?.id, created_by_name: profile?.full_name || null })
+    .select().single();
+  return { data, error };
+};
+
+export const updateDirectorAgenda = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('director_agendas')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select().single();
+  return { data, error };
+};
+
+export const deleteDirectorAgenda = async (id) => {
+  const { error } = await supabase.from('director_agendas').delete().eq('id', id);
+  return { error };
+};

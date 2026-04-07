@@ -23,6 +23,7 @@ import Gamification from './pages/Gamification';
 import FundOpportunities from './pages/FundOpportunities';
 import FormsManager from './pages/FormsManager';
 import Events from './pages/Events';
+import DirectorAgendas from './pages/DirectorAgendas';
 import PublicFormFill from './pages/PublicFormFill';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -39,9 +40,9 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','admin','users','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','admin','users','profile'],
   direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
-  asistan:              ['dashboard','notifications','agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','profile'],
+  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','profile'],
   koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
   personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','funds','forms','notes','events','profile'],
 };
@@ -297,7 +298,8 @@ export default function App() {
     funds:        FundOpportunities,
     forms:        FormsManager,
     gamification: Gamification,
-    events:       Events,
+    events:           Events,
+    direktor_agendas: DirectorAgendas,
     admin:     Admin,
     users:     Admin,
   };
@@ -324,7 +326,8 @@ export default function App() {
     funds:        '💰 Fon Fırsatları',
     forms:        '📋 Formlar',
     gamification: '🏆 Oyunlaştırma',
-    events:       '📅 Etkinlikler',
+    events:           '📅 Etkinlikler',
+    direktor_agendas: '🗂 Direktör Gündemleri',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',
