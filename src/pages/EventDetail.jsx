@@ -547,30 +547,20 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
     let eventId = event?.id;
 
     if (isNew) {
-      // Önce görseli yükle (varsa)
-      if (pendingImageFile) {
-        const ext = pendingImageFile.name.split('.').pop();
-        const path = `tmp_${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('event-covers').upload(path, pendingImageFile, { upsert: true });
-        if (!upErr) {
-          const { data: { publicUrl } } = supabase.storage.from('event-covers').getPublicUrl(path);
-          payload.cover_image_url = publicUrl;
-        }
-      }
+      // Önce etkinliği görselsiz kaydet (event ID almak için)
       const { data, error: insertErr } = await supabase.from('events').insert(payload).select().single();
       if (insertErr) { console.error('Event insert error:', insertErr); setSaving(false); alert('Kayıt hatası: ' + insertErr.message); return; }
       eventId = data?.id;
       if (eventId) {
-        // Eğer görsel temp path ile yüklendiyse event ID'li path'e taşı (upsert)
-        if (pendingImageFile && payload.cover_image_url) {
+        // Sonra görseli doğrudan event ID'li path'e yükle — move/taşıma yok
+        if (pendingImageFile) {
           const ext = pendingImageFile.name.split('.').pop();
-          const newPath = `${eventId}/${Date.now()}.${ext}`;
-          await supabase.storage.from('event-covers').move(
-            payload.cover_image_url.split('/event-covers/')[1],
-            newPath
-          );
-          const { data: { publicUrl } } = supabase.storage.from('event-covers').getPublicUrl(newPath);
-          await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', eventId);
+          const path = `${eventId}/${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('event-covers').upload(path, pendingImageFile, { upsert: true });
+          if (!upErr) {
+            const { data: { publicUrl } } = supabase.storage.from('event-covers').getPublicUrl(path);
+            await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', eventId);
+          }
         }
         await logActivity(eventId, 'etkinliği oluşturdu');
         awardXP(user?.id, 'event_create', `Etkinlik oluşturuldu: ${payload.title}`, eventId);
