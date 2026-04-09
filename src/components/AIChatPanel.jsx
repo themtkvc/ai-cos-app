@@ -153,19 +153,37 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
     }
   }, [isOpen]);
 
-  // ── Ortak görsel işleme (file picker + paste) ───────────────────────────────
+  // ── Ortak görsel işleme (file picker + paste) — otomatik sıkıştırma ─────────
   const processImageFile = useCallback((file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Görsel boyutu 5 MB\'dan küçük olmalıdır.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Görsel boyutu 10 MB\'dan küçük olmalıdır.');
       return;
     }
+
+    // Görseli canvas ile sıkıştır (max 1200px, quality 0.8)
+    const img = new Image();
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64 = dataUrl.split(',')[1];
-      const mediaType = file.type || 'image/png';
-      setPendingImage({ base64, preview: dataUrl, mediaType });
+      img.onload = () => {
+        const MAX_DIM = 1200;
+        let w = img.width, h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        // JPEG olarak sıkıştır (0.8 quality ≈ iyi görünüm, küçük boyut)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const base64 = dataUrl.split(',')[1];
+        setPendingImage({ base64, preview: dataUrl, mediaType: 'image/jpeg', originalName: file.name });
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   }, []);
