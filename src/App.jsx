@@ -44,7 +44,7 @@ export const ROLE_ACCESS = {
   direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
   asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','profile'],
   koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','profile'],
-  personel:             ['dashboard','notifications','agendas','reports','dailylog','analytics','orgchart','network','funds','forms','notes','events','profile'],
+  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
