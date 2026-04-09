@@ -77,17 +77,26 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
       });
     }
     // Bildirim sayısı
-    getUnreadNotificationCount(user.id).then(({ count }) => {
-      setUnreadNotifCount(count || 0);
-    });
-    // Realtime bildirim sayısı güncelleme
+    const refreshNotifCount = () => {
+      getUnreadNotificationCount(user.id).then(({ count }) => setUnreadNotifCount(count || 0));
+    };
+    refreshNotifCount();
+
+    // Realtime bildirim sayısı güncelleme (yeni bildirim geldiğinde)
     const channel = supabase
       .channel('sidebar-notif-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
-        getUnreadNotificationCount(user.id).then(({ count }) => setUnreadNotifCount(count || 0));
+        refreshNotifCount();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    // Bildirimler sayfasından okundu event'i dinle
+    window.addEventListener('notification-count-changed', refreshNotifCount);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('notification-count-changed', refreshNotifCount);
+    };
   }, [user, role]);
 
   const badges = { meetings: openActionsCount || null, notifications: unreadNotifCount || null };

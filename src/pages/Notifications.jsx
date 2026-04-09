@@ -151,11 +151,15 @@ export default function Notifications({ user, onNavigate }) {
   const handleRead = async (id) => {
     await markNotificationRead(id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    // Sidebar badge'ini güncelle
+    window.dispatchEvent(new CustomEvent('notification-count-changed'));
   };
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead(user.id);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    // Sidebar badge'ini güncelle
+    window.dispatchEvent(new CustomEvent('notification-count-changed'));
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
