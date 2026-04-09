@@ -309,7 +309,7 @@ function FieldRenderer({ field, value, onChange }) {
     case 'date':
       return <input type="date" value={value || ''} onChange={e => onChange(e.target.value)} required={field.required} style={inputStyle} />;
     case 'time':
-      return <input type="time" value={value || ''} onChange={e => onChange(e.target.value)} required={field.required} style={inputStyle} />;
+      return <input type="time" lang="tr" value={value || ''} onChange={e => onChange(e.target.value)} required={field.required} style={inputStyle} />;
     case 'datetime':
       return <input type="datetime-local" value={value || ''} onChange={e => onChange(e.target.value)} required={field.required} style={inputStyle} />;
     case 'yes_no':

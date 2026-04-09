@@ -793,11 +793,11 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
                 </Field>
                 <Field>
                   <Label>Başlangıç Saati</Label>
-                  <input type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} style={inputStyle} />
+                  <input type="time" lang="tr" value={form.start_time} onChange={e => set('start_time', e.target.value)} style={inputStyle} />
                 </Field>
                 <Field>
                   <Label>Bitiş Saati</Label>
-                  <input type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} style={inputStyle} />
+                  <input type="time" lang="tr" value={form.end_time} onChange={e => set('end_time', e.target.value)} style={inputStyle} />
                 </Field>
               </div>
             </Panel>

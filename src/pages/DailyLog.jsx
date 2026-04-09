@@ -131,6 +131,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
               type="time"
+              lang="tr"
               value={item.start_time}
               disabled={disabled}
               onChange={e => onChange('start_time', e.target.value)}
@@ -144,6 +145,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
             <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>→</span>
             <input
               type="time"
+              lang="tr"
               value={item.end_time}
               disabled={disabled}
               onChange={e => onChange('end_time', e.target.value)}
