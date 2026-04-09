@@ -441,6 +441,33 @@ export const ASSISTANT_TOOLS = [
     },
   },
 
+  // ── GÖRSEL YÜKLEME ───────────────────────────────────────────────────────────
+  {
+    name: 'upload_image_to_entity',
+    description: 'Kullanıcının chat\'e yüklediği görseli bir etkinliğe, kişiye veya kuruma profil resmi/logo/kapak görseli olarak ekler. Kullanıcı bir görsel gönderip "bunu X etkinliğine ekle" veya "bu kişinin fotoğrafı" dediğinde kullan.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        entity_type: { type: 'string', description: 'Hedef varlık türü: event, contact, organization', enum: ['event', 'contact', 'organization'] },
+        entity_name: { type: 'string', description: 'Hedef varlığın adı (kısmi eşleşme ile bulunur)' },
+      },
+      required: ['entity_type', 'entity_name'],
+    },
+  },
+  {
+    name: 'add_image_from_url',
+    description: 'URL\'den görsel indirip bir etkinliğe, kişiye veya kuruma ekler. Kullanıcı bir görsel URL\'si paylaştığında kullan.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        image_url: { type: 'string', description: 'Görselin URL\'si' },
+        entity_type: { type: 'string', description: 'Hedef varlık türü: event, contact, organization', enum: ['event', 'contact', 'organization'] },
+        entity_name: { type: 'string', description: 'Hedef varlığın adı (kısmi eşleşme ile bulunur)' },
+      },
+      required: ['image_url', 'entity_type', 'entity_name'],
+    },
+  },
+
   // ── NOTLAR ───────────────────────────────────────────────────────────────────
   {
     name: 'search_notes',
@@ -482,6 +509,22 @@ export async function executeTool(toolName, toolInput, context) {
   };
 
   const nullIfEmpty = (v) => (!v || v === '' ? null : v);
+
+  // Yardımcı: Varlık adından entity bul (event, contact, organization)
+  const findEntity = async (entityType, name) => {
+    if (!name) return null;
+    if (entityType === 'event') {
+      const { data } = await supabase.from('events').select('id, title').ilike('title', `%${name}%`).limit(1);
+      return data?.[0] ? { id: data[0].id, title: data[0].title, name: data[0].title } : null;
+    } else if (entityType === 'contact') {
+      const { data } = await supabase.from('network_contacts').select('id, full_name').ilike('full_name', `%${name}%`).limit(1);
+      return data?.[0] ? { id: data[0].id, name: data[0].full_name } : null;
+    } else if (entityType === 'organization') {
+      const { data } = await supabase.from('network_organizations').select('id, name').ilike('name', `%${name}%`).limit(1);
+      return data?.[0] ? { id: data[0].id, name: data[0].name } : null;
+    }
+    return null;
+  };
 
   switch (toolName) {
 
@@ -895,6 +938,89 @@ export async function executeTool(toolName, toolInput, context) {
       return { success: true, note: { id: data.id, title: data.title } };
     }
 
+    // ── GÖRSEL YÜKLEME ──────────────────────────────────────────────────────────
+    case 'upload_image_to_entity': {
+      // pendingImage context üzerinden gelir: { base64, mediaType }
+      const img = context.pendingImage;
+      if (!img || !img.base64) return { error: 'Görsel bulunamadı. Lütfen önce bir görsel yükleyin veya yapıştırın.' };
+
+      // Hedef varlığı bul
+      const entity = await findEntity(toolInput.entity_type, toolInput.entity_name);
+      if (!entity) return { error: `"${toolInput.entity_name}" adlı ${toolInput.entity_type === 'event' ? 'etkinlik' : toolInput.entity_type === 'contact' ? 'kişi' : 'kurum'} bulunamadı.` };
+
+      // Base64'ü Blob'a dönüştür
+      const byteChars = atob(img.base64);
+      const byteArray = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+      const ext = img.mediaType.includes('png') ? 'png' : img.mediaType.includes('webp') ? 'webp' : 'jpg';
+      const blob = new Blob([byteArray], { type: img.mediaType });
+
+      // Bucket ve alan seçimi
+      let publicUrl;
+      if (toolInput.entity_type === 'event') {
+        const path = `${entity.id}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('event-covers').upload(path, blob, { upsert: true, contentType: img.mediaType });
+        if (upErr) return { error: `Yükleme hatası: ${upErr.message}` };
+        const { data: urlData } = supabase.storage.from('event-covers').getPublicUrl(path);
+        publicUrl = urlData.publicUrl + '?t=' + Date.now();
+        await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', entity.id);
+      } else {
+        const entType = toolInput.entity_type === 'contact' ? 'contact' : 'organization';
+        const path = `${userId}/${entType}_${entity.id}.${ext}`;
+        await supabase.storage.from('network-media').remove([path]);
+        const { error: upErr } = await supabase.storage.from('network-media').upload(path, blob, { upsert: true, contentType: img.mediaType });
+        if (upErr) return { error: `Yükleme hatası: ${upErr.message}` };
+        const { data: urlData } = supabase.storage.from('network-media').getPublicUrl(path);
+        publicUrl = urlData.publicUrl + '?t=' + Date.now();
+        const table = toolInput.entity_type === 'contact' ? 'network_contacts' : 'network_organizations';
+        const field = toolInput.entity_type === 'contact' ? 'avatar_url' : 'logo_url';
+        await supabase.from(table).update({ [field]: publicUrl }).eq('id', entity.id);
+      }
+
+      return { success: true, message: `Görsel "${entity.name || entity.title}" için başarıyla yüklendi.`, url: publicUrl };
+    }
+
+    case 'add_image_from_url': {
+      // URL'den görseli çek
+      let blob, ext = 'jpg', contentType = 'image/jpeg';
+      try {
+        const resp = await fetch(toolInput.image_url);
+        if (!resp.ok) return { error: `Görsel indirilemedi (HTTP ${resp.status}).` };
+        contentType = resp.headers.get('content-type') || 'image/jpeg';
+        ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+        blob = await resp.blob();
+      } catch (e) {
+        return { error: `URL'den görsel alınamadı: ${e.message}` };
+      }
+
+      // Hedef varlığı bul
+      const entityUrl = await findEntity(toolInput.entity_type, toolInput.entity_name);
+      if (!entityUrl) return { error: `"${toolInput.entity_name}" adlı ${toolInput.entity_type === 'event' ? 'etkinlik' : toolInput.entity_type === 'contact' ? 'kişi' : 'kurum'} bulunamadı.` };
+
+      let publicUrl;
+      if (toolInput.entity_type === 'event') {
+        const path = `${entityUrl.id}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('event-covers').upload(path, blob, { upsert: true, contentType });
+        if (upErr) return { error: `Yükleme hatası: ${upErr.message}` };
+        const { data: urlData } = supabase.storage.from('event-covers').getPublicUrl(path);
+        publicUrl = urlData.publicUrl + '?t=' + Date.now();
+        await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', entityUrl.id);
+      } else {
+        const entType = toolInput.entity_type === 'contact' ? 'contact' : 'organization';
+        const path = `${userId}/${entType}_${entityUrl.id}.${ext}`;
+        await supabase.storage.from('network-media').remove([path]);
+        const { error: upErr } = await supabase.storage.from('network-media').upload(path, blob, { upsert: true, contentType });
+        if (upErr) return { error: `Yükleme hatası: ${upErr.message}` };
+        const { data: urlData } = supabase.storage.from('network-media').getPublicUrl(path);
+        publicUrl = urlData.publicUrl + '?t=' + Date.now();
+        const table = toolInput.entity_type === 'contact' ? 'network_contacts' : 'network_organizations';
+        const field = toolInput.entity_type === 'contact' ? 'avatar_url' : 'logo_url';
+        await supabase.from(table).update({ [field]: publicUrl }).eq('id', entityUrl.id);
+      }
+
+      return { success: true, message: `Görsel "${entityUrl.name || entityUrl.title}" için başarıyla yüklendi.`, url: publicUrl };
+    }
+
     default:
       return { error: `Bilinmeyen araç: ${toolName}` };
   }
@@ -947,6 +1073,13 @@ Sistemdeki TÜM modüllere erişimin var ve her türlü görevi yapabilirsin. Ku
 ### 📝 Notlar
 - Not oluşturma ve arama
 
+### 🖼️ Görsel Yönetimi
+- Kullanıcının yüklediği görseli etkinlik, kişi veya kuruma ekleyebilirsin
+- URL'den görsel indirip ilgili kayda ekleyebilirsin
+- Etkinliklere kapak görseli, kişilere profil fotoğrafı, kurumlara logo eklenebilir
+- Kullanıcı bir görsel gönderip "bunu X'e ekle" derse upload_image_to_entity tool'unu kullan
+- Kullanıcı bir görsel URL'si paylaşırsa add_image_from_url tool'unu kullan
+
 ### 👥 Personel
 - Kullanıcı listesi (birim/rol bazında)
 - Genel sistem istatistikleri
@@ -965,5 +1098,7 @@ Sistemdeki TÜM modüllere erişimin var ve her türlü görevi yapabilirsin. Ku
 - "İş kaydımı oluştur" derse: bugünün tarihiyle iş kaydı oluştur
 - LinkedIn ekran görüntüsü gelirse: bilgileri çıkar ve network'e ekle
 - Etkinlik linki/görseli gelirse: etkinlik bilgilerini çıkar ve takvime ekle
+- Görsel yüklenip "bunu şu etkinliğe/kişiye/kuruma ekle" denirse: upload_image_to_entity ile yükle
+- Görsel URL'si paylaşılıp bir varlığa eklenmesi istenirse: add_image_from_url ile yükle
 - "X kişisine bildir/haber ver" derse: bildirim gönder
 - Sorgulamalarda önce tool kullan, sonuçları özetle`;

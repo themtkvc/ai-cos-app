@@ -64,8 +64,11 @@ function ToolIndicator({ name }) {
     search_organizations: '🏢 Kurum arıyor…',
     create_organization: '🏢 Kurum ekleniyor…',
     create_event: '📅 Etkinlik ekleniyor…',
+    create_main_event: '📅 Etkinlik ekleniyor…',
     get_summary: '📊 Özet hazırlıyor…',
     list_profiles: '👥 Personel listeliyor…',
+    upload_image_to_entity: '🖼️ Görsel yükleniyor…',
+    add_image_from_url: '🖼️ URL\'den görsel indiriliyor…',
   };
   return (
     <div style={{
@@ -202,6 +205,7 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
 
     // API mesajını hazırla (görsel + text content blocks)
     let apiContent;
+    const imageForTools = pendingImage ? { base64: pendingImage.base64, mediaType: pendingImage.mediaType } : null;
     if (pendingImage) {
       apiContent = [];
       apiContent.push({
@@ -240,7 +244,8 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
           for (const block of assistantContent) {
             if (block.type === 'tool_use') {
               setToolStatus(block.name);
-              const result = await executeTool(block.name, block.input, context);
+              const toolContext = { ...context, pendingImage: imageForTools };
+              const result = await executeTool(block.name, block.input, toolContext);
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,
