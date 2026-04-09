@@ -160,7 +160,12 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
       .map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const reply = await sendMessage(history, context);
+      const reply = await sendMessage(history, context, {
+        role: profile?.role,
+        name: profile?.full_name,
+        unit: profile?.unit,
+        userId: user.id,
+      });
       const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: reply, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
       try { await saveChatMessage(user.id, 'assistant', reply); }
