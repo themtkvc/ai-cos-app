@@ -243,30 +243,46 @@ function EventForm({ event, user, profile, onSaved, onCancel }) {
     if (!file || !file.type.startsWith('image/')) return;
     setUploading(true);
     try {
-      // Otomatik sıkıştır — her boyuttaki görsel kabul edilir
-      const img = new Image();
-      const reader = new FileReader();
-      const dataUrl = await new Promise((resolve) => {
-        reader.onload = () => {
-          img.onload = () => {
-            const MAX = 1600;
-            let w = img.width, h = img.height;
-            if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
-            const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.82));
-          };
-          img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
+      // 1) Görseli yükle
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        const r = new FileReader();
+        r.onload = () => { i.src = r.result; };
+        r.readAsDataURL(file);
       });
-      const base64 = dataUrl.split(',')[1];
-      const byteChars = atob(base64);
-      const byteArray = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
+      // 2) Adaptive sıkıştırma — 4.5 MB altına inene kadar kaliteyi düşür
+      const MAX_BYTES = 4.5 * 1024 * 1024;
+      let maxDim = 1600;
+      let quality = 0.82;
+      let blob;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const r = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * r);
+          h = Math.round(h * r);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64 = dataUrl.split(',')[1];
+        const byteChars = atob(base64);
+        const byteArray = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+        blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+        if (blob.size <= MAX_BYTES) break;
+        // Kaliteyi ve boyutu kademeli düşür
+        quality = Math.max(0.4, quality - 0.12);
+        maxDim = Math.round(maxDim * 0.75);
+      }
+
+      // 3) Supabase'e yükle
       const id = isEdit ? event.id : 'temp-' + Date.now();
       const path = `${id}/${Date.now()}.jpg`;
       const { error } = await supabase.storage.from('capacity-covers').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
