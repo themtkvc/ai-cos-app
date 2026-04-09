@@ -25,6 +25,7 @@ const ALL_NAV = [
   { id: 'forms',            icon: '📋', label: 'Formlar' },
   { id: 'gamification',     icon: '🏆', label: 'Oyunlaştırma' },
   { id: 'events',           icon: '📅', label: 'Etkinlikler' },
+  { id: 'capacity',         icon: '📚', label: 'Kapasite Geliştirme' },
 ];
 
 const ADMIN_NAV = [
