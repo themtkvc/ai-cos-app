@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
   PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, ComposedChart, Area,
 } from 'recharts';
-import { getDashboardLogs } from '../lib/supabase';
+import { getDashboardLogs, supabase } from '../lib/supabase';
 import { ROLE_LABELS, toLocalDateStr as _toLocalDateStr } from '../lib/constants';
 
 // ── SABITLER ─────────────────────────────────────────────────────────────────
@@ -243,8 +243,36 @@ function processLogs(logs, dateRange) {
     }))
     .sort((a, b) => b.hours - a.hours);
 
+  // Gündem bazlı analiz
+  const agendaMap = {};
+  logs.forEach(l => {
+    (l.work_items || []).forEach(item => {
+      if (item.agenda_item_id) {
+        if (!agendaMap[item.agenda_item_id]) {
+          agendaMap[item.agenda_item_id] = { id: item.agenda_item_id, totalMins: 0, persons: new Set() };
+        }
+        agendaMap[item.agenda_item_id].totalMins += getItemMins(item);
+        agendaMap[item.agenda_item_id].persons.add(l.user_id);
+        // Kişi bazlı detay
+        if (!agendaMap[item.agenda_item_id].personDetail) agendaMap[item.agenda_item_id].personDetail = {};
+        const pName = l.full_name || l.user_id.slice(0,8);
+        agendaMap[item.agenda_item_id].personDetail[pName] = (agendaMap[item.agenda_item_id].personDetail[pName] || 0) + getItemMins(item);
+      }
+    });
+  });
+  const agendaData = Object.values(agendaMap)
+    .map((a, i) => ({
+      id: a.id,
+      hours: parseFloat(fmtHShort(a.totalMins)),
+      totalMins: a.totalMins,
+      persons: a.persons.size,
+      personDetail: a.personDetail || {},
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    }))
+    .sort((a, b) => b.totalMins - a.totalMins);
+
   return { totalWorkMins, totalOtMins, workDays, avgDailyMins, submissionRate,
-           uniqueUsers, dailyData, statusData, categoryData, personData, unitData };
+           uniqueUsers, dailyData, statusData, categoryData, personData, unitData, agendaData };
 }
 
 // ── ANA COMPONENT ─────────────────────────────────────────────────────────────
@@ -261,6 +289,7 @@ export default function LogsDashboard({ user, profile }) {
   const [selectedPerson, setSelectedPerson] = useState('');   // user_id
   const [selectedUnit, setSelectedUnit]     = useState('');   // unit name
   const [allLogs, setAllLogs]         = useState([]);
+  const [agendaNames, setAgendaNames] = useState({});  // id -> title
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
 
@@ -293,6 +322,22 @@ export default function LogsDashboard({ user, profile }) {
     const { data, error: err } = await getDashboardLogs(dateRange.start, dateRange.end);
     if (err) { setError(err.message); setLoading(false); return; }
     setAllLogs(data || []);
+
+    // İş kayıtlarındaki agenda_item_id'lerin başlıklarını çek
+    const agendaIds = new Set();
+    (data || []).forEach(l => {
+      (l.work_items || []).forEach(i => { if (i.agenda_item_id) agendaIds.add(i.agenda_item_id); });
+    });
+    if (agendaIds.size > 0) {
+      const { data: agendas } = await supabase
+        .from('agendas')
+        .select('id, title, unit')
+        .in('id', [...agendaIds]);
+      const map = {};
+      (agendas || []).forEach(a => { map[a.id] = a.title; });
+      setAgendaNames(map);
+    }
+
     setLoading(false);
   }, [dateRange.start, dateRange.end]);
 
@@ -567,6 +612,68 @@ export default function LogsDashboard({ user, profile }) {
               </div>
             )}
           </div>
+
+          {/* SATIR 2.5: Gündem Bazlı Çalışma Analizi */}
+          {stats.agendaData?.length > 0 && (
+            <div className="card" style={{ padding: '18px 16px', marginBottom: 14 }}>
+              <SectionTitle>📋 Gündem Bazlı Çalışma Analizi</SectionTitle>
+              <div style={{ overflowX: 'auto' }}>
+                <ResponsiveContainer width="100%" height={Math.max(200, stats.agendaData.length * 38)}>
+                  <BarChart
+                    layout="vertical"
+                    data={stats.agendaData.map(a => ({ ...a, name: agendaNames[a.id] || `Gündem #${String(a.id).slice(0,6)}` }))}
+                    margin={{ top: 0, right: 40, bottom: 0, left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10.5 }} unit="s" />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={180} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="hours" name="Süre" radius={[0,4,4,0]}>
+                      {stats.agendaData.map((entry, i) => (
+                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Gündem detay tablosu */}
+              <div style={{ marginTop: 16, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      {['Gündem', 'Toplam Süre', 'Kişi Sayısı', 'Katkıda Bulunanlar'].map(h => (
+                        <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 700, fontSize: 11, letterSpacing: '0.04em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.agendaData.map((a, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'var(--surface)' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                          📋 {agendaNames[a.id] || `#${String(a.id).slice(0,8)}`}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--navy)' }}>
+                          {fmtH(a.totalMins)}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>{a.persons} kişi</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>
+                          {Object.entries(a.personDetail || {}).map(([name, mins]) => (
+                            <span key={name} style={{
+                              display: 'inline-block', fontSize: 11, padding: '2px 6px', borderRadius: 4,
+                              background: 'var(--navy)08', border: '1px solid var(--navy)15', marginRight: 4, marginBottom: 2,
+                            }}>
+                              {name.split('@')[0]} <strong>{fmtH(mins)}</strong>
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* SATIR 3: Kişi Bazlı Karşılaştırma (birden fazla kişi varsa) */}
           {showPersonChart && (

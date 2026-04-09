@@ -565,6 +565,24 @@ export const getMyOpenTasks = async (userId) => {
   return { data: combined, error: agendaErr || taskErr };
 };
 
+// Birimdeki tüm gündemleri getir (iş kaydı bağlama için)
+export const getUnitAgendas = async (unit) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .select('id, title, unit, priority, due_date, status')
+    .neq('status', 'tamamlandi')
+    .neq('status', 'arsiv')
+    .order('created_at', { ascending: false });
+
+  // Birim filtresi: eğer unit varsa sadece o birim + birim belirtilmemiş olanları getir
+  const filtered = unit
+    ? (data || []).filter(a => a.unit === unit || !a.unit)
+    : (data || []);
+
+  const agendaItems = filtered.map(a => ({ ...a, _type: 'agenda' }));
+  return { data: agendaItems, error };
+};
+
 // ── GÜNDEM TÜRLERİ ──────────────────────────────────────────────────────────
 export const getAgendaTypes = async () => {
   const { data, error } = await supabase
