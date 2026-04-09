@@ -240,22 +240,22 @@ function EventForm({ event, user, profile, onSaved, onCancel }) {
   const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
 
   const handleImageUpload = async (file) => {
-    if (!file || file.size > 5 * 1024 * 1024) { alert('Max 5 MB'); return; }
+    if (!file || !file.type.startsWith('image/')) return;
     setUploading(true);
     try {
-      // Sıkıştır
+      // Otomatik sıkıştır — her boyuttaki görsel kabul edilir
       const img = new Image();
       const reader = new FileReader();
       const dataUrl = await new Promise((resolve) => {
         reader.onload = () => {
           img.onload = () => {
-            const MAX = 1200;
+            const MAX = 1600;
             let w = img.width, h = img.height;
             if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
             const canvas = document.createElement('canvas');
             canvas.width = w; canvas.height = h;
             canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
           };
           img.src = reader.result;
         };
