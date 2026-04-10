@@ -10,6 +10,26 @@ const STATUS_COLORS = { green: '#16a34a', yellow: '#d97706', red: '#dc2626' };
 const STATUS_LABELS = { green: 'Normal', yellow: 'Dikkat Gerekli', red: 'Kritik' };
 const STATUS_ICONS  = { green: '🟢', yellow: '🟡', red: '🔴' };
 
+// İngilizce birim adları ↔ Türkçe profil birim adları eşleştirmesi
+const UNIT_NAME_MAP = {
+  'Partnerships':         'Ortaklıklar Birimi',
+  'Humanitarian Affairs': 'Uluslararası İnsani İşler Birimi',
+  'Traditional Donors':   'Geleneksel Donörler Birimi',
+  'Grants':               'Uluslararası Hibeler Birimi',
+  'Accreditations':       'Akreditasyonlar Birimi',
+  'Policy & Governance':  'Politika, Yönetişim ve Güvence Birimi',
+};
+// Ters yönlü map: Türkçe → İngilizce
+const UNIT_NAME_REVERSE = Object.fromEntries(Object.entries(UNIT_NAME_MAP).map(([en, tr]) => [tr, en]));
+
+// Rapordaki unit alanını UNIT_LIST'teki İngilizce isme çevir
+function matchUnitName(reportUnit) {
+  // Zaten İngilizce ise direkt döndür
+  if (UNIT_LIST.find(u => u.name === reportUnit)) return reportUnit;
+  // Türkçe ise İngilizce karşılığını bul
+  return UNIT_NAME_REVERSE[reportUnit] || reportUnit;
+}
+
 const RISK_CATEGORIES = ['Operasyonel', 'Finansal', 'İnsan Kaynağı', 'Paydaş İlişkisi', 'Dış Etken', 'Uyum/Hukuk', 'Diğer'];
 const PROBABILITY_OPTIONS = ['Düşük', 'Orta', 'Yüksek'];
 const IMPACT_OPTIONS = ['Düşük', 'Orta', 'Yüksek', 'Kritik'];
@@ -682,17 +702,18 @@ function DirectorDashboard({ reports, onViewReport }) {
   const thisWeek = useMemo(() => reports.filter(r => r.week_start === weekStart && r.status === 'submitted'), [reports, weekStart]);
   const drafts = useMemo(() => reports.filter(r => r.week_start === weekStart && r.status === 'draft'), [reports, weekStart]);
 
-  // Son submitted rapor per unit
+  // Son submitted rapor per unit (Türkçe → İngilizce eşleştirmeli)
   const latestByUnit = useMemo(() => {
     const map = {};
     reports.filter(r => r.status === 'submitted').forEach(r => {
-      if (!map[r.unit] || r.week_start > map[r.unit].week_start) map[r.unit] = r;
+      const key = matchUnitName(r.unit);
+      if (!map[key] || r.week_start > map[key].week_start) map[key] = r;
     });
     return map;
   }, [reports]);
 
   // KPI'lar
-  const unitsReporting = thisWeek.length;
+  const unitsReporting = new Set(thisWeek.map(r => matchUnitName(r.unit))).size;
   const totalUnits = UNIT_LIST.length;
   const criticalFlags = thisWeek.filter(r => r.critical_flag).length;
   const redStatus = thisWeek.filter(r => r.overall_status === 'red').length;
@@ -735,7 +756,7 @@ function DirectorDashboard({ reports, onViewReport }) {
       {unitsReporting < totalUnits && (
         <div style={{ background: '#fef3c7', borderRadius: 10, padding: 12, marginBottom: 20, fontSize: 13 }}>
           <strong>⏳ Henüz raporlamayan birimler:</strong>{' '}
-          {UNIT_LIST.filter(u => !thisWeek.find(r => r.unit === u.name)).map(u => u.name).join(', ')}
+          {UNIT_LIST.filter(u => !thisWeek.find(r => matchUnitName(r.unit) === u.name)).map(u => u.name).join(', ')}
         </div>
       )}
 
