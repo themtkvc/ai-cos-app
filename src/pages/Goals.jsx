@@ -19,7 +19,7 @@ const UNITS = [
   { key: 'akreditasyonlar', name: 'Akreditasyonlar', icon: '✅', color: '#16a34a', coord: 'Yavuz' },
   { key: 'politika', name: 'Politika & Yönetişim', icon: '⚖️', color: '#6366f1', coord: 'Sezgin' },
 ];
-const PERIODS = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Yıllık 2026'];
+const PERIODS = ['2026', 'Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026'];
 const METRICS = ['Sayı', 'Para (USD)', 'Yüzde (%)', 'Süre (gün)', 'Puan'];
 const OKR_GRADIENTS = [
   'linear-gradient(135deg,#1a3a5c,#2563eb)', 'linear-gradient(135deg,#065f46,#059669)',
@@ -100,7 +100,7 @@ export default function Goals({ user, profile }) {
 
   // ── UI state ──
   const [activeTab, setActiveTab] = useState(0);
-  const [activePeriod, setActivePeriod] = useState('Q1 2026');
+  const [activePeriod, setActivePeriod] = useState('2026');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
@@ -296,7 +296,7 @@ export default function Goals({ user, profile }) {
 
   const openLinkBirimModal = (kurumGoal) => {
     const currentLinks = getLinkedBirimIds(kurumGoal.id);
-    const available = birimGoals.filter(b => b.period === kurumGoal.period || b.period === 'Yıllık 2026');
+    const available = birimGoals.filter(b => b.period === kurumGoal.period || b.period === '2026');
     openModal('🔗 Birim Hedefi Bağla',
       <LinkBirimForm
         available={available}
@@ -331,7 +331,7 @@ export default function Goals({ user, profile }) {
   };
 
   const openKRForm = (objectiveId, editKR = null, unitKey = null, period = null) => {
-    const available = birimGoals.filter(b => b.unit === unitKey && (b.period === period || b.period === 'Yıllık 2026'));
+    const available = birimGoals.filter(b => b.unit === unitKey && (b.period === period || b.period === '2026'));
     openModal(editKR ? 'Anahtar Sonuç Düzenle' : 'Anahtar Sonuç Ekle',
       <KeyResultForm
         initial={editKR}
@@ -346,10 +346,10 @@ export default function Goals({ user, profile }) {
   // ═══════════════════════════════════════════════════
   // TAB COUNTS
   // ═══════════════════════════════════════════════════
-  const isYillik = activePeriod === 'Yıllık 2026';
-  const filteredKurum = kurumGoals.filter(g => g.period === activePeriod || (!isYillik && g.period === 'Yıllık 2026'));
-  const filteredBirim = birimGoals.filter(g => g.period === activePeriod || (!isYillik && g.period === 'Yıllık 2026'));
-  const filteredOKR = okrObjectives.filter(o => o.period === activePeriod || (!isYillik && o.period === 'Yıllık 2026'));
+  const isAll = activePeriod === '2026';
+  const filteredKurum = isAll ? kurumGoals : kurumGoals.filter(g => g.period === activePeriod);
+  const filteredBirim = isAll ? birimGoals : birimGoals.filter(g => g.period === activePeriod);
+  const filteredOKR = isAll ? okrObjectives : okrObjectives.filter(o => o.period === activePeriod);
 
   // ═══════════════════════════════════════════════════
   // RENDER
