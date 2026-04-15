@@ -192,14 +192,14 @@ export default function Goals({ user, profile }) {
       if (editId) result = await updateKurumGoal(editId, formData);
       else result = await createKurumGoal(payload);
       if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
-      closeModal(); await loadAll(); toast(editId ? '✅ Kurum hedefi güncellendi!' : '✅ Kurum hedefi eklendi!');
+      closeModal(); await loadAll(); toast(editId ? '✅ Departman hedefi güncellendi!' : '✅ Departman hedefi eklendi!');
     } catch (err) { console.error('handleSaveKurum error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeleteKurum = async (id) => {
-    if (!window.confirm('Bu kurum hedefini silmek istediğinize emin misiniz?')) return;
+    if (!window.confirm('Bu departman hedefini silmek istediğinize emin misiniz?')) return;
     try {
-      await deleteKurumGoal(id); await loadAll(); toast('Kurum hedefi silindi.');
+      await deleteKurumGoal(id); await loadAll(); toast('Departman hedefi silindi.');
     } catch (err) { console.error('handleDeleteKurum error:', err); toast('❌ Silme hatası'); }
   };
 
@@ -284,7 +284,7 @@ export default function Goals({ user, profile }) {
   };
 
   const openKurumForm = (editGoal = null) => {
-    openModal(editGoal ? 'Kurum Hedefi Düzenle' : 'Kurum Hedefi Ekle',
+    openModal(editGoal ? 'Departman Hedefi Düzenle' : 'Departman Hedefi Ekle',
       <KurumGoalForm
         initial={editGoal}
         activePeriod={activePeriod}
@@ -397,7 +397,7 @@ export default function Goals({ user, profile }) {
             else if (activeTab === 1) openBirimForm();
             else openOKRForm();
           }} style={styles.primaryBtn}>
-            + {activeTab === 0 ? 'Kurum Hedefi Ekle' : activeTab === 1 ? 'Birim Hedefi Ekle' : 'Yeni OKR Ekle'}
+            + {activeTab === 0 ? 'Departman Hedefi Ekle' : activeTab === 1 ? 'Birim Hedefi Ekle' : 'Yeni OKR Ekle'}
           </button>
         </div>
       </div>
@@ -435,7 +435,7 @@ export default function Goals({ user, profile }) {
 }
 
 // ═══════════════════════════════════════════════════
-// TAB 0: GENEL GÖRÜNÜM (Kurum hedefleri + hiyerarşi)
+// TAB 0: GENEL GÖRÜNÜM (Departman hedefleri + hiyerarşi)
 // ═══════════════════════════════════════════════════
 function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds, kurumProgress,
   onEditKurum, onDeleteKurum, onLinkBirim, onEditPersonal, onDeletePersonal, onAddPersonal, onSwitchTab }) {
@@ -452,9 +452,9 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
     <>
       {/* Desc */}
       <div style={styles.descBox}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy, #1a3a5c)', marginBottom: 6 }}>🏗️ Genel Görünüm — Kurum Hedefleri</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy, #1a3a5c)', marginBottom: 6 }}>🏗️ Genel Görünüm — Departman Hedefleri</h2>
         <p style={{ fontSize: 13, color: 'var(--text, #374151)', lineHeight: 1.6 }}>
-          Kurum hedefleri, birim hedeflerine bağlanır. İlerleme otomatik hesaplanır.{' '}
+          Departman hedefleri, birim hedeflerine bağlanır. İlerleme otomatik hesaplanır.{' '}
           <span style={styles.tag}>🔗 Bağlantılı</span> etiketli hedefler diğer sekmelerdeki verilerle senkronize çalışır.
         </p>
       </div>
@@ -473,7 +473,7 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
       {kurumGoals.length === 0 ? (
         <div style={styles.emptyState}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-          <p style={{ fontSize: 14, color: 'var(--text-muted, #9ca3af)' }}>Bu dönem için kurum hedefi yok.</p>
+          <p style={{ fontSize: 14, color: 'var(--text-muted, #9ca3af)' }}>Bu dönem için departman hedefi yok.</p>
         </div>
       ) : kurumGoals.map(kg => {
         const prog = kurumProgress(kg);
@@ -486,7 +486,7 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
-                <div style={styles.treeLabel}>Kurum Hedefi</div>
+                <div style={styles.treeLabel}>Departman Hedefi</div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text, #111827)' }}>{kg.title}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{kg.metric} · İlerleme: {fmtN(prog.current)}/{fmtN(prog.target)} · {kg.period}</span>
@@ -794,7 +794,7 @@ function KurumGoalForm({ initial, activePeriod, onSave, onCancel }) {
   return (
     <>
       <div style={styles.formGroup}><label style={styles.formLabel}>Başlık</label>
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Kurum hedefi" style={styles.formInput} /></div>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Departman hedefi" style={styles.formInput} /></div>
       <div style={styles.formRow}>
         <div style={styles.formGroup}><label style={styles.formLabel}>Metrik</label>
           <select value={metric} onChange={e => setMetric(e.target.value)} style={styles.formInput}>
@@ -827,7 +827,7 @@ function LinkBirimForm({ available, currentLinks, onSave, onCancel }) {
 
   return (
     <>
-      <p style={{ fontSize: 13, color: 'var(--text-muted, #6b7280)', marginBottom: 12 }}>Kurum hedefine bağlamak istediğiniz birim hedeflerini seçin:</p>
+      <p style={{ fontSize: 13, color: 'var(--text-muted, #6b7280)', marginBottom: 12 }}>Departman hedefine bağlamak istediğiniz birim hedeflerini seçin:</p>
       <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border, #e5e7eb)', borderRadius: 10, padding: 8 }}>
         {available.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted, #9ca3af)' }}>Bu dönemde birim hedefi yok.</div>
