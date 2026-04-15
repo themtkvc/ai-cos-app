@@ -27,6 +27,7 @@ import CapacityBuilding from './pages/CapacityBuilding';
 import DirectorAgendas from './pages/DirectorAgendas';
 import SystemEmails from './pages/SystemEmails';
 import Activities from './pages/Activities';
+import Goals from './pages/Goals';
 import PublicFormFill from './pages/PublicFormFill';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -43,11 +44,11 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','emails','admin','users','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','profile'],
-  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','profile'],
-  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','emails','admin','users','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
+  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
+  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
+  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
 };
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
@@ -305,6 +306,7 @@ export default function App() {
     capacity:         CapacityBuilding,
     direktor_agendas: DirectorAgendas,
     activities:       Activities,
+    goals:            Goals,
     emails:           SystemEmails,
     admin:     Admin,
     users:     Admin,
@@ -335,6 +337,7 @@ export default function App() {
     events:           '📅 Etkinlikler',
     capacity:         '📚 Kapasite Geliştirme',
     direktor_agendas: '🗂 Direktör Gündemleri',
+    goals:      '🎯 Hedefler',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',

@@ -1566,3 +1566,156 @@ export const deleteDirectorAgenda = async (id) => {
   if (!error) logActivity({ action: 'sildi', module: 'direktör_gündemleri', entityType: 'gündem' });
   return { error };
 };
+
+// ── HEDEFLER (GOALS) MODULE ──
+
+// Birim Goals — tek veri kaynağı
+export const getBirimGoals = async () => {
+  const { data, error } = await supabase
+    .from('birim_goals').select('*').order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const createBirimGoal = async (goal) => {
+  const { data, error } = await supabase.from('birim_goals').insert([goal]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'hedefler', entityType: 'birim_hedef', entityName: goal.title });
+  return { data, error };
+};
+
+export const updateBirimGoal = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('birim_goals').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'hedefler', entityType: 'birim_hedef', entityName: updates.title });
+  return { data, error };
+};
+
+export const deleteBirimGoal = async (id) => {
+  const { error } = await supabase.from('birim_goals').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'birim_hedef' });
+  return { error };
+};
+
+// Kurum Goals
+export const getKurumGoals = async () => {
+  const { data, error } = await supabase
+    .from('kurum_goals').select('*').order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const createKurumGoal = async (goal) => {
+  const { data, error } = await supabase.from('kurum_goals').insert([goal]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'hedefler', entityType: 'kurum_hedef', entityName: goal.title });
+  return { data, error };
+};
+
+export const updateKurumGoal = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('kurum_goals').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'hedefler', entityType: 'kurum_hedef', entityName: updates.title });
+  return { data, error };
+};
+
+export const deleteKurumGoal = async (id) => {
+  // Bağlantılar ON DELETE CASCADE ile otomatik silinir
+  const { error } = await supabase.from('kurum_goals').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'kurum_hedef' });
+  return { error };
+};
+
+// Kurum-Birim Links
+export const getKurumBirimLinks = async () => {
+  const { data, error } = await supabase.from('kurum_birim_links').select('*');
+  return { data, error };
+};
+
+export const setKurumBirimLinks = async (kurumGoalId, birimGoalIds) => {
+  // Sil-yeniden-ekle stratejisi
+  await supabase.from('kurum_birim_links').delete().eq('kurum_goal_id', kurumGoalId);
+  if (birimGoalIds.length === 0) return { error: null };
+  const rows = birimGoalIds.map(bid => ({ kurum_goal_id: kurumGoalId, birim_goal_id: bid }));
+  const { error } = await supabase.from('kurum_birim_links').insert(rows);
+  return { error };
+};
+
+// Personal Goals
+export const getPersonalGoals = async () => {
+  const { data, error } = await supabase
+    .from('personal_goals').select('*').order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const createPersonalGoal = async (goal) => {
+  const { data, error } = await supabase.from('personal_goals').insert([goal]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'hedefler', entityType: 'kişisel_hedef', entityName: goal.title });
+  return { data, error };
+};
+
+export const updatePersonalGoal = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('personal_goals').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'hedefler', entityType: 'kişisel_hedef' });
+  return { data, error };
+};
+
+export const deletePersonalGoal = async (id) => {
+  const { error } = await supabase.from('personal_goals').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'kişisel_hedef' });
+  return { error };
+};
+
+// OKR Objectives
+export const getOkrObjectives = async () => {
+  const { data, error } = await supabase
+    .from('okr_objectives').select('*').order('created_at', { ascending: false });
+  return { data, error };
+};
+
+export const createOkrObjective = async (obj) => {
+  const { data, error } = await supabase.from('okr_objectives').insert([obj]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'hedefler', entityType: 'okr', entityName: obj.objective });
+  return { data, error };
+};
+
+export const updateOkrObjective = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('okr_objectives').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'hedefler', entityType: 'okr' });
+  return { data, error };
+};
+
+export const deleteOkrObjective = async (id) => {
+  const { error } = await supabase.from('okr_objectives').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'okr' });
+  return { error };
+};
+
+// OKR Key Results
+export const getOkrKeyResults = async () => {
+  const { data, error } = await supabase
+    .from('okr_key_results').select('*').order('created_at', { ascending: true });
+  return { data, error };
+};
+
+export const createOkrKeyResult = async (kr) => {
+  const { data, error } = await supabase.from('okr_key_results').insert([kr]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'hedefler', entityType: 'anahtar_sonuç', entityName: kr.title });
+  return { data, error };
+};
+
+export const updateOkrKeyResult = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('okr_key_results').update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'hedefler', entityType: 'anahtar_sonuç' });
+  return { data, error };
+};
+
+export const deleteOkrKeyResult = async (id) => {
+  const { error } = await supabase.from('okr_key_results').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'anahtar_sonuç' });
+  return { error };
+};

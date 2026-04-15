@@ -27,6 +27,7 @@ const ALL_NAV = [
   { id: 'events',           icon: '📅', label: 'Etkinlikler' },
   { id: 'capacity',         icon: '📚', label: 'Kapasite Geliştirme' },
   { id: 'activities',       icon: '📊', label: 'Aktiviteler' },
+  { id: 'goals',            icon: '🎯', label: 'Hedefler' },
   { id: 'emails',           icon: '📧', label: 'Mailler' },
 ];
 
