@@ -1062,7 +1062,7 @@ const styles = {
     fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--card-bg, #fff)',
     color: 'var(--text, #111827)', boxSizing: 'border-box',
   },
-  formRow: { display: 'flex', gap: 12 },
+  formRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 },
   infoBanner: {
     background: '#f3e8ff', border: '1px solid #d8b4fe', borderRadius: 10,
