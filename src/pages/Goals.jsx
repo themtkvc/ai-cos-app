@@ -108,17 +108,22 @@ export default function Goals({ user, profile }) {
 
   // ── Load all data ──
   const loadAll = useCallback(async () => {
-    const [bg, kg, ln, pg, oo, kr] = await Promise.all([
-      getBirimGoals(), getKurumGoals(), getKurumBirimLinks(),
-      getPersonalGoals(), getOkrObjectives(), getOkrKeyResults(),
-    ]);
-    setBirimGoals(bg.data || []);
-    setKurumGoals(kg.data || []);
-    setLinks(ln.data || []);
-    setPersonalGoals(pg.data || []);
-    setOkrObjectives(oo.data || []);
-    setOkrKeyResults(kr.data || []);
-    setLoading(false);
+    try {
+      const [bg, kg, ln, pg, oo, kr] = await Promise.all([
+        getBirimGoals(), getKurumGoals(), getKurumBirimLinks(),
+        getPersonalGoals(), getOkrObjectives(), getOkrKeyResults(),
+      ]);
+      setBirimGoals(bg.data || []);
+      setKurumGoals(kg.data || []);
+      setLinks(ln.data || []);
+      setPersonalGoals(pg.data || []);
+      setOkrObjectives(oo.data || []);
+      setOkrKeyResults(kr.data || []);
+    } catch (err) {
+      console.error('Goals loadAll error:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
@@ -160,77 +165,106 @@ export default function Goals({ user, profile }) {
 
   // Birim Goals
   const handleSaveBirim = async (formData, editId = null) => {
-    const payload = { ...formData, user_id: user.id };
-    if (editId) await updateBirimGoal(editId, formData);
-    else await createBirimGoal(payload);
-    closeModal(); await loadAll(); toast(editId ? '✅ Birim hedefi güncellendi!' : '✅ Birim hedefi eklendi!');
+    try {
+      const payload = { ...formData, user_id: user.id };
+      let result;
+      if (editId) result = await updateBirimGoal(editId, formData);
+      else result = await createBirimGoal(payload);
+      if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
+      closeModal(); await loadAll(); toast(editId ? '✅ Birim hedefi güncellendi!' : '✅ Birim hedefi eklendi!');
+    } catch (err) { console.error('handleSaveBirim error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeleteBirim = async (id) => {
     const lc = countBirimLinks(id);
     const msg = lc ? `Bu hedef ${lc} yere bağlı. Silmek bağlantıları da kaldırır. Devam?` : 'Silmek istediğinize emin misiniz?';
     if (!window.confirm(msg)) return;
-    await deleteBirimGoal(id); await loadAll(); toast('Silindi — bağlantılar temizlendi.');
+    try {
+      await deleteBirimGoal(id); await loadAll(); toast('Silindi — bağlantılar temizlendi.');
+    } catch (err) { console.error('handleDeleteBirim error:', err); toast('❌ Silme hatası'); }
   };
 
   // Kurum Goals
   const handleSaveKurum = async (formData, editId = null) => {
-    const payload = { ...formData, user_id: user.id };
-    if (editId) {
-      await updateKurumGoal(editId, formData);
-    } else {
-      await createKurumGoal(payload);
-    }
-    closeModal(); await loadAll(); toast(editId ? '✅ Kurum hedefi güncellendi!' : '✅ Kurum hedefi eklendi!');
+    try {
+      const payload = { ...formData, user_id: user.id };
+      let result;
+      if (editId) result = await updateKurumGoal(editId, formData);
+      else result = await createKurumGoal(payload);
+      if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
+      closeModal(); await loadAll(); toast(editId ? '✅ Kurum hedefi güncellendi!' : '✅ Kurum hedefi eklendi!');
+    } catch (err) { console.error('handleSaveKurum error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeleteKurum = async (id) => {
     if (!window.confirm('Bu kurum hedefini silmek istediğinize emin misiniz?')) return;
-    await deleteKurumGoal(id); await loadAll(); toast('Kurum hedefi silindi.');
+    try {
+      await deleteKurumGoal(id); await loadAll(); toast('Kurum hedefi silindi.');
+    } catch (err) { console.error('handleDeleteKurum error:', err); toast('❌ Silme hatası'); }
   };
 
   // Links
   const handleSaveLinks = async (kurumGoalId, birimGoalIds) => {
-    await setKurumBirimLinks(kurumGoalId, birimGoalIds);
-    await loadAll(); toast('🔗 Bağlantılar güncellendi!');
+    try {
+      await setKurumBirimLinks(kurumGoalId, birimGoalIds);
+      await loadAll(); toast('🔗 Bağlantılar güncellendi!');
+    } catch (err) { console.error('handleSaveLinks error:', err); toast('❌ Bağlantı hatası'); }
   };
 
   // Personal Goals
   const handleSavePersonal = async (formData, editId = null) => {
-    const payload = { ...formData, user_id: user.id };
-    if (editId) await updatePersonalGoal(editId, formData);
-    else await createPersonalGoal(payload);
-    closeModal(); await loadAll(); toast(editId ? '✅ Güncellendi!' : '✅ Kişisel hedef eklendi!');
+    try {
+      const payload = { ...formData, user_id: user.id };
+      let result;
+      if (editId) result = await updatePersonalGoal(editId, formData);
+      else result = await createPersonalGoal(payload);
+      if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
+      closeModal(); await loadAll(); toast(editId ? '✅ Güncellendi!' : '✅ Kişisel hedef eklendi!');
+    } catch (err) { console.error('handleSavePersonal error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeletePersonal = async (id) => {
     if (!window.confirm('Silmek istediğinize emin misiniz?')) return;
-    await deletePersonalGoal(id); await loadAll(); toast('Silindi.');
+    try {
+      await deletePersonalGoal(id); await loadAll(); toast('Silindi.');
+    } catch (err) { console.error('handleDeletePersonal error:', err); toast('❌ Silme hatası'); }
   };
 
   // OKR
   const handleSaveOKR = async (formData, editId = null) => {
-    const payload = { ...formData, user_id: user.id };
-    if (editId) await updateOkrObjective(editId, formData);
-    else await createOkrObjective(payload);
-    closeModal(); await loadAll(); toast(editId ? '✅ OKR güncellendi!' : '✅ OKR eklendi!');
+    try {
+      const payload = { ...formData, user_id: user.id };
+      let result;
+      if (editId) result = await updateOkrObjective(editId, formData);
+      else result = await createOkrObjective(payload);
+      if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
+      closeModal(); await loadAll(); toast(editId ? '✅ OKR güncellendi!' : '✅ OKR eklendi!');
+    } catch (err) { console.error('handleSaveOKR error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeleteOKR = async (id) => {
     if (!window.confirm('Bu OKR\'ı silmek istediğinize emin misiniz?')) return;
-    await deleteOkrObjective(id); await loadAll(); toast('OKR silindi.');
+    try {
+      await deleteOkrObjective(id); await loadAll(); toast('OKR silindi.');
+    } catch (err) { console.error('handleDeleteOKR error:', err); toast('❌ Silme hatası'); }
   };
 
   // Key Results
   const handleSaveKR = async (formData, objectiveId, editId = null) => {
-    if (editId) await updateOkrKeyResult(editId, formData);
-    else await createOkrKeyResult({ ...formData, objective_id: objectiveId });
-    closeModal(); await loadAll(); toast(editId ? '✅ Güncellendi!' : '✅ Anahtar sonuç eklendi!');
+    try {
+      let result;
+      if (editId) result = await updateOkrKeyResult(editId, formData);
+      else result = await createOkrKeyResult({ ...formData, objective_id: objectiveId });
+      if (result?.error) { toast('❌ Hata: ' + (result.error.message || 'Kayıt başarısız')); return; }
+      closeModal(); await loadAll(); toast(editId ? '✅ Güncellendi!' : '✅ Anahtar sonuç eklendi!');
+    } catch (err) { console.error('handleSaveKR error:', err); toast('❌ Beklenmeyen hata oluştu'); }
   };
 
   const handleDeleteKR = async (id) => {
     if (!window.confirm('Silmek istediğinize emin misiniz?')) return;
-    await deleteOkrKeyResult(id); await loadAll(); toast('Silindi.');
+    try {
+      await deleteOkrKeyResult(id); await loadAll(); toast('Silindi.');
+    } catch (err) { console.error('handleDeleteKR error:', err); toast('❌ Silme hatası'); }
   };
 
   // ═══════════════════════════════════════════════════
@@ -278,6 +312,7 @@ export default function Goals({ user, profile }) {
       <PersonalGoalForm
         initial={editGoal}
         birimGoalId={birimGoalId}
+        colorIndex={personalGoals.length}
         onSave={(data) => handleSavePersonal(data, editGoal?.id)}
         onCancel={closeModal}
       />
@@ -821,7 +856,7 @@ function LinkBirimForm({ available, currentLinks, onSave, onCancel }) {
   );
 }
 
-function PersonalGoalForm({ initial, birimGoalId, onSave, onCancel }) {
+function PersonalGoalForm({ initial, birimGoalId, colorIndex, onSave, onCancel }) {
   const [name, setName] = useState(initial?.person_name || '');
   const [initials, setInitials] = useState(initial?.person_initials || '');
   const [title, setTitle] = useState(initial?.title || '');
@@ -851,7 +886,7 @@ function PersonalGoalForm({ initial, birimGoalId, onSave, onCancel }) {
           onSave({
             birim_goal_id: birimGoalId, person_name: name.trim(),
             person_initials: initials.toUpperCase() || name.slice(0, 2).toUpperCase(),
-            person_color: PERSON_COLORS[(personalGoals?.length || 0) % PERSON_COLORS.length],
+            person_color: initial?.person_color || PERSON_COLORS[(colorIndex || 0) % PERSON_COLORS.length],
             title: title.trim(), target: Number(target) || 0, current_value: Number(currentVal) || 0,
           });
         }} style={styles.primaryBtn}>Kaydet</button>
