@@ -346,9 +346,10 @@ export default function Goals({ user, profile }) {
   // ═══════════════════════════════════════════════════
   // TAB COUNTS
   // ═══════════════════════════════════════════════════
-  const filteredKurum = kurumGoals.filter(g => g.period === activePeriod);
-  const filteredBirim = birimGoals.filter(g => g.period === activePeriod);
-  const filteredOKR = okrObjectives.filter(o => o.period === activePeriod);
+  const isYillik = activePeriod === 'Yıllık 2026';
+  const filteredKurum = kurumGoals.filter(g => g.period === activePeriod || (!isYillik && g.period === 'Yıllık 2026'));
+  const filteredBirim = birimGoals.filter(g => g.period === activePeriod || (!isYillik && g.period === 'Yıllık 2026'));
+  const filteredOKR = okrObjectives.filter(o => o.period === activePeriod || (!isYillik && o.period === 'Yıllık 2026'));
 
   // ═══════════════════════════════════════════════════
   // RENDER
