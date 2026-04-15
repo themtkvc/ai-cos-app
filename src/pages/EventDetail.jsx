@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase, awardXP } from '../lib/supabase';
+import { supabase, awardXP, logActivity as logActivityGlobal } from '../lib/supabase';
 import { WORLD_COUNTRIES, CITIES_BY_COUNTRY } from '../lib/worldData';
 import {
   EVENT_TYPES, EVENT_STATUS, LOCATION_TYPES, PARTICIPANT_ROLES,
@@ -562,12 +562,12 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
             await supabase.from('events').update({ cover_image_url: publicUrl }).eq('id', eventId);
           }
         }
-        await logActivity(eventId, 'etkinliği oluşturdu');
+        logActivityGlobal({ action: 'oluşturdu', module: 'etkinlikler', entityType: 'etkinlik', entityName: form.title });
         awardXP(user?.id, 'event_create', `Etkinlik oluşturuldu: ${payload.title}`, eventId);
       }
     } else {
       await supabase.from('events').update(payload).eq('id', event.id);
-      await logActivity(event.id, 'etkinliği güncelledi');
+      logActivityGlobal({ action: 'güncelledi', module: 'etkinlikler', entityType: 'etkinlik', entityName: form.title });
       if (payload.status === 'completed' && event?.status !== 'completed') {
         awardXP(user?.id, 'event_complete', `Etkinlik tamamlandı: ${payload.title}`, event.id);
       }
@@ -793,11 +793,11 @@ export default function EventDetail({ event, user, profile, onClose, onSaved }) 
                 </Field>
                 <Field>
                   <Label>Başlangıç Saati</Label>
-                  <input type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)} style={inputStyle} />
+                  <input type="time" lang="tr" value={form.start_time} onChange={e => set('start_time', e.target.value)} style={inputStyle} />
                 </Field>
                 <Field>
                   <Label>Bitiş Saati</Label>
-                  <input type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)} style={inputStyle} />
+                  <input type="time" lang="tr" value={form.end_time} onChange={e => set('end_time', e.target.value)} style={inputStyle} />
                 </Field>
               </div>
             </Panel>

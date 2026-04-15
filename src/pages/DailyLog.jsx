@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getMyOpenTasks, awardXP, awardXPCustom, getXPSettings, supabase } from '../lib/supabase';
+import { getDailyLog, upsertDailyLog, submitDailyLog, getWeekLogs, getUnitAgendas, awardXP, awardXPCustom, getXPSettings, supabase, logActivity } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 // ── SABITLER ──────────────────────────────────────────────────────────────────
@@ -131,6 +131,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
               type="time"
+              lang="tr"
               value={item.start_time}
               disabled={disabled}
               onChange={e => onChange('start_time', e.target.value)}
@@ -144,6 +145,7 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
             <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>→</span>
             <input
               type="time"
+              lang="tr"
               value={item.end_time}
               disabled={disabled}
               onChange={e => onChange('end_time', e.target.value)}
@@ -195,26 +197,20 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
       ) : <span />}
     </div>
 
-    {/* Göreve Bağla satırı */}
-    {(myTasks.length > 0 || item.agenda_item_id) && (() => {
-      const taskItems = myTasks.filter(t => t._type === 'task');
-      const agendaItems = myTasks.filter(t => t._type === 'agenda');
-      // Eski format desteği (type yok)
-      const legacyItems = myTasks.filter(t => !t._type);
-      return (
+    {/* Gündeme Bağla satırı */}
+    {(myTasks.length > 0 || item.agenda_item_id) && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, paddingLeft: 163 }}>
-        <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>🔗 Göreve Bağla:</span>
+        <span style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>📋 Gündeme Bağla:</span>
         {disabled ? (
           linkedTask ? (
             <span style={{
               fontSize: 11.5, padding: '2px 8px', borderRadius: 6,
               background: 'var(--primary-light)', color: 'var(--primary)', border: '1px solid var(--blue-pale)', fontWeight: 600,
             }}>
-              {linkedTask._type === 'task' ? '📌' : '📋'} {linkedTask.title}
-              {linkedTask._agendaTitle ? ` (${linkedTask._agendaTitle})` : ''}
+              📋 {linkedTask.title}
             </span>
           ) : item.agenda_item_id ? (
-            <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>Bağlı görev</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>Bağlı gündem</span>
           ) : null
         ) : (
           <select
@@ -223,31 +219,14 @@ function WorkItemRow({ item, disabled, onChange, onRemove, myTasks = [] }) {
             onChange={e => onChange('agenda_item_id', e.target.value || null)}
             style={{ fontSize: 11.5, padding: '4px 8px', maxWidth: 420 }}
           >
-            <option value="">Göreve Bağlayın…</option>
-            {taskItems.length > 0 && (
-              <optgroup label="📌 Atanan Görevler">
-                {taskItems.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}{t._agendaTitle ? ` — ${t._agendaTitle}` : ''}{t.unit ? ` (${t.unit})` : ''}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {agendaItems.length > 0 && (
-              <optgroup label="📋 Gündemler">
-                {agendaItems.map(t => (
-                  <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
-                ))}
-              </optgroup>
-            )}
-            {legacyItems.length > 0 && legacyItems.map(t => (
+            <option value="">Gündeme Bağlayın…</option>
+            {myTasks.map(t => (
               <option key={t.id} value={t.id}>{t.title}{t.unit ? ` (${t.unit})` : ''}</option>
             ))}
           </select>
         )}
       </div>
-      );
-    })()}
+    )}
     </div>
   );
 }
@@ -340,13 +319,14 @@ export default function DailyLog({ user, profile, linkedTask }) {
   useEffect(() => { loadLog(selectedDate); }, [selectedDate]);
   useEffect(() => { loadWeekLogs(); }, [weekOffset, user.id]);
 
-  // Kişisel açık görevleri çek (görev bağlama için)
+  // Birimdeki tüm gündemleri çek (iş kaydı bağlama için)
   useEffect(() => {
     if (!user?.id) return;
-    getMyOpenTasks(user.id).then(({ data }) => {
+    const unit = profile?.unit || null;
+    getUnitAgendas(unit).then(({ data }) => {
       setMyTasks(data || []);
     });
-  }, [user.id]);
+  }, [user.id, profile?.unit]);
 
   // ── Otomatik kaydet — stateRef kullanarak stale closure'ı önler
   const triggerAutoSave = useCallback(() => {
@@ -423,6 +403,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
       setAutoSaveState('idle');
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       loadWeekLogs();
+      logActivity({ action: 'gönderdi', module: 'iş_kayıtları', entityType: 'günlük_kayıt', details: { log_date: selectedDate } });
 
       // ── XP: sadece personel, sadece ilk gönderimde (editing=false)
       if (profile?.role === 'personel' && !editing) {
@@ -812,7 +793,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
                 background: 'var(--primary-light)', border: '1px solid var(--blue-pale)',
                 fontSize: 12.5, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                🔗 <strong>{linkedTask.title}</strong> görevine bağlanarak açıldı — ilk iş kaleminde göreve bağlı
+                📋 <strong>{linkedTask.title}</strong> gündemine bağlanarak açıldı — ilk iş kaleminde gündeme bağlı
               </div>
             )}
 

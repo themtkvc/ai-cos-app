@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, logActivity } from '../lib/supabase';
 
 // ── Renk paleti (Google Keep tarzı) ──────────────────────────────────────────
 const NOTE_COLORS = [
@@ -643,12 +643,14 @@ export default function Notes({ user }) {
       images: note.images || [],
       user_id: user.id, updated_at: new Date().toISOString(),
     };
+    const isEdit = !!note.id;
     if (note.id) {
       await supabase.from('notes').update(payload).eq('id', note.id);
     } else {
       await supabase.from('notes').insert(payload);
     }
     loadNotes();
+    logActivity({ action: isEdit ? 'güncelledi' : 'oluşturdu', module: 'notlar', entityType: 'not', entityName: note.title });
   };
 
   // ── Sabitle / kaldır ──────────────────────────────────────────────────────
@@ -669,6 +671,7 @@ export default function Notes({ user }) {
   const deleteNote = async (id) => {
     await supabase.from('notes').delete().eq('id', id);
     loadNotes();
+    logActivity({ action: 'sildi', module: 'notlar', entityType: 'not' });
   };
 
   // ── Hızlı not kaydet ─────────────────────────────────────────────────────

@@ -12,6 +12,36 @@ export const supabase = createClient(
   supabaseAnonKey || 'placeholder'
 );
 
+// ── ACTIVITY LOGGING ──
+// Fire-and-forget — UI'ı asla bloklamaz
+let _cachedProfile = null;
+
+export const logActivity = async ({ action, module, entityType, entityId, entityName, details }) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Profili cache'le — her log için tekrar çekme
+    if (!_cachedProfile || _cachedProfile.user_id !== user.id) {
+      const { data } = await supabase.from('user_profiles').select('full_name, role, unit').eq('user_id', user.id).single();
+      _cachedProfile = data ? { ...data, user_id: user.id } : { user_id: user.id };
+    }
+
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      user_name: _cachedProfile.full_name || user.email,
+      user_role: _cachedProfile.role || 'personel',
+      unit: _cachedProfile.unit || null,
+      action,
+      module,
+      entity_type: entityType || null,
+      entity_id: entityId || null,
+      entity_name: entityName || null,
+      details: details || {},
+    });
+  } catch (_) { /* sessizce geç — loglama hatası UX'i bozmamalı */ }
+};
+
 // ── AUTH HELPERS ──
 export const signIn = async (email, password) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -71,6 +101,7 @@ export const updateDonor = async (id, updates) => {
   const { data, error } = await supabase
     .from('donors').update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'donörler', entityType: 'donör', entityName: data?.[0]?.name || updates?.name });
   return { data, error };
 };
 
@@ -84,6 +115,7 @@ export const getInteractions = async (userId, donorId = null) => {
 
 export const createInteraction = async (interaction) => {
   const { data, error } = await supabase.from('interactions').insert([interaction]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'donörler', entityType: 'etkileşim' });
   return { data, error };
 };
 
@@ -97,6 +129,7 @@ export const getMeetingActions = async (userId) => {
 
 export const createMeetingAction = async (action) => {
   const { data, error } = await supabase.from('meeting_actions').insert([action]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'toplantılar', entityType: 'aksiyon', entityName: data?.[0]?.title || action?.title });
   return { data, error };
 };
 
@@ -104,6 +137,7 @@ export const updateMeetingAction = async (id, updates) => {
   const { data, error } = await supabase
     .from('meeting_actions').update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'toplantılar', entityType: 'aksiyon', entityName: data?.[0]?.title || updates?.title });
   return { data, error };
 };
 
@@ -144,11 +178,13 @@ export const clearChatHistory = async (userId) => {
 // ── DONOR CRUD (full) ──
 export const createDonor = async (donor) => {
   const { data, error } = await supabase.from('donors').insert([donor]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'donörler', entityType: 'donör', entityName: data?.[0]?.name || donor?.name });
   return { data, error };
 };
 
 export const deleteDonor = async (id) => {
   const { error } = await supabase.from('donors').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'donörler', entityType: 'donör' });
   return { error };
 };
 
@@ -211,6 +247,7 @@ export const upsertDailyLog = async (log) => {
     .from('daily_logs')
     .upsert(log, { onConflict: 'user_id,log_date' })
     .select();
+  if (!error) logActivity({ action: 'kaydetti', module: 'iş_kayıtları', entityType: 'günlük_kayıt', details: { log_date: log.log_date } });
   return { data, error };
 };
 
@@ -223,6 +260,7 @@ export const submitDailyLog = async (log) => {
       submitted_at: new Date().toISOString(),
     }, { onConflict: 'user_id,log_date' })
     .select();
+  if (!error) logActivity({ action: 'gönderdi', module: 'iş_kayıtları', entityType: 'günlük_kayıt', details: { log_date: log.log_date } });
   return { data, error };
 };
 
@@ -446,6 +484,7 @@ export const createAgendaItem = async (agenda) => {
     .from('agendas')
     .insert([agenda])
     .select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'gündemler', entityType: 'gündem', entityName: data?.[0]?.title || agenda?.title });
   return { data, error };
 };
 
@@ -455,6 +494,7 @@ export const updateAgendaItem = async (id, updates) => {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'gündemler', entityType: 'gündem', entityName: data?.[0]?.title || updates?.title });
   return { data, error };
 };
 
@@ -463,6 +503,7 @@ export const deleteAgendaItem = async (id) => {
     .from('agendas')
     .delete()
     .eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'gündemler', entityType: 'gündem' });
   return { error };
 };
 
@@ -563,6 +604,24 @@ export const getMyOpenTasks = async (userId) => {
   // Birleştir: önce görevler, sonra gündemler
   const combined = [...taskItems, ...agendaItems];
   return { data: combined, error: agendaErr || taskErr };
+};
+
+// Birimdeki tüm gündemleri getir (iş kaydı bağlama için)
+export const getUnitAgendas = async (unit) => {
+  const { data, error } = await supabase
+    .from('agendas')
+    .select('id, title, unit, priority, due_date, status')
+    .neq('status', 'tamamlandi')
+    .neq('status', 'arsiv')
+    .order('created_at', { ascending: false });
+
+  // Birim filtresi: eğer unit varsa sadece o birim + birim belirtilmemiş olanları getir
+  const filtered = unit
+    ? (data || []).filter(a => a.unit === unit || !a.unit)
+    : (data || []);
+
+  const agendaItems = filtered.map(a => ({ ...a, _type: 'agenda' }));
+  return { data: agendaItems, error };
 };
 
 // ── GÜNDEM TÜRLERİ ──────────────────────────────────────────────────────────
@@ -683,6 +742,7 @@ export const createAgenda = async (agenda) => {
     .from('agendas')
     .insert([{ ...agenda, updated_at: new Date().toISOString() }])
     .select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'gündemler', entityType: 'gündem', entityName: data?.[0]?.title || agenda?.title });
   return { data, error };
 };
 
@@ -693,12 +753,14 @@ export const updateAgenda = async (id, updates) => {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'gündemler', entityType: 'gündem', entityName: data?.[0]?.title || updates?.title });
   return { data, error };
 };
 
 // Gündem sil
 export const deleteAgenda = async (id) => {
   const { error } = await supabase.from('agendas').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'gündemler', entityType: 'gündem' });
   return { error };
 };
 
@@ -709,6 +771,7 @@ export const createAgendaTask = async (task) => {
     .from('agenda_tasks')
     .insert([{ ...task, updated_at: new Date().toISOString() }])
     .select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'gündemler', entityType: 'görev', entityName: data?.[0]?.title || task?.title });
   return { data, error };
 };
 
@@ -718,11 +781,13 @@ export const updateAgendaTask = async (id, updates) => {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'gündemler', entityType: 'görev', entityName: data?.[0]?.title || updates?.title });
   return { data, error };
 };
 
 export const deleteAgendaTask = async (id) => {
   const { error } = await supabase.from('agenda_tasks').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'gündemler', entityType: 'görev' });
   return { error };
 };
 
@@ -733,6 +798,7 @@ export const markAgendaTaskDone = async (id) => {
     .update({ completion_status: 'pending_review', status: 'tamamlandi', updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'tamamladı', module: 'gündemler', entityType: 'görev' });
   return { data, error };
 };
 
@@ -743,6 +809,7 @@ export const markAgendaTaskDoneSelf = async (id) => {
     .update({ completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'tamamladı', module: 'gündemler', entityType: 'görev' });
   return { data, error };
 };
 
@@ -753,6 +820,7 @@ export const approveAgendaTask = async (id) => {
     .update({ completion_status: 'approved', status: 'tamamlandi', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'onayladı', module: 'gündemler', entityType: 'görev' });
   return { data, error };
 };
 
@@ -783,6 +851,7 @@ export const addAgendaComment = async (comment) => {
     .from('agenda_comments')
     .insert([comment])
     .select();
+  if (!error) logActivity({ action: 'yorum ekledi', module: 'gündemler', entityType: 'yorum' });
   return { data, error };
 };
 
@@ -899,15 +968,18 @@ export const createNetworkOrg = async (data, creatorName = null) => {
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_organizations')
     .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'network', entityType: 'kurum', entityName: d?.name || data?.name });
   return { data: d, error };
 };
 export const updateNetworkOrg = async (id, data) => {
   const { data: d, error } = await supabase.from('network_organizations')
     .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  if (!error) logActivity({ action: 'güncelledi', module: 'network', entityType: 'kurum', entityName: d?.name || data?.name });
   return { data: d, error };
 };
 export const deleteNetworkOrg = async (id) => {
   const { error } = await supabase.from('network_organizations').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'network', entityType: 'kurum' });
   return { error };
 };
 
@@ -917,15 +989,18 @@ export const createNetworkContact = async (data, creatorName = null) => {
   if (!uid) return { data: null, error: { message: 'Oturum bulunamadı' } };
   const { data: d, error } = await supabase.from('network_contacts')
     .insert({ ...data, created_by: uid, created_by_name: creatorName || null }).select().single();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'network', entityType: 'kişi', entityName: d?.full_name || data?.full_name });
   return { data: d, error };
 };
 export const updateNetworkContact = async (id, data) => {
   const { data: d, error } = await supabase.from('network_contacts')
     .update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  if (!error) logActivity({ action: 'güncelledi', module: 'network', entityType: 'kişi', entityName: d?.full_name || data?.full_name });
   return { data: d, error };
 };
 export const deleteNetworkContact = async (id) => {
   const { error } = await supabase.from('network_contacts').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'network', entityType: 'kişi' });
   return { error };
 };
 
@@ -1326,6 +1401,7 @@ export const createFundOpportunity = async (record) => {
   const { data, error } = await supabase.from('fund_opportunities')
     .insert(record)
     .select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'fonlar', entityType: 'fon_fırsatı', entityName: data?.[0]?.title || record?.title });
   return { data, error };
 };
 
@@ -1334,6 +1410,7 @@ export const updateFundOpportunity = async (id, updates) => {
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'fonlar', entityType: 'fon_fırsatı', entityName: data?.[0]?.title || updates?.title });
   return { data, error };
 };
 
@@ -1341,6 +1418,7 @@ export const deleteFundOpportunity = async (id) => {
   const { data, error } = await supabase.from('fund_opportunities')
     .delete()
     .eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'fonlar', entityType: 'fon_fırsatı' });
   return { data, error };
 };
 
@@ -1470,6 +1548,7 @@ export const createDirectorAgenda = async (payload) => {
     .from('director_agendas')
     .insert({ ...payload, created_by: user?.id, created_by_name: profile?.full_name || null })
     .select().single();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'direktör_gündemleri', entityType: 'gündem', entityName: data?.title || payload?.title });
   return { data, error };
 };
 
@@ -1478,10 +1557,12 @@ export const updateDirectorAgenda = async (id, updates) => {
     .from('director_agendas')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id).select().single();
+  if (!error) logActivity({ action: 'güncelledi', module: 'direktör_gündemleri', entityType: 'gündem', entityName: data?.title || updates?.title });
   return { data, error };
 };
 
 export const deleteDirectorAgenda = async (id) => {
   const { error } = await supabase.from('director_agendas').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'direktör_gündemleri', entityType: 'gündem' });
   return { error };
 };

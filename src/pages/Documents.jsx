@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, logActivity } from '../lib/supabase';
 import { useProfile } from '../App';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -624,6 +624,7 @@ export default function Documents({ user }) {
     if (!error && data) {
       loadDocs();
       setActiveDoc(data);
+      logActivity({ action: 'oluşturdu', module: 'dokümanlar', entityType: 'doküman', entityName: title });
     }
   };
 
@@ -651,6 +652,7 @@ export default function Documents({ user }) {
       file_size: file.size,
     });
     loadDocs();
+    logActivity({ action: 'yükledi', module: 'dokümanlar', entityType: 'dosya', entityName: file.name });
   };
 
   // ── Filtreleme ─────────────────────────────────────────────────────────────
