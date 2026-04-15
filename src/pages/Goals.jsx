@@ -12,12 +12,11 @@ import {
 // CONSTANTS
 // ═══════════════════════════════════════════════════
 const UNITS = [
-  { key: 'ortakliklar', name: 'Ortaklıklar', icon: '🤝', color: '#7c3aed', coord: 'Hatice' },
-  { key: 'insani_yardim', name: 'İnsani Yardım', icon: '🌍', color: '#059669', coord: 'Gülsüm' },
-  { key: 'bagiscilar', name: 'Geleneksel Bağışçılar', icon: '💰', color: '#d97706', coord: 'Murat' },
-  { key: 'hibeler', name: 'Hibeler', icon: '📝', color: '#2563eb', coord: 'Yasir' },
   { key: 'fonlar', name: 'Fonlar', icon: '💎', color: '#16a34a', coord: 'Yavuz Sofi' },
-  { key: 'politika', name: 'Politika & Yönetişim', icon: '⚖️', color: '#6366f1', coord: 'Sezgin' },
+  { key: 'hibeler', name: 'Hibeler', icon: '📝', color: '#2563eb', coord: 'Yasir' },
+  { key: 'insani_isler', name: 'İnsani İşler', icon: '🌍', color: '#059669', coord: 'Gülsüm' },
+  { key: 'partnerlikler', name: 'Partnerlikler', icon: '🤝', color: '#7c3aed', coord: 'Hatice' },
+  { key: 'politika', name: 'Politika, Yönetişim ve Güvence', icon: '⚖️', color: '#6366f1', coord: 'Sezgin' },
 ];
 const PERIODS = ['2026', 'Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026'];
 const METRICS = ['Sayı', 'Para (USD)', 'Yüzde (%)', 'Süre (gün)', 'Puan'];
