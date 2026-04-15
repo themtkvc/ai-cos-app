@@ -534,17 +534,17 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
                           {deadlineBadge(bg.deadline, bp >= 100)}
                         </div>
                       </div>
-                      <span style={{ ...styles.badge, background: bp >= 70 ? '#dcfce7' : bp >= 40 ? '#fef9c3' : '#fee2e2', color: bp >= 70 ? '#16a34a' : bp >= 40 ? '#ca8a04' : '#dc2626' }}>{bp}%</span>
+                      <span style={{ ...styles.badge, background: `${unit.color}18`, color: unit.color, fontWeight: 700 }}>{bp}%</span>
                     </div>
                     <div style={{ ...styles.progressRow, marginTop: 6 }}>
-                      <div style={{ ...styles.progressWrap, height: 6 }}><div style={{ ...styles.progressBar, width: `${bp}%`, background: pColor(bp) }} /></div>
+                      <div style={{ ...styles.progressWrap, height: 6 }}><div style={{ ...styles.progressBar, width: `${bp}%`, background: unit.color }} /></div>
                     </div>
 
                     {/* Personal goals */}
                     {pgs.map(pg => {
                       const pp = pct(Number(pg.current_value), Number(pg.target));
                       return (
-                        <div key={pg.id} style={{ borderLeft: '3px solid #60a5fa', paddingLeft: 16, marginLeft: 16, marginTop: 10 }}>
+                        <div key={pg.id} style={{ borderLeft: `3px solid ${unit.color}44`, paddingLeft: 16, marginLeft: 16, marginTop: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ ...styles.avatar, background: pg.person_color || '#7c3aed' }}>{pg.person_initials || '?'}</span>
                             <div style={{ flex: 1 }}>
@@ -615,12 +615,12 @@ function Tab1BirimGoals({ birimGoals, countBirimLinks, onEdit, onDelete, onAddFo
                     <div style={{ display: 'flex', alignItems: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 4, gap: 6 }}>
                       <span style={{ flex: 1, color: 'var(--text, #111827)' }}>{g.title}</span>
                       {lc > 0 && <span style={styles.linkBadge}>🔗 {lc}</span>}
-                      <span style={{ color: pColor(p), whiteSpace: 'nowrap' }}>{fmtN(Number(g.current_value))}/{fmtN(Number(g.target))}{p >= 100 ? ' ✅' : ''}</span>
+                      <span style={{ color: unit.color, whiteSpace: 'nowrap', fontWeight: 700 }}>{fmtN(Number(g.current_value))}/{fmtN(Number(g.target))}{p >= 100 ? ' ✅' : ''}</span>
                       {deadlineBadge(g.deadline, p >= 100)}
                       <button onClick={() => onEdit(g)} style={{ ...styles.actionBtn, width: 22, height: 22 }}>✏️</button>
                       <button onClick={() => onDelete(g.id)} style={{ ...styles.actionBtn, ...styles.deleteBtn, width: 22, height: 22 }}>🗑️</button>
                     </div>
-                    <div style={{ ...styles.progressWrap, height: 7 }}><div style={{ ...styles.progressBar, width: `${p}%`, background: pColor(p) }} /></div>
+                    <div style={{ ...styles.progressWrap, height: 7 }}><div style={{ ...styles.progressBar, width: `${p}%`, background: unit.color, opacity: p >= 100 ? 1 : 0.85 }} /></div>
                   </div>
                 );
               })}
