@@ -16,7 +16,7 @@ const UNITS = [
   { key: 'insani_yardim', name: 'İnsani Yardım', icon: '🌍', color: '#059669', coord: 'Gülsüm' },
   { key: 'bagiscilar', name: 'Geleneksel Bağışçılar', icon: '💰', color: '#d97706', coord: 'Murat' },
   { key: 'hibeler', name: 'Hibeler', icon: '📝', color: '#2563eb', coord: 'Yasir' },
-  { key: 'akreditasyonlar', name: 'Akreditasyonlar', icon: '✅', color: '#16a34a', coord: 'Yavuz' },
+  { key: 'fonlar', name: 'Fonlar', icon: '💎', color: '#16a34a', coord: 'Yavuz Sofi' },
   { key: 'politika', name: 'Politika & Yönetişim', icon: '⚖️', color: '#6366f1', coord: 'Sezgin' },
 ];
 const PERIODS = ['2026', 'Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026'];
