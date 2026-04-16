@@ -19,6 +19,25 @@ const UNIT_NAME_MAP = {
   'Accreditations':       'Akreditasyonlar Birimi',
   'Policy & Governance':  'Politika, Yönetişim ve Güvence Birimi',
 };
+
+// Birim renk paleti (Türkçe profil birim adı → renk)
+const UNIT_COLORS = {
+  'Fonlar Birimi':                       '#EAB308',
+  'Uluslararası Hibeler Birimi':         '#DC2626',
+  'Uluslararası İnsani İşler Birimi':    '#2563EB',
+  'Ortaklıklar Birimi':                  '#16A34A',
+  'Politika, Yönetişim ve Güvence Birimi':'#EA580C',
+  // İngilizce adlar için de ekle
+  'Partnerships':         '#16A34A',
+  'Humanitarian Affairs': '#2563EB',
+  'Grants':               '#DC2626',
+  'Policy & Governance':  '#EA580C',
+  'Traditional Donors':   '#EAB308',
+  'Accreditations':       '#EAB308',
+};
+function getUnitColor(unitName) {
+  return UNIT_COLORS[unitName] || '#6366f1';
+}
 // Ters yönlü map: Türkçe → İngilizce
 const UNIT_NAME_REVERSE = Object.fromEntries(Object.entries(UNIT_NAME_MAP).map(([en, tr]) => [tr, en]));
 
@@ -865,14 +884,26 @@ function CoordinatorView({ reports, user, profile, onViewReport }) {
   const [editReport, setEditReport] = useState(null);
 
   const weekStart = getWeekStart();
+  const weekEnd = getWeekEnd(weekStart);
   const myReports = useMemo(() => reports.filter(r => r.user_id === user.id).sort((a, b) => b.week_start.localeCompare(a.week_start)), [reports, user.id]);
   const thisWeekReport = myReports.find(r => r.week_start === weekStart);
-  const canCreateNew = !thisWeekReport || thisWeekReport.status === 'draft';
+  const submittedReports = myReports.filter(r => r.status === 'submitted');
+  const unitColor = getUnitColor(profile.unit);
+
+  // İstatistikler
+  const totalSubmitted = submittedReports.length;
+  const greenCount = submittedReports.filter(r => r.overall_status === 'green').length;
+  const yellowCount = submittedReports.filter(r => r.overall_status === 'yellow').length;
+  const redCount = submittedReports.filter(r => r.overall_status === 'red').length;
+
+  // Son rapordan bu yana kaç gün
+  const lastReport = submittedReports[0];
+  const daysSinceLast = lastReport ? Math.floor((new Date() - new Date(lastReport.submitted_at || lastReport.week_end)) / 86400000) : null;
 
   const handleSaved = (saved) => {
     setShowForm(false);
     setEditReport(null);
-    window.location.reload(); // Simple refresh to reload data
+    window.location.reload();
   };
 
   if (showForm || editReport) {
@@ -889,67 +920,225 @@ function CoordinatorView({ reports, user, profile, onViewReport }) {
 
   return (
     <div>
-      {/* Bu Haftanın Durumu */}
-      <div style={{ background: 'var(--bg-hover)', borderRadius: 12, padding: 18, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{UNIT_ICON_MAP[profile.unit]} {profile.unit}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-            {weekLabel(weekStart, getWeekEnd(weekStart))}
-            {thisWeekReport?.status === 'submitted' && <span style={{ color: '#16a34a', fontWeight: 600 }}> — ✅ Gönderildi</span>}
-            {thisWeekReport?.status === 'draft' && <span style={{ color: '#d97706', fontWeight: 600 }}> — 📝 Taslak</span>}
-            {!thisWeekReport && <span style={{ color: 'var(--red)', fontWeight: 600 }}> — ⏳ Henüz girilmedi</span>}
+      {/* ── Hero Card ─────────────────────────────────────────────── */}
+      <div style={{
+        background: `linear-gradient(135deg, ${unitColor}12 0%, ${unitColor}06 100%)`,
+        border: `1.5px solid ${unitColor}30`,
+        borderRadius: 16, padding: '24px 28px', marginBottom: 24,
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Dekoratif arka plan ikonu */}
+        <div style={{
+          position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 80, opacity: 0.06, pointerEvents: 'none',
+        }}>{UNIT_ICON_MAP[profile.unit] || '📊'}</div>
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, position: 'relative', zIndex: 1 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: unitColor + '20', fontSize: 22,
+              }}>{UNIT_ICON_MAP[profile.unit] || '📊'}</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)' }}>{profile.unit}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{profile.full_name}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '5px 14px', borderRadius: 20,
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                fontSize: 13, fontWeight: 600, color: 'var(--text)',
+              }}>
+                📅 {weekLabel(weekStart, weekEnd)}
+              </div>
+
+              {thisWeekReport?.status === 'submitted' && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 14px', borderRadius: 20,
+                  background: '#dcfce7', border: '1px solid #bbf7d0',
+                  fontSize: 13, fontWeight: 700, color: '#15803d',
+                }}>✅ Gönderildi</div>
+              )}
+              {thisWeekReport?.status === 'draft' && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 14px', borderRadius: 20,
+                  background: '#fef3c7', border: '1px solid #fde68a',
+                  fontSize: 13, fontWeight: 700, color: '#92400e',
+                }}>📝 Taslak Kaydedildi</div>
+              )}
+              {!thisWeekReport && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 14px', borderRadius: 20,
+                  background: '#fef2f2', border: '1px solid #fecaca',
+                  fontSize: 13, fontWeight: 700, color: '#991b1b',
+                }}>⏳ Henüz girilmedi</div>
+              )}
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {thisWeekReport?.status === 'draft' && (
-            <button className="btn btn-primary" onClick={() => setEditReport(thisWeekReport)}>📝 Taslağı Düzenle</button>
-          )}
-          {!thisWeekReport && (
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Yeni Haftalık Rapor</button>
-          )}
-          {thisWeekReport?.status === 'submitted' && (
-            <button className="btn btn-outline" onClick={() => onViewReport(thisWeekReport)}>📄 Raporu Görüntüle</button>
-          )}
+
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {thisWeekReport?.status === 'draft' && (
+              <button className="btn btn-primary" onClick={() => setEditReport(thisWeekReport)}
+                style={{ background: unitColor, borderColor: unitColor, fontWeight: 700, padding: '10px 20px', borderRadius: 12, fontSize: 14 }}>
+                📝 Taslağı Düzenle
+              </button>
+            )}
+            {!thisWeekReport && (
+              <button className="btn btn-primary" onClick={() => setShowForm(true)}
+                style={{ background: unitColor, borderColor: unitColor, fontWeight: 700, padding: '10px 20px', borderRadius: 12, fontSize: 14 }}>
+                + Yeni Haftalık Rapor
+              </button>
+            )}
+            {thisWeekReport?.status === 'submitted' && (
+              <button className="btn btn-outline" onClick={() => onViewReport(thisWeekReport)}
+                style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 12, fontSize: 14, borderColor: unitColor, color: unitColor }}>
+                📄 Raporu Görüntüle
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Geçmiş Raporlar */}
-      <h3 style={{ fontSize: 15, marginBottom: 12 }}>📁 Rapor Geçmişi</h3>
+      {/* ── Mini İstatistikler ────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
+        <div style={{
+          background: 'var(--bg-card)', borderRadius: 12, padding: '16px 14px', textAlign: 'center',
+          border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: unitColor }}>{totalSubmitted}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>Toplam Rapor</div>
+        </div>
+        <div style={{
+          background: 'var(--bg-card)', borderRadius: 12, padding: '16px 14px', textAlign: 'center',
+          border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#16a34a' }}>{greenCount}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>🟢 Normal</div>
+        </div>
+        <div style={{
+          background: 'var(--bg-card)', borderRadius: 12, padding: '16px 14px', textAlign: 'center',
+          border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#d97706' }}>{yellowCount}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>🟡 Dikkat</div>
+        </div>
+        <div style={{
+          background: 'var(--bg-card)', borderRadius: 12, padding: '16px 14px', textAlign: 'center',
+          border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#dc2626' }}>{redCount}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>🔴 Kritik</div>
+        </div>
+      </div>
+
+      {/* ── Rapor Geçmişi ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, margin: 0, fontWeight: 700 }}>📁 Rapor Geçmişi</h3>
+        {daysSinceLast !== null && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+            Son rapor: {daysSinceLast === 0 ? 'Bugün' : `${daysSinceLast} gün önce`}
+          </span>
+        )}
+      </div>
+
       {myReports.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📊</div>
-          <div style={{ fontSize: 14 }}>Henüz rapor girmediniz</div>
-          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setShowForm(true)}>İlk Raporu Oluştur</button>
+        <div style={{
+          textAlign: 'center', padding: '48px 20px', borderRadius: 16,
+          background: `linear-gradient(135deg, ${unitColor}08 0%, transparent 100%)`,
+          border: '1.5px dashed var(--border)',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 14, opacity: 0.6 }}>📊</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Henüz rapor girmediniz</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Haftalık birim raporunuzu girerek departman yönetimine katkıda bulunun.</div>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}
+            style={{ background: unitColor, borderColor: unitColor, fontWeight: 700, padding: '10px 24px', borderRadius: 12 }}>
+            İlk Raporu Oluştur
+          </button>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="table" style={{ fontSize: 13 }}>
-            <thead>
-              <tr>
-                <th>Hafta</th>
-                <th>Durum</th>
-                <th>Özet</th>
-                <th>Gönderim</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {myReports.map(r => (
-                <tr key={r.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDisplayDate(r.week_start)}</td>
-                  <td>{STATUS_ICONS[r.overall_status]} {r.status === 'draft' ? <span className="badge badge-orange">Taslak</span> : STATUS_LABELS[r.overall_status]}</td>
-                  <td style={{ maxWidth: 300 }}>{r.executive_summary?.slice(0, 80)}{r.executive_summary?.length > 80 ? '…' : ''}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{r.submitted_at ? fmtDisplayDate(r.submitted_at.slice(0, 10)) : '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {r.status === 'draft' && <button className="btn btn-outline btn-sm" onClick={() => setEditReport(r)}>Düzenle</button>}
-                      <button className="btn btn-outline btn-sm" onClick={() => onViewReport(r)}>Görüntüle</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {myReports.map(r => {
+            const statusColor = STATUS_COLORS[r.overall_status] || '#9ca3af';
+            const isDraft = r.status === 'draft';
+            return (
+              <div key={r.id}
+                style={{
+                  background: 'var(--bg-card)', borderRadius: 14, padding: '16px 20px',
+                  border: '1px solid var(--border)', borderLeft: `4px solid ${isDraft ? '#d97706' : statusColor}`,
+                  cursor: 'pointer', transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+                onClick={() => isDraft ? setEditReport(r) : onViewReport(r)}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: statusColor + '15', fontSize: 18, flexShrink: 0,
+                    }}>{STATUS_ICONS[r.overall_status]}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                          {weekLabel(r.week_start, r.week_end)}
+                        </span>
+                        {isDraft && (
+                          <span style={{
+                            padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                            background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a',
+                          }}>Taslak</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.executive_summary?.slice(0, 120) || 'Özet girilmemiş'}
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    {/* Mini KPI badges */}
+                    {(r.activities?.length > 0 || r.stakeholder_engagements?.length > 0) && (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {r.activities?.length > 0 && (
+                          <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                            📋 {r.activities.length}
+                          </span>
+                        )}
+                        {r.stakeholder_engagements?.length > 0 && (
+                          <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                            🤝 {r.stakeholder_engagements.length}
+                          </span>
+                        )}
+                        {r.critical_flag && (
+                          <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: '#fef2f2', color: '#dc2626' }}>
+                            🚨
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right', minWidth: 80 }}>
+                      {r.submitted_at ? fmtDisplayDate(r.submitted_at.slice(0, 10)) : 'Gönderilmedi'}
+                    </div>
+
+                    <button className="btn btn-outline btn-sm"
+                      onClick={e => { e.stopPropagation(); isDraft ? setEditReport(r) : onViewReport(r); }}
+                      style={{ borderRadius: 10, fontWeight: 600, fontSize: 12, padding: '6px 14px', borderColor: unitColor + '60', color: unitColor }}>
+                      {isDraft ? 'Düzenle' : 'Görüntüle'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
