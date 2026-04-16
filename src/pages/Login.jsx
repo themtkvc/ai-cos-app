@@ -53,7 +53,7 @@ export default function Login({ onLogin }) {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f1e2e 0%, #1a3a5c 50%, #0f2640 100%)',
       display: 'flex',
-      fontFamily: 'var(--font-body, system-ui, sans-serif)',
+      fontFamily: 'var(--font-body)',
     }}>
 
       {/* ── Sol: İçerik Alanı ─────────────────────────────────────────── */}

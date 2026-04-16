@@ -79,7 +79,7 @@ function OpportunityCard({ item, onEdit, onStatusChange, isDirektor, isOwner }) 
       <div style={{
         height: 4,
         background: item.status === 'won' ? 'linear-gradient(90deg, var(--gold), var(--orange))'
-          : item.status === 'applied' ? 'linear-gradient(90deg, var(--primary), var(--blue-bright, #60a5fa))'
+          : item.status === 'applied' ? 'linear-gradient(90deg, var(--primary), var(--blue-bright))'
           : item.status === 'lost' || item.status === 'closed' ? 'var(--gray-mid)'
           : `linear-gradient(90deg, ${pc.color}, ${pc.color}88)`,
       }} />

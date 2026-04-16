@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, logActivity } from '../lib/supabase';
-import { UNITS as UNIT_LIST, UNIT_ICON_MAP, fmtDisplayDate } from '../lib/constants';
+import { UNITS as UNIT_LIST, UNIT_ICON_MAP, fmtDisplayDate, resolveUnitName, getUnitColor } from '../lib/constants';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SABITLER & YARDIMCILAR
@@ -10,43 +10,11 @@ const STATUS_COLORS = { green: '#16a34a', yellow: '#d97706', red: '#dc2626' };
 const STATUS_LABELS = { green: 'Normal', yellow: 'Dikkat Gerekli', red: 'Kritik' };
 const STATUS_ICONS  = { green: '🟢', yellow: '🟡', red: '🔴' };
 
-// İngilizce birim adları ↔ Türkçe profil birim adları eşleştirmesi
-const UNIT_NAME_MAP = {
-  'Partnerships':         'Ortaklıklar Birimi',
-  'Humanitarian Affairs': 'Uluslararası İnsani İşler Birimi',
-  'Traditional Donors':   'Geleneksel Donörler Birimi',
-  'Grants':               'Uluslararası Hibeler Birimi',
-  'Accreditations':       'Akreditasyonlar Birimi',
-  'Policy & Governance':  'Politika, Yönetişim ve Güvence Birimi',
-};
-
-// Birim renk paleti (Türkçe profil birim adı → renk)
-const UNIT_COLORS = {
-  'Fonlar Birimi':                       '#EAB308',
-  'Uluslararası Hibeler Birimi':         '#DC2626',
-  'Uluslararası İnsani İşler Birimi':    '#2563EB',
-  'Ortaklıklar Birimi':                  '#16A34A',
-  'Politika, Yönetişim ve Güvence Birimi':'#EA580C',
-  // İngilizce adlar için de ekle
-  'Partnerships':         '#16A34A',
-  'Humanitarian Affairs': '#2563EB',
-  'Grants':               '#DC2626',
-  'Policy & Governance':  '#EA580C',
-  'Traditional Donors':   '#EAB308',
-  'Accreditations':       '#EAB308',
-};
-function getUnitColor(unitName) {
-  return UNIT_COLORS[unitName] || '#6366f1';
-}
-// Ters yönlü map: Türkçe → İngilizce
-const UNIT_NAME_REVERSE = Object.fromEntries(Object.entries(UNIT_NAME_MAP).map(([en, tr]) => [tr, en]));
-
-// Rapordaki unit alanını UNIT_LIST'teki İngilizce isme çevir
+// Rapordaki unit alanını UNIT_LIST'teki standart isme çevir (resolveUnitName constants.js'ten gelir)
 function matchUnitName(reportUnit) {
-  // Zaten İngilizce ise direkt döndür
-  if (UNIT_LIST.find(u => u.name === reportUnit)) return reportUnit;
-  // Türkçe ise İngilizce karşılığını bul
-  return UNIT_NAME_REVERSE[reportUnit] || reportUnit;
+  const resolved = resolveUnitName(reportUnit);
+  if (UNIT_LIST.find(u => u.name === resolved)) return resolved;
+  return reportUnit;
 }
 
 const RISK_CATEGORIES = ['Operasyonel', 'Finansal', 'İnsan Kaynağı', 'Paydaş İlişkisi', 'Dış Etken', 'Uyum/Hukuk', 'Diğer'];

@@ -547,7 +547,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px', borderRadius: 10, marginBottom: 16,
-          background: 'var(--navy-pale,#eef2f8)', border: '1px solid var(--navy)22', fontSize: 13,
+          background: 'var(--navy-pale)', border: '1px solid var(--navy)22', fontSize: 13,
         }}>
           <span>💾 Kaydedilmiş taslak bulundu. Devam etmek ister misiniz?</span>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -648,7 +648,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
             return (
               <button key={ds} onClick={() => setSelectedDate(ds)} style={{
                 padding: '10px 4px', borderRadius: 10, cursor: 'pointer', border: 'none',
-                background: isSel ? 'var(--navy)' : isToday ? 'var(--navy-pale,#eef2f8)' : 'var(--surface)',
+                background: isSel ? 'var(--navy)' : isToday ? 'var(--navy-pale)' : 'var(--surface)',
                 boxShadow: isSel ? '0 2px 8px rgba(26,58,92,0.25)' : undefined,
                 outline: isToday && !isSel ? '2px solid var(--navy)' : undefined,
                 opacity: isWknd ? 0.55 : 1,
@@ -941,7 +941,7 @@ export default function DailyLog({ user, profile, linkedTask }) {
             width: '100%', padding: '15px', fontSize: 15, fontWeight: 700,
             borderRadius: 12, marginBottom: 20,
             opacity: (!isNonWork && totalMin === 0) ? 0.5 : 1,
-            background: editing ? 'var(--orange,#f59e0b)' : undefined,
+            background: editing ? 'var(--orange)' : undefined,
           }}>
           {submitting
             ? '⏳ Kaydediliyor…'

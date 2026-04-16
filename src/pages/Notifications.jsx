@@ -151,11 +151,15 @@ export default function Notifications({ user, onNavigate }) {
   const handleRead = async (id) => {
     await markNotificationRead(id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    // Sidebar badge'ini güncelle
+    window.dispatchEvent(new CustomEvent('notification-count-changed'));
   };
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead(user.id);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    // Sidebar badge'ini güncelle
+    window.dispatchEvent(new CustomEvent('notification-count-changed'));
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -235,8 +239,8 @@ export default function Notifications({ user, onNavigate }) {
             <button key={f.id} onClick={() => setFilter(f.id)}
               style={{
                 padding: '6px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
-                border: `1.5px solid ${isActive ? 'var(--navy, #1a3a5c)' : 'var(--border)'}`,
-                background: isActive ? 'var(--navy, #1a3a5c)' : 'var(--bg-card)',
+                border: `1.5px solid ${isActive ? 'var(--navy)' : 'var(--border)'}`,
+                background: isActive ? 'var(--navy)' : 'var(--bg-card)',
                 color: isActive ? '#fff' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 400,
               }}>

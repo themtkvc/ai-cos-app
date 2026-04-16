@@ -320,7 +320,7 @@ function DirectorCard({ profile, label = 'Direktör', assistants = [], isDirekto
                   fontSize: 12, color: 'var(--text)', textAlign: 'left',
                   transition: 'background 0.1s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <span style={{ fontWeight: 600 }}>{p.full_name || p.email}</span>

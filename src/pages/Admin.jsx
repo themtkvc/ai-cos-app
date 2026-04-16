@@ -166,7 +166,7 @@ function UserManagement({ currentUser, notify }) {
     return { senior, groups, unassigned, orphanStaff };
   }, [profiles]);
 
-  if (loading) return <div style={{padding:32,textAlign:'center',color:'var(--text-muted)'}}>Yükleniyor…</div>;
+  if (loading) return <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>;
 
   const UserRow = ({ p }) => (
     <div key={p.user_id} style={{
@@ -599,7 +599,7 @@ function AnnouncementManagement({ notify }) {
 
         {/* List */}
         {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Yükleniyor…</div>
+          <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
         ) : announcements.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
             Henüz duyuru yok. "+ Yeni Duyuru" ile ekleyin.
@@ -1117,7 +1117,7 @@ export default function Admin({ user, profile, onNavigate, defaultTab }) {
             </button>
           </div>
           {statsLoading ? (
-            <div style={{padding:20,textAlign:'center',color:'var(--text-muted)'}}>Yükleniyor…</div>
+            <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
           ) : (
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               {[

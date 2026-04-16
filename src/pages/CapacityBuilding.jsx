@@ -45,7 +45,7 @@ function PosterCard({ event, onClick }) {
 
   return (
     <div onClick={onClick} style={{
-      background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
       borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
       display: 'flex', flexDirection: 'column',
       transition: 'transform 0.15s, box-shadow 0.15s',
@@ -125,8 +125,8 @@ function DetailModal({ event, onClose, canEdit, onEdit }) {
       <div className="modal" style={{ maxWidth: 640, maxHeight: '85vh', overflowY: 'auto' }}>
         {/* Kapak Görseli */}
         {event.cover_image_url && (
-          <div style={{ margin: '-24px -24px 16px', height: 240, overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
-            <img src={event.cover_image_url} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ margin: '-24px -24px 16px', overflow: 'hidden', borderRadius: '12px 12px 0 0', position: 'relative', paddingTop: '60%' }}>
+            <img src={event.cover_image_url} alt={event.title} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
         )}
 
@@ -445,16 +445,17 @@ function EventForm({ event, user, profile, onSaved, onCancel }) {
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label">Afiş Görseli</label>
             <div style={{
-              border: '2px dashed var(--border)', borderRadius: 12, overflow: 'hidden',
+              borderRadius: 12, overflow: 'hidden',
               position: 'relative', cursor: 'pointer',
+              border: form.cover_image_url ? 'none' : '2px dashed var(--border)',
               background: form.cover_image_url ? 'transparent' : 'var(--bg-hover)',
             }}
             onClick={() => document.getElementById('cb-cover-input')?.click()}>
               {form.cover_image_url ? (
                 <div style={{ position: 'relative' }}>
-                  <img src={form.cover_image_url} alt="cover" style={{ width: '100%', maxHeight: 280, objectFit: 'cover', display: 'block' }} />
+                  <img src={form.cover_image_url} alt="cover" style={{ width: '100%', display: 'block', borderRadius: 12 }} />
                   <button type="button" onClick={e => { e.stopPropagation(); set('cover_image_url', ''); }}
-                    style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14 }}>✕</button>
+                    style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, zIndex: 2 }}>✕</button>
                 </div>
               ) : (
                 <div style={{ padding: '40px 20px', textAlign: 'center' }}>

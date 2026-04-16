@@ -4,18 +4,54 @@
 
 // ── BİRİM TANIMLARI ─────────────────────────────────────────────────────────
 export const UNITS = [
-  { name: 'Partnerships',         coordinator: 'Hatice', icon: '🤝', cssClass: 'unit-partnerships' },
-  { name: 'Humanitarian Affairs', coordinator: 'Gülsüm', icon: '🌍', cssClass: 'unit-humanitarian' },
-  { name: 'Traditional Donors',   coordinator: 'Murat',  icon: '💰', cssClass: 'unit-traditional-donors' },
-  { name: 'Grants',               coordinator: 'Yasir',  icon: '📝', cssClass: 'unit-grants' },
-  { name: 'Accreditations',       coordinator: 'Yavuz',  icon: '✅', cssClass: 'unit-accreditations' },
-  { name: 'Policy & Governance',  coordinator: 'Sezgin', icon: '⚖️', cssClass: 'unit-policy' },
+  { name: 'Fonlar',                            key: 'fonlar',       coordinator: 'Yavuz Sofi', icon: '💎', color: '#EAB308', cssClass: 'unit-fonlar' },
+  { name: 'Hibeler',                           key: 'hibeler',      coordinator: 'Yasir',      icon: '📝', color: '#DC2626', cssClass: 'unit-hibeler' },
+  { name: 'İnsani İşler',                      key: 'insani_isler', coordinator: 'Gülsüm',     icon: '🌍', color: '#2563EB', cssClass: 'unit-insani' },
+  { name: 'Partnerlikler',                     key: 'partnerlikler',coordinator: 'Hatice',      icon: '🤝', color: '#16A34A', cssClass: 'unit-partnerlikler' },
+  { name: 'Politika, Yönetişim ve Güvence',    key: 'politika',     coordinator: 'Sezgin',      icon: '⚖️', color: '#EA580C', cssClass: 'unit-politika' },
 ];
+
+// Eski İngilizce isimleri Türkçe'ye eşleme (geriye dönük uyumluluk)
+export const UNIT_LEGACY_MAP = {
+  'Partnerships':         'Partnerlikler',
+  'Humanitarian Affairs': 'İnsani İşler',
+  'Traditional Donors':   'Fonlar',
+  'Grants':               'Hibeler',
+  'Accreditations':       'Fonlar',
+  'Policy & Governance':  'Politika, Yönetişim ve Güvence',
+  // Profil birim adları (uzun form)
+  'Ortaklıklar Birimi':                  'Partnerlikler',
+  'Uluslararası İnsani İşler Birimi':    'İnsani İşler',
+  'Geleneksel Donörler Birimi':          'Fonlar',
+  'Uluslararası Hibeler Birimi':         'Hibeler',
+  'Akreditasyonlar Birimi':              'Fonlar',
+  'Politika, Yönetişim ve Güvence Birimi':'Politika, Yönetişim ve Güvence',
+  'Fonlar Birimi':                       'Fonlar',
+  'Hibeler Birimi':                      'Hibeler',
+  'İnsani İşler Birimi':                 'İnsani İşler',
+  'Partnerlikler Birimi':                'Partnerlikler',
+};
+
+/** Herhangi bir birim adını (eski/yeni/uzun) standart kısa isme çevirir */
+export function resolveUnitName(raw) {
+  if (!raw) return raw;
+  // Zaten standart UNITS listesinde mi?
+  if (UNITS.find(u => u.name === raw)) return raw;
+  return UNIT_LEGACY_MAP[raw] || raw;
+}
+
+/** Birim adından renk döndürür */
+export function getUnitColor(raw) {
+  const name = resolveUnitName(raw);
+  const unit = UNITS.find(u => u.name === name);
+  return unit?.color || '#6366f1';
+}
 
 export const UNIT_NAMES     = UNITS.map(u => u.name);
 export const UNIT_MAP       = Object.fromEntries(UNITS.map(u => [u.name, u]));
 export const UNIT_CSS_MAP   = Object.fromEntries(UNITS.map(u => [u.name, u.cssClass]));
 export const UNIT_ICON_MAP  = Object.fromEntries(UNITS.map(u => [u.name, u.icon]));
+export const UNIT_COLOR_MAP = Object.fromEntries(UNITS.map(u => [u.name, u.color]));
 
 // ── ROL TANIMLARI ────────────────────────────────────────────────────────────
 export const ROLE_LABELS = {

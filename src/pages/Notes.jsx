@@ -115,7 +115,7 @@ function Toolbar({ editorRef }) {
                   width: 'auto',
                   padding: '0 6px',
                   background: (activeHeading || showHeadingMenu) ? 'var(--bg-hover)' : 'transparent',
-                  color: activeHeading ? 'var(--navy, #1a3a5c)' : 'var(--text-secondary)',
+                  color: activeHeading ? 'var(--navy)' : 'var(--text-secondary)',
                 })}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = (activeHeading || showHeadingMenu) ? 'var(--bg-hover)' : 'transparent'}
@@ -127,7 +127,7 @@ function Toolbar({ editorRef }) {
               {showHeadingMenu && (
                 <div style={{
                   position: 'absolute', top: '100%', left: 0, marginTop: 4,
-                  background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
                   borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                   padding: 4, zIndex: 100, minWidth: 160,
                 }}>
@@ -140,16 +140,16 @@ function Toolbar({ editorRef }) {
                           display: 'flex', alignItems: 'center', gap: 10,
                           width: '100%', padding: '8px 12px', border: 'none',
                           borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-                          background: isActive ? 'var(--bg-hover, #f3f4f6)' : 'transparent',
+                          background: isActive ? 'var(--bg-hover)' : 'transparent',
                           transition: 'background 0.1s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
-                        onMouseLeave={e => e.currentTarget.style.background = isActive ? 'var(--bg-hover, #f3f4f6)' : 'transparent'}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = isActive ? 'var(--bg-hover)' : 'transparent'}
                       >
                         <span style={{
                           ...opt.style, color: 'var(--text)', lineHeight: 1.2,
                         }}>{opt.label}</span>
-                        {isActive && <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--navy, #1a3a5c)' }}>✓</span>}
+                        {isActive && <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--navy)' }}>✓</span>}
                       </button>
                     );
                   })}
@@ -190,7 +190,7 @@ function Checklist({ items, onChange }) {
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           <input type="checkbox" checked={it.done}
             onChange={e => update(i, { done: e.target.checked })}
-            style={{ width: 16, height: 16, accentColor: 'var(--navy, #1a3a5c)', cursor: 'pointer', flexShrink: 0 }} />
+            style={{ width: 16, height: 16, accentColor: 'var(--navy)', cursor: 'pointer', flexShrink: 0 }} />
           <input value={it.text}
             onChange={e => update(i, { text: e.target.value })}
             onKeyDown={e => {
@@ -230,7 +230,7 @@ function ColorPicker({ value, onChange }) {
         <button key={c.id} title={c.label}
           onClick={() => onChange(c.id)}
           style={{
-            width: 26, height: 26, borderRadius: '50%', border: value === c.id ? '2.5px solid var(--navy, #1a3a5c)' : `2px solid ${c.border}`,
+            width: 26, height: 26, borderRadius: '50%', border: value === c.id ? '2.5px solid var(--navy)' : `2px solid ${c.border}`,
             background: c.bg, cursor: 'pointer', transition: 'transform 0.1s',
             transform: value === c.id ? 'scale(1.15)' : 'scale(1)',
           }}
@@ -251,7 +251,7 @@ function CategoryPicker({ value, onChange, categories }) {
           style={{
             padding: '3px 10px', borderRadius: 12, fontSize: 11.5, fontWeight: 500,
             border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.1s',
-            background: value === cat ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+            background: value === cat ? 'var(--navy)' : 'var(--bg-hover)',
             color: value === cat ? '#fff' : 'var(--text-secondary)',
           }}>
           {cat}
@@ -714,7 +714,7 @@ export default function Notes({ user, profile, onNavigate }) {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <div style={{ display:'flex', justifyContent:'center', padding: 60 }}>
         <div className="loading-spinner" />
       </div>
     );
@@ -730,12 +730,12 @@ export default function Notes({ user, profile, onNavigate }) {
       {/* ── Sol: ana notlar ─────────────────────────────────────────────────── */}
       <div style={{ flex: 1, minWidth: 0 }}>
       {/* Header */}
-      <div style={{
+      <div className="page-header" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 20, flexWrap: 'wrap', gap: 12,
       }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>📝 Notlarım</h2>
+          <h2 className="page-title" style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>📝 Notlarım</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
             {notes.filter(n => !n.is_archived).length} not · {notes.filter(n => n.is_archived).length} arşiv
           </p>
@@ -784,7 +784,7 @@ export default function Notes({ user, profile, onNavigate }) {
             <button key={c.id} title={c.label} onClick={() => setFilterColor(filterColor === c.id ? '' : c.id)}
               style={{
                 width: 18, height: 18, borderRadius: '50%', cursor: 'pointer',
-                border: filterColor === c.id ? '2px solid var(--navy, #1a3a5c)' : `1.5px solid ${c.border}`,
+                border: filterColor === c.id ? '2px solid var(--navy)' : `1.5px solid ${c.border}`,
                 background: c.bg, transform: filterColor === c.id ? 'scale(1.2)' : 'scale(1)',
                 transition: 'transform 0.1s',
               }} />
@@ -795,7 +795,7 @@ export default function Notes({ user, profile, onNavigate }) {
         <button onClick={() => setShowArchived(!showArchived)}
           style={{
             ...secondaryBtnStyle, fontSize: 12, padding: '6px 12px',
-            background: showArchived ? 'var(--navy, #1a3a5c)' : undefined,
+            background: showArchived ? 'var(--navy)' : undefined,
             color: showArchived ? '#fff' : undefined,
           }}>
           🗄 {showArchived ? 'Aktif notlar' : 'Arşiv'}
@@ -880,14 +880,14 @@ export default function Notes({ user, profile, onNavigate }) {
         width: 280, flexShrink: 0, position: 'sticky', top: 24,
       }}>
         <div style={{
-          background: 'var(--card-bg, #fff)',
-          border: '1px solid var(--border, #E5E7EB)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
           borderRadius: 14, overflow: 'hidden',
         }}>
           {/* Panel başlık */}
           <div style={{
             padding: '14px 16px 10px',
-            borderBottom: '1px solid var(--border, #E5E7EB)',
+            borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <span style={{ fontSize: 16 }}>⚡</span>
@@ -910,10 +910,10 @@ export default function Notes({ user, profile, onNavigate }) {
               rows={3}
               style={{
                 width: '100%', boxSizing: 'border-box',
-                border: '1.5px solid var(--border, #E5E7EB)',
+                border: '1.5px solid var(--border)',
                 borderRadius: 10, padding: '9px 12px',
                 fontSize: 13, lineHeight: 1.6,
-                color: 'var(--text)', background: 'var(--bg, #F9FAFB)',
+                color: 'var(--text)', background: 'var(--bg)',
                 resize: 'none', outline: 'none', fontFamily: 'inherit',
               }}
             />
@@ -946,7 +946,7 @@ export default function Notes({ user, profile, onNavigate }) {
 // ── Shared styles ────────────────────────────────────────────────────────────
 const primaryBtnStyle = {
   padding: '7px 16px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600,
-  background: 'var(--navy, #1a3a5c)', color: '#fff', cursor: 'pointer', transition: 'opacity 0.15s',
+  background: 'var(--navy)', color: '#fff', cursor: 'pointer', transition: 'opacity 0.15s',
 };
 const secondaryBtnStyle = {
   padding: '7px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500,

@@ -64,7 +64,7 @@ function generateSlug() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const inputStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 8,
-  border: '1.5px solid var(--border)', background: 'var(--bg-input, var(--white))',
+  border: '1.5px solid var(--border)', background: 'var(--bg-input)',
   color: 'var(--text)', fontSize: 13.5, fontFamily: 'inherit',
   outline: 'none', transition: 'border-color 0.15s',
 };
@@ -75,7 +75,7 @@ const labelStyle = {
 };
 
 const cardStyle = {
-  background: 'var(--bg-card, var(--white))', border: '1px solid var(--border)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: 14, padding: 20, boxShadow: 'var(--shadow-sm)',
 };
 
@@ -437,7 +437,7 @@ function FieldRenderer({ field, value, onChange }) {
             </thead>
             <tbody>
               {rows.map((r, ri) => (
-                <tr key={ri} style={{ borderBottom: '1px solid var(--border-light, var(--border))' }}>
+                <tr key={ri} style={{ borderBottom: '1px solid var(--border-light)' }}>
                   <td style={{ padding: 8, fontSize: 13, color: 'var(--text)' }}>{r}</td>
                   {cols.map((c, ci) => (
                     <td key={ci} style={{ padding: 8, textAlign: 'center' }}>
@@ -935,7 +935,7 @@ export default function FormsManager({ user, profile }) {
                   const dataMap = {};
                   (resp.form_response_data || []).forEach(d => { dataMap[d.field_id] = d.value; });
                   return (
-                    <tr key={resp.id} style={{ borderBottom: '1px solid var(--border-light, var(--border))' }}
+                    <tr key={resp.id} style={{ borderBottom: '1px solid var(--border-light)' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                       <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap' }}>{resp.respondent_name || 'Anonim'}</td>
@@ -996,7 +996,7 @@ export default function FormsManager({ user, profile }) {
                       return (
                         <div key={label} style={{ marginBottom: 6 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
-                            <span style={{ color: 'var(--text-secondary, var(--text))' }}>{label}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
                             <span style={{ fontWeight: 700, color: 'var(--text)' }}>{pct}% ({count})</span>
                           </div>
                           <div style={{ height: 6, borderRadius: 3, background: 'var(--gray-light)', overflow: 'hidden' }}>

@@ -235,9 +235,7 @@ export default function Donors({ user, profile, onNavigate }) {
   // Loading state
   if (loading) {
     return (
-      <div style={{padding:40,color:'var(--text-muted)',textAlign:'center'}}>
-        Yükleniyor…
-      </div>
+      <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
     );
   }
 

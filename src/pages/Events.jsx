@@ -74,8 +74,8 @@ function EventCard({ event, onClick }) {
     <div
       onClick={() => onClick(event)}
       style={{
-        background: 'var(--card-bg, #fff)',
-        border: '1px solid var(--border, #E5E7EB)',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         overflow: 'hidden',
         cursor: 'pointer',
@@ -112,7 +112,7 @@ function EventCard({ event, onClick }) {
       <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
       {/* Üst: başlık + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text, #111)', lineHeight: 1.4, flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>
           {event.title}
         </div>
         <StatusBadge status={event.status} />
@@ -125,12 +125,12 @@ function EventCard({ event, onClick }) {
 
       {/* Meta bilgiler */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted, #6B7280)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
           <span>📅</span>
           <span>{formatDateRange(event.start_date, event.end_date)}</span>
         </div>
         {event.location_name && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted, #6B7280)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
             <span>📍</span>
             <span>{event.location_name}</span>
             <span style={{ fontSize: 11, color: '#9CA3AF', padding: '1px 6px', background: '#F3F4F6', borderRadius: 8 }}>
@@ -139,7 +139,7 @@ function EventCard({ event, onClick }) {
           </div>
         )}
         {event.unit && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted, #6B7280)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
             <span>🏢</span>
             <span>{event.unit}</span>
           </div>
@@ -155,7 +155,7 @@ function EventCard({ event, onClick }) {
       )}
 
       {/* Alt: owner + katılımcı sayısı */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border, #E5E7EB)', fontSize: 12, color: '#9CA3AF', marginTop: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 12, color: '#9CA3AF', marginTop: 'auto' }}>
         <span>{event.owner_name ? `${event.owner_name}` : '—'}</span>
         <span>{event._participant_count || 0} katılımcı</span>
       </div>
@@ -281,8 +281,8 @@ export default function Events({ user, profile, onNavigate }) {
       {/* Başlık */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text, #111)', margin: 0 }}>Etkinlikler</h1>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted, #6B7280)', fontSize: 14 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', margin: 0 }}>Etkinlikler</h1>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 14 }}>
             Tüm organizasyonel etkinlikleri yönetin ve takip edin
           </p>
         </div>
@@ -291,7 +291,7 @@ export default function Events({ user, profile, onNavigate }) {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'var(--navy, #1A3C5E)', color: '#fff', fontWeight: 700, fontSize: 14,
+            background: 'var(--navy)', color: '#fff', fontWeight: 700, fontSize: 14,
           }}
         >
           + Yeni Etkinlik
@@ -306,9 +306,9 @@ export default function Events({ user, profile, onNavigate }) {
           placeholder="Etkinlik ara..."
           style={{
             flex: '1 1 260px', padding: '9px 14px', borderRadius: 8,
-            border: '1px solid var(--border, #E5E7EB)',
-            background: 'var(--card-bg, #fff)', fontSize: 14,
-            color: 'var(--text, #111)', outline: 'none',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-card)', fontSize: 14,
+            color: 'var(--text)', outline: 'none',
           }}
         />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
@@ -325,12 +325,12 @@ export default function Events({ user, profile, onNavigate }) {
         </select>
 
         {/* View toggle */}
-        <div style={{ display: 'flex', gap: 2, background: 'var(--bg, #F9FAFB)', borderRadius: 8, padding: 3, border: '1px solid var(--border, #E5E7EB)', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 8, padding: 3, border: '1px solid var(--border)', marginLeft: 'auto' }}>
           {[['grid','⊞'],['list','☰'],['calendar','📅']].map(([v, icon]) => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 14,
-              background: view === v ? 'var(--navy, #1A3C5E)' : 'transparent',
-              color: view === v ? '#fff' : 'var(--text-muted, #6B7280)',
+              background: view === v ? 'var(--navy)' : 'transparent',
+              color: view === v ? '#fff' : 'var(--text-muted)',
               fontWeight: view === v ? 700 : 400,
             }}>{icon}</button>
           ))}
@@ -339,7 +339,7 @@ export default function Events({ user, profile, onNavigate }) {
 
       {/* İçerik */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Yükleniyor…</div>
+        <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
@@ -351,9 +351,9 @@ export default function Events({ user, profile, onNavigate }) {
           {filtered.map(e => <EventCard key={e.id} event={e} onClick={handleOpenEvent} />)}
         </div>
       ) : view === 'list' ? (
-        <div style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border, #E5E7EB)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
           {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px', gap: 12, padding: '10px 18px', background: 'var(--navy, #1A3C5E)', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px', gap: 12, padding: '10px 18px', background: 'var(--navy)', fontSize: 12, fontWeight: 700, color: '#fff' }}>
             <span>Etkinlik</span><span>Tarih</span><span>Lokasyon</span><span>Birim</span><span>Durum</span><span>Katılımcı</span>
           </div>
           {filtered.map((e, i) => (
@@ -363,16 +363,16 @@ export default function Events({ user, profile, onNavigate }) {
               style={{
                 display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
                 gap: 12, padding: '13px 18px', cursor: 'pointer',
-                background: i % 2 === 0 ? 'var(--card-bg, #fff)' : 'var(--bg, #F9FAFB)',
-                borderBottom: '1px solid var(--border, #E5E7EB)',
+                background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)',
+                borderBottom: '1px solid var(--border)',
                 transition: 'background 0.1s',
                 alignItems: 'center',
               }}
-              onMouseEnter={el => el.currentTarget.style.background = 'var(--primary-light, #EFF6FF)'}
-              onMouseLeave={(el, idx=i) => el.currentTarget.style.background = idx % 2 === 0 ? 'var(--card-bg, #fff)' : 'var(--bg, #F9FAFB)'}
+              onMouseEnter={el => el.currentTarget.style.background = 'var(--primary-light)'}
+              onMouseLeave={(el, idx=i) => el.currentTarget.style.background = idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg)'}
             >
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text, #111)' }}>{e.title}</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{e.title}</div>
                 <TypeBadge type={e.event_type} />
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{formatDateRange(e.start_date, e.end_date)}</div>
@@ -388,7 +388,7 @@ export default function Events({ user, profile, onNavigate }) {
         </div>
       ) : (
         /* TAKVİM */
-        <div style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border, #E5E7EB)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
           {/* Takvim başlık */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
             <button onClick={() => setCalMonth(m => {
@@ -430,7 +430,7 @@ export default function Events({ user, profile, onNavigate }) {
                 <div key={i} style={{
                   minHeight: 90, padding: '6px', borderRight: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border)',
-                  background: !day ? 'var(--bg, #F9FAFB)' : 'var(--card-bg, #fff)',
+                  background: !day ? 'var(--bg)' : 'var(--bg-card)',
                 }}>
                   {day && (
                     <>
@@ -439,7 +439,7 @@ export default function Events({ user, profile, onNavigate }) {
                         color: isToday ? '#fff' : 'var(--text)',
                         width: 24, height: 24, borderRadius: '50%', display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
-                        background: isToday ? 'var(--navy, #1A3C5E)' : 'transparent',
+                        background: isToday ? 'var(--navy)' : 'transparent',
                         marginBottom: 4,
                       }}>{day}</div>
                       {dayEvents.slice(0, 3).map(ev => {
@@ -466,8 +466,8 @@ export default function Events({ user, profile, onNavigate }) {
 }
 
 const selectStyle = {
-  padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border, #E5E7EB)',
-  background: 'var(--card-bg, #fff)', fontSize: 13, color: 'var(--text, #111)', cursor: 'pointer', outline: 'none',
+  padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)',
+  background: 'var(--bg-card)', fontSize: 13, color: 'var(--text)', cursor: 'pointer', outline: 'none',
 };
 
 const navBtnStyle = {

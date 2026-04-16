@@ -24,6 +24,19 @@ import {
 import { ROLE_LABELS } from '../lib/constants';
 import MentionInput, { extractMentions, renderMentionText } from '../components/MentionInput';
 
+// ── Yardımcılar ──────────────────────────────────────────────────────────────
+function linkifyText(text) {
+  if (!text || typeof text !== 'string') return text;
+  const re = /(https?:\/\/[^\s<]+)/g;
+  const parts = text.split(re);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part)
+      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline', wordBreak: 'break-all' }}>{part}</a>
+      : part
+  );
+}
+
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
   { value: 'kritik', label: '🔴 Kritik',  color: 'var(--red)', bg: 'var(--red-pale)' },
@@ -144,7 +157,7 @@ function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
                 {part.text}
               </span>
             ) : (
-              <span key={i}>{part.text}</span>
+              <span key={i}>{linkifyText(part.text)}</span>
             )
           )}
         </div>
@@ -205,7 +218,14 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
   const isAssigned = task.assigned_to === myId;
   const isCreator  = task.created_by === myId || agendaCreatedBy === myId;
   const isKoord    = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role);
-  const canApprove = isKoord && task.completion_status === 'pending_review';
+  // Onay yetkisi: direktör oluşturduysa → sadece direktör onaylar, diğerleri → koordinatör onaylar
+  const creatorProfile = profiles.find(p => p.user_id === (task.created_by || agendaCreatedBy));
+  const createdByDirektor = creatorProfile?.role === 'direktor' || creatorProfile?.role === 'direktor_yardimcisi';
+  const canApprove = task.completion_status === 'pending_review' && (
+    createdByDirektor
+      ? ['direktor', 'direktor_yardimcisi'].includes(role)
+      : role === 'koordinator'
+  );
   const canMarkDone = isAssigned && task.completion_status !== 'approved' && task.completion_status !== 'pending_review';
   const canNotifyTask = onNotify && task.assigned_to && task.assigned_to !== myId && isKoord;
 
@@ -1439,12 +1459,13 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
 
   const pendingApprovalCount = useMemo(() => {
     if (!['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role)) return 0;
-    return agendas.reduce((sum, a) => {
-      // Koordinatör: sadece kendi biriminin onay bekleyenlerini görür
-      // Direktör: hepsini görür
-      if (!canSeeAllUnits && a.unit !== myUnit) return sum;
-      return sum + (a.agenda_tasks || []).filter(t => t.completion_status === 'pending_review').length;
-    }, 0);
+    // Gündem bazında say (görev değil) — ekrandaki görüntüyle tutarlı olması için
+    return agendas.filter(a => {
+      if (a.status === 'arsiv') return false;
+      if (a.is_personal) return false;
+      if (!canSeeAllUnits && a.unit !== myUnit) return false;
+      return (a.agenda_tasks || []).some(t => t.completion_status === 'pending_review');
+    }).length;
   }, [agendas, role, canSeeAllUnits, myUnit]);
 
   // ── Görünüm yardımcıları ────────────────────────────────────────────────────
@@ -1708,13 +1729,13 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
             // Badge sayıları
             let assignedCount = 0;
             if (tab.id === 'assigned_to_me') {
-              assignedCount = agendas.filter(a => a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length;
+              assignedCount = agendas.filter(a => a.status !== 'arsiv' && a.assigned_to === myId && a.created_by !== myId && !a.is_personal).length;
             } else if (tab.id === 'assigned_by_me') {
-              assignedCount = agendas.filter(a => a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal).length;
+              assignedCount = agendas.filter(a => a.status !== 'arsiv' && a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal).length;
             } else if (tab.id === 'assigned_tasks') {
-              assignedCount = agendas.reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by !== myId).length, 0);
+              assignedCount = agendas.filter(a => a.status !== 'arsiv').reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by !== myId).length, 0);
             } else if (tab.id === 'my_tasks') {
-              assignedCount = agendas.reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by === myId).length, 0);
+              assignedCount = agendas.filter(a => a.status !== 'arsiv').reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by === myId).length, 0);
             } else if (tab.id === 'pending_approval') {
               assignedCount = pendingApprovalCount;
             }

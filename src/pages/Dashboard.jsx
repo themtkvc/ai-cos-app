@@ -608,16 +608,52 @@ export default function Dashboard({ user, profile, onNavigate }) {
           <button className="btn btn-outline btn-sm">{hasLogToday ? 'Düzenle →' : 'Kayıt Gir →'}</button>
         </div>
         {hasLogToday ? (
-          <div style={{display:'flex', gap:16, alignItems:'center', padding:'4px 0'}}>
-            <div style={{padding:'6px 12px', borderRadius:8, background:'rgba(22,163,74,0.08)', border:'1px solid rgba(22,163,74,0.2)'}}>
-              <span style={{fontSize:13, color:'var(--green)', fontWeight:600}}>
-                {todayLog.work_status === 'ofis' ? '🏢 Ofisten' : todayLog.work_status === 'ev' ? '🏠 Evden' : todayLog.work_status === 'saha' ? '🗺️ Sahadan' : '✅ Kayıt mevcut'}
+          <div style={{padding:'4px 0'}}>
+            <div style={{display:'flex', gap:16, alignItems:'center'}}>
+              <div style={{padding:'6px 12px', borderRadius:8, background:'rgba(22,163,74,0.08)', border:'1px solid rgba(22,163,74,0.2)'}}>
+                <span style={{fontSize:13, color:'var(--green)', fontWeight:600}}>
+                  {todayLog.work_status === 'ofis' ? '🏢 Ofisten' : todayLog.work_status === 'ev' ? '🏠 Evden' : todayLog.work_status === 'saha' ? '🗺️ Sahadan' : '✅ Kayıt mevcut'}
+                </span>
+              </div>
+              <span style={{fontSize:12, color:'var(--text-muted)'}}>
+                {(todayLog.work_items || []).length} iş kalemi
+                {todayLog.submitted ? ' · 📤 Gönderildi' : ' · 📝 Taslak'}
               </span>
             </div>
-            <span style={{fontSize:12, color:'var(--text-muted)'}}>
-              {(todayLog.work_items || []).length} iş kalemi
-              {todayLog.submitted ? ' · 📤 Gönderildi' : ' · 📝 Taslak'}
-            </span>
+            {/* Bağlı gündem bilgisi */}
+            {(() => {
+              const linkedItems = (todayLog.work_items || []).filter(i => i.agenda_item_id);
+              if (linkedItems.length === 0) return null;
+              const agendaIds = [...new Set(linkedItems.map(i => i.agenda_item_id))];
+              const linkedAgendas = agendaIds.map(id => {
+                const agenda = (agendas || []).find(a => a.id === id);
+                const items = linkedItems.filter(i => i.agenda_item_id === id);
+                const totalMins = items.reduce((s, i) => {
+                  if (i.all_day) return s + 480;
+                  if (!i.start_time || !i.end_time) return s;
+                  const [sh, sm] = i.start_time.split(':').map(Number);
+                  const [eh, em] = i.end_time.split(':').map(Number);
+                  return s + Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+                }, 0);
+                return { id, title: agenda?.title || 'Gündem', mins: totalMins };
+              });
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {linkedAgendas.map(a => (
+                    <span key={a.id} style={{
+                      fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                      background: 'var(--navy)08', border: '1px solid var(--navy)18', color: 'var(--navy)',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      📋 {a.title}
+                      {a.mins > 0 && <strong style={{ marginLeft: 2 }}>
+                        {Math.floor(a.mins / 60) > 0 ? `${Math.floor(a.mins / 60)}s` : ''}{a.mins % 60 > 0 ? ` ${a.mins % 60}dk` : ''}
+                      </strong>}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div style={{padding:'12px 0', color:'var(--text-muted)', fontSize:13}}>

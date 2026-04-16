@@ -522,7 +522,7 @@ function DetailPanel({ item, type, orgs, contacts, events, connections, onClose,
               )}
 
               {commsLoading ? (
-                <div style={{ textAlign:'center', padding:20, color:'var(--text-light)', fontSize:13 }}>Yükleniyor…</div>
+                <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
               ) : comms.length === 0 ? (
                 <div style={{ textAlign:'center', padding:'32px 16px', color:'var(--text-light)' }}>
                   <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
@@ -1859,10 +1859,7 @@ export default function NetworkManager({ user, profile }) {
           </div>
 
           {activityLoading ? (
-            <div style={{ textAlign:'center', padding:48, color:'var(--text-light)' }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>⏳</div>
-              <div style={{ fontSize:13, fontWeight:500 }}>Yükleniyor…</div>
-            </div>
+            <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
           ) : activityLog.length === 0 ? (
             <div style={{ textAlign:'center', padding:48, color:'var(--text-light)' }}>
               <div style={{ fontSize:36, marginBottom:8 }}>📭</div>
@@ -1941,10 +1938,7 @@ export default function NetworkManager({ user, profile }) {
 
       {/* İçerik — aktivite sekmesi değilse göster */}
       {tab !== 'activity' && loading && (
-        <div style={{ textAlign:'center', padding:'60px', color:'var(--text-light)' }}>
-          <div style={{ fontSize:36, marginBottom:10 }}>⏳</div>
-          <div style={{ fontSize:14, fontWeight:500 }}>Yükleniyor…</div>
-        </div>
+        <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
       )}
 
       {tab !== 'activity' && !loading && currentItems.length === 0 && (

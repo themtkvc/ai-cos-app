@@ -431,7 +431,7 @@ function NewDocModal({ onClose, onCreate }) {
               style={{
                 padding: '6px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
                 border: '1.5px solid var(--border)', transition: 'all 0.1s',
-                background: docType === t.id ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+                background: docType === t.id ? 'var(--navy)' : 'var(--bg-hover)',
                 color: docType === t.id ? '#fff' : 'var(--text-secondary)',
               }}>
               {t.icon} {t.label}
@@ -448,7 +448,7 @@ function NewDocModal({ onClose, onCreate }) {
             style={{
               padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               border: 'none', cursor: !title.trim() || creating ? 'default' : 'pointer',
-              background: !title.trim() || creating ? 'var(--border)' : 'var(--navy, #1a3a5c)',
+              background: !title.trim() || creating ? 'var(--border)' : 'var(--navy)',
               color: '#fff',
             }}>
             {creating ? 'Oluşturuluyor…' : 'Oluştur'}
@@ -490,7 +490,7 @@ function UploadModal({ onClose, onUpload }) {
           background: file ? '#f0fdf4' : 'var(--bg-hover)',
         }}
           onClick={() => document.getElementById('doc-file-input')?.click()}
-          onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--navy, #1a3a5c)'; }}
+          onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--navy)'; }}
           onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
           onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); e.currentTarget.style.borderColor = 'var(--border)'; }}
         >
@@ -527,7 +527,7 @@ function UploadModal({ onClose, onUpload }) {
             style={{
               padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               border: 'none', cursor: !file || uploading ? 'default' : 'pointer',
-              background: !file || uploading ? 'var(--border)' : 'var(--navy, #1a3a5c)',
+              background: !file || uploading ? 'var(--border)' : 'var(--navy)',
               color: '#fff',
             }}>
             {uploading ? 'Yükleniyor…' : 'Yükle'}
@@ -716,7 +716,7 @@ export default function Documents({ user }) {
           <button onClick={() => setShowNewDoc(true)} style={{
             padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 600,
             border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--navy, #1a3a5c)', color: '#fff',
+            background: 'var(--navy)', color: '#fff',
           }}>
             <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Yeni Doküman
           </button>
@@ -749,7 +749,7 @@ export default function Documents({ user }) {
           style={{
             padding: '6px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
             border: '1.5px solid var(--border)',
-            background: showArchived ? 'var(--navy, #1a3a5c)' : 'var(--bg-hover)',
+            background: showArchived ? 'var(--navy)' : 'var(--bg-hover)',
             color: showArchived ? '#fff' : 'var(--text-secondary)',
           }}>
           🗄 {showArchived ? 'Aktif' : 'Arşiv'}

@@ -171,14 +171,14 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
     <div style={{
       background: 'var(--bg-card)',
       borderRadius: 14,
-      border: '1px solid rgba(0,0,0,0.08)',
+      border: '1px solid var(--border)',
       boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
       marginBottom: 20,
       overflow: 'hidden',
     }}>
       <div style={{
         padding: '14px 20px',
-        borderBottom: '1px solid rgba(0,0,0,0.07)',
+        borderBottom: '1px solid var(--border)',
         background: 'var(--navy-pale)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
@@ -204,7 +204,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
         style={{
           width: '100%', boxSizing: 'border-box',
           padding: '10px 13px', borderRadius: 9,
-          border: `1.5px solid ${errors[key] ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
+          border: `1.5px solid ${errors[key] ? 'var(--red)' : 'var(--border)'}`,
           fontSize: 14, fontFamily: 'inherit',
           color: 'var(--text)', background: 'var(--bg-card)', outline: 'none',
           transition: 'border-color 0.15s',
@@ -219,7 +219,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
   return (
     <div className="page-container" style={{ maxWidth: 640 }}>
       {/* Başlık */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="page-header">
         <h1 className="page-title">👤 Profil Ayarları</h1>
         <p className="page-subtitle">Kişisel bilgilerini ve hesap ayarlarını yönet</p>
       </div>
@@ -284,28 +284,15 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
+                className="btn btn-outline"
                 onClick={() => fileInputRef.current?.click()}
-                style={{
-                  padding: '9px 18px', borderRadius: 9,
-                  border: '1.5px solid var(--navy-pale)',
-                  background: 'var(--bg-card)', cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, color: 'var(--navy)',
-                  fontFamily: 'inherit',
-                }}
               >📁 Resim Seç</button>
               {avatarFile && (
                 <button
                   type="button"
+                  className="btn btn-primary"
                   onClick={handleUploadAvatar}
                   disabled={uploadingAvatar}
-                  style={{
-                    padding: '9px 18px', borderRadius: 9,
-                    border: 'none',
-                    background: uploadingAvatar ? 'var(--navy-pale)' : 'var(--navy)',
-                    cursor: uploadingAvatar ? 'not-allowed' : 'pointer',
-                    fontSize: 13, fontWeight: 700, color: 'white',
-                    fontFamily: 'inherit',
-                  }}
                 >
                   {uploadingAvatar ? '⏳ Yükleniyor…' : '⬆️ Kaydet'}
                 </button>
@@ -332,7 +319,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
               </div>
               <div style={{
                 padding: '10px 13px', borderRadius: 9,
-                border: '1.5px solid rgba(0,0,0,0.1)',
+                border: '1.5px solid var(--border)',
                 fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
               }}>
                 {ROLE_LABELS[profile?.role] || profile?.role || '—'}
@@ -344,7 +331,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
               </div>
               <div style={{
                 padding: '10px 13px', borderRadius: 9,
-                border: '1.5px solid rgba(0,0,0,0.1)',
+                border: '1.5px solid var(--border)',
                 fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
               }}>
                 {profile?.unit || '—'}
@@ -358,14 +345,9 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
 
           <button
             type="submit"
+            className="btn btn-primary"
             disabled={saving}
-            style={{
-              width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: saving ? 'var(--navy-pale)' : 'var(--navy)',
-              color: 'white', fontWeight: 700, fontSize: 14,
-              cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-              marginTop: 4,
-            }}
+            style={{ width: '100%', marginTop: 4 }}
           >
             {saving ? '⏳ Kaydediliyor…' : '💾 Kaydet'}
           </button>
@@ -381,7 +363,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
             </div>
             <div style={{
               padding: '10px 13px', borderRadius: 9,
-              border: '1.5px solid rgba(0,0,0,0.1)',
+              border: '1.5px solid var(--border)',
               fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-hover)',
             }}>
               {user?.email || '—'}
@@ -400,7 +382,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 padding: '10px 13px', borderRadius: 9,
-                border: `1.5px solid ${errors.email ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
+                border: `1.5px solid ${errors.email ? 'var(--red)' : 'var(--border)'}`,
                 fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', outline: 'none',
               }}
             />
@@ -409,14 +391,9 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
 
           <button
             type="submit"
+            className="btn btn-primary"
             disabled={savingEmail || !newEmail.trim()}
-            style={{
-              width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: (!newEmail.trim() || savingEmail) ? 'var(--navy-pale)' : 'var(--navy)',
-              color: 'white', fontWeight: 700, fontSize: 14,
-              cursor: (!newEmail.trim() || savingEmail) ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit',
-            }}
+            style={{ width: '100%' }}
           >
             {savingEmail ? '⏳ Gönderiliyor…' : '📧 Doğrulama E-postası Gönder'}
           </button>
@@ -442,7 +419,7 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '10px 13px', borderRadius: 9,
-                  border: `1.5px solid ${errors[key] ? 'var(--red)' : 'rgba(0,0,0,0.15)'}`,
+                  border: `1.5px solid ${errors[key] ? 'var(--red)' : 'var(--border)'}`,
                   fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', outline: 'none',
                 }}
               />
@@ -452,13 +429,9 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
 
           <button
             type="submit"
+            className="btn btn-primary"
             disabled={savingPw}
-            style={{
-              width: '100%', padding: '11px', borderRadius: 10, border: 'none',
-              background: savingPw ? 'var(--navy-pale)' : 'var(--navy)',
-              color: 'white', fontWeight: 700, fontSize: 14,
-              cursor: savingPw ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-            }}
+            style={{ width: '100%' }}
           >
             {savingPw ? '⏳ Kaydediliyor…' : '🔒 Şifreyi Güncelle'}
           </button>

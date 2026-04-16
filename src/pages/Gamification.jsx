@@ -158,7 +158,7 @@ function LeaderboardRow({ rank, profile, xpData, isMe }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-      borderRadius: 12, background: isMe ? '#eef2ff' : 'var(--bg-card, #fff)',
+      borderRadius: 12, background: isMe ? '#eef2ff' : 'var(--bg-card)',
       border: `1.5px solid ${isMe ? '#6366f130' : 'var(--border)'}`,
       transition: 'all 0.15s',
     }}>
@@ -446,7 +446,7 @@ export default function Gamification({ user, profile }) {
                 style={{
                   padding: '6px 16px', borderRadius: 16, fontSize: 12.5, cursor: 'pointer',
                   border: `1.5px solid ${lbPeriod === p.id ? '#6366f1' : 'var(--border)'}`,
-                  background: lbPeriod === p.id ? '#6366f1' : 'var(--bg-card, #fff)',
+                  background: lbPeriod === p.id ? '#6366f1' : 'var(--bg-card)',
                   color: lbPeriod === p.id ? '#fff' : 'var(--text-muted)',
                   fontWeight: lbPeriod === p.id ? 700 : 500,
                 }}>
@@ -537,7 +537,7 @@ export default function Gamification({ user, profile }) {
                 {leaderHistoryList.map((lh) => (
                   <div key={lh.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                    borderRadius: 12, background: 'var(--bg-card, #fff)',
+                    borderRadius: 12, background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
                   }}>
                     <div style={{
@@ -637,7 +637,7 @@ export default function Gamification({ user, profile }) {
                   return (
                     <div key={action} style={{
                       padding: '10px 12px', borderRadius: 12,
-                      background: 'var(--bg-card, #fff)',
+                      background: 'var(--bg-card)',
                       border: '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', gap: 8,
                     }}>
@@ -657,7 +657,7 @@ export default function Gamification({ user, profile }) {
                 return (
                   <div key={event.id || i} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                    borderRadius: 10, background: 'var(--bg-card, #fff)',
+                    borderRadius: 10, background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
                   }}>
                     <div style={{
@@ -747,7 +747,7 @@ export default function Gamification({ user, profile }) {
               }}
               style={{
                 padding: '9px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'var(--navy, #1A3C5E)', color: '#fff', fontWeight: 700, fontSize: 13,
+                background: 'var(--navy)', color: '#fff', fontWeight: 700, fontSize: 13,
                 alignSelf: 'flex-end',
               }}
             >

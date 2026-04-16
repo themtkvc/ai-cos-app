@@ -45,7 +45,7 @@ function deadlineBadge(dateStr, completed) {
   const diff = Math.ceil((dl - now) / 86400000);
   if (diff < 0) return <span style={{ ...styles.deadlineBadge, color: '#dc2626', background: '#fee2e2' }}>🔴 {Math.abs(diff)} gün gecikti</span>;
   if (diff <= 7) return <span style={{ ...styles.deadlineBadge, color: '#d97706', background: '#fffbeb' }}>⚠️ {diff === 0 ? 'Bugün!' : diff + ' gün kaldı'}</span>;
-  return <span style={{ ...styles.deadlineBadge, color: '#6b7280', background: 'var(--bg-secondary, #f3f4f6)' }}>📅 {fmtDate(dateStr)}</span>;
+  return <span style={{ ...styles.deadlineBadge, color: '#6b7280', background: 'var(--bg-secondary)' }}>📅 {fmtDate(dateStr)}</span>;
 }
 
 function StatusBadge({ p }) {
@@ -63,7 +63,7 @@ function Modal({ open, onClose, title, children }) {
   return (
     <div style={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={styles.modal}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: 'var(--navy, #1a3a5c)' }}>{title}</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: 'var(--navy)' }}>{title}</h2>
         {children}
       </div>
     </div>
@@ -76,7 +76,7 @@ function Modal({ open, onClose, title, children }) {
 function Toast({ message, visible }) {
   return (
     <div style={{
-      position: 'fixed', bottom: 24, right: 24, background: 'var(--navy, #1a3a5c)', color: '#fff',
+      position: 'fixed', bottom: 24, right: 24, background: 'var(--navy)', color: '#fff',
       padding: '12px 20px', borderRadius: 12, fontSize: 13, fontWeight: 600, zIndex: 2000,
       opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(20px)',
       transition: 'all 0.3s', pointerEvents: 'none',
@@ -357,7 +357,7 @@ export default function Goals({ user, profile }) {
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 40px' }}>
       {/* Tab Bar */}
       <div style={styles.tabBar}>
-        <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text, #111827)', marginRight: 24, display: 'flex', alignItems: 'center', gap: 8 }}>🎯 Hedefler</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginRight: 24, display: 'flex', alignItems: 'center', gap: 8 }}>🎯 Hedefler</h1>
         {[
           { label: 'Genel Görünüm', count: filteredKurum.length },
           { label: 'Birim Hedefleri', count: filteredBirim.length },
@@ -365,14 +365,14 @@ export default function Goals({ user, profile }) {
         ].map((tab, i) => (
           <button key={i} onClick={() => setActiveTab(i)} style={{
             ...styles.tabBtn,
-            color: activeTab === i ? 'var(--navy, #1a3a5c)' : 'var(--text-muted, #6b7280)',
-            borderBottomColor: activeTab === i ? 'var(--navy, #1a3a5c)' : 'transparent',
+            color: activeTab === i ? 'var(--navy)' : 'var(--text-muted)',
+            borderBottomColor: activeTab === i ? 'var(--navy)' : 'transparent',
             fontWeight: activeTab === i ? 700 : 500,
           }}>
             {tab.label}
             <span style={{
-              background: activeTab === i ? 'var(--navy, #1a3a5c)' : 'var(--bg-secondary, #e5e7eb)',
-              color: activeTab === i ? '#fff' : 'var(--text-muted, #6b7280)',
+              background: activeTab === i ? 'var(--navy)' : 'var(--bg-secondary)',
+              color: activeTab === i ? '#fff' : 'var(--text-muted)',
               fontSize: 10, padding: '1px 7px', borderRadius: 10, marginLeft: 6,
             }}>{tab.count}</span>
           </button>
@@ -381,13 +381,13 @@ export default function Goals({ user, profile }) {
 
       {/* Period Bar */}
       <div style={styles.periodBar}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #6b7280)', marginRight: 8 }}>Dönem:</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginRight: 8 }}>Dönem:</span>
         {PERIODS.map(p => (
           <button key={p} onClick={() => setActivePeriod(p)} style={{
             ...styles.periodBtn,
-            background: p === activePeriod ? 'var(--navy, #1a3a5c)' : 'var(--card-bg, #fff)',
-            color: p === activePeriod ? '#fff' : 'var(--text-muted, #6b7280)',
-            borderColor: p === activePeriod ? 'var(--navy, #1a3a5c)' : 'var(--border, #e5e7eb)',
+            background: p === activePeriod ? 'var(--navy)' : 'var(--bg-card)',
+            color: p === activePeriod ? '#fff' : 'var(--text-muted)',
+            borderColor: p === activePeriod ? 'var(--navy)' : 'var(--border)',
           }}>{p}</button>
         ))}
         <div style={{ marginLeft: 'auto' }}>
@@ -451,8 +451,8 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
     <>
       {/* Desc */}
       <div style={styles.descBox}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy, #1a3a5c)', marginBottom: 6 }}>🏗️ Genel Görünüm — Departman Hedefleri</h2>
-        <p style={{ fontSize: 13, color: 'var(--text, #374151)', lineHeight: 1.6 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)', marginBottom: 6 }}>🏗️ Genel Görünüm — Departman Hedefleri</h2>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
           Departman hedefleri, birim hedeflerine bağlanır. İlerleme otomatik hesaplanır.{' '}
           <span style={styles.tag}>🔗 Bağlantılı</span> etiketli hedefler diğer sekmelerdeki verilerle senkronize çalışır.
         </p>
@@ -472,7 +472,7 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
       {kurumGoals.length === 0 ? (
         <div style={styles.emptyState}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-          <p style={{ fontSize: 14, color: 'var(--text-muted, #9ca3af)' }}>Bu dönem için departman hedefi yok.</p>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Bu dönem için departman hedefi yok.</p>
         </div>
       ) : kurumGoals.map(kg => {
         const prog = kurumProgress(kg);
@@ -481,17 +481,17 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
         const linkedBG = birimGoals.filter(b => linkedIds.includes(b.id));
 
         return (
-          <div key={kg.id} style={{ ...styles.card, borderLeft: '5px solid var(--navy, #1a3a5c)' }}>
+          <div key={kg.id} style={{ ...styles.card, borderLeft: '5px solid var(--navy)' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={styles.treeLabel}>Departman Hedefi</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text, #111827)' }}>{kg.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{kg.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>{kg.metric} · İlerleme: {fmtN(prog.current)}/{fmtN(prog.target)} · {kg.period}</span>
                   {kg.owner_name && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ ...styles.avatar, background: 'var(--navy, #1a3a5c)', width: 20, height: 20, fontSize: 8 }}>{kg.owner_initials || '?'}</span>
+                      <span style={{ ...styles.avatar, background: 'var(--navy)', width: 20, height: 20, fontSize: 8 }}>{kg.owner_initials || '?'}</span>
                       {kg.owner_name}
                     </span>
                   )}
@@ -528,8 +528,8 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text, #111827)' }}>{bg.title}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{bg.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           Koordinatör: {unit.coord} · Hedef: {fmtN(Number(bg.target))} · Mevcut: {fmtN(Number(bg.current_value))}
                           {deadlineBadge(bg.deadline, bp >= 100)}
                         </div>
@@ -548,7 +548,7 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ ...styles.avatar, background: pg.person_color || '#7c3aed' }}>{pg.person_initials || '?'}</span>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text, #111827)' }}>{pg.person_name} — {pg.title}</div>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{pg.person_name} — {pg.title}</div>
                               <div style={{ ...styles.progressRow, marginTop: 4 }}>
                                 <div style={{ ...styles.progressWrap, height: 5 }}><div style={{ ...styles.progressBar, width: `${pp}%`, background: pg.person_color || '#7c3aed' }} /></div>
                                 <span style={{ fontSize: 11, fontWeight: 700, color: pg.person_color || '#7c3aed' }}>{Number(pg.current_value)}/{Number(pg.target)}</span>
@@ -580,8 +580,8 @@ function Tab1BirimGoals({ birimGoals, countBirimLinks, onEdit, onDelete, onAddFo
   return (
     <>
       <div style={styles.descBox}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy, #1a3a5c)', marginBottom: 6 }}>📊 Birim Hedefleri</h2>
-        <p style={{ fontSize: 13, color: 'var(--text, #374151)', lineHeight: 1.6 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)', marginBottom: 6 }}>📊 Birim Hedefleri</h2>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
           Her birimin hedefleri burada yönetilir. Burası <strong>tek veri kaynağıdır</strong> — burada güncellenen hedefler
           Genel Görünüm ve OKR sekmelerinde otomatik yansır. <span style={styles.tag}>🔗</span> simgesi diğer sekmelere bağlı hedefleri gösterir.
         </p>
@@ -596,24 +596,24 @@ function Tab1BirimGoals({ birimGoals, countBirimLinks, onEdit, onDelete, onAddFo
             <div key={unit.key} style={{ ...styles.card, borderTop: `4px solid ${unit.color}` }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted, #6b7280)', fontWeight: 600 }}>{unit.icon} {unit.name.toUpperCase()}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)' }}>Koordinatör: {unit.coord}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{unit.icon} {unit.name.toUpperCase()}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Koordinatör: {unit.coord}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 22, fontWeight: 800, color: unit.color }}>{avgP}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted, #6b7280)' }}>Genel İlerleme</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Genel İlerleme</div>
                 </div>
               </div>
 
               {goals.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted, #9ca3af)', fontSize: 13 }}>Henüz hedef yok</div>
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>Henüz hedef yok</div>
               ) : goals.map(g => {
                 const p = pct(Number(g.current_value), Number(g.target));
                 const lc = countBirimLinks(g.id);
                 return (
                   <div key={g.id} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', fontSize: 12.5, fontWeight: 600, marginBottom: 4, gap: 6 }}>
-                      <span style={{ flex: 1, color: 'var(--text, #111827)' }}>{g.title}</span>
+                      <span style={{ flex: 1, color: 'var(--text)' }}>{g.title}</span>
                       {lc > 0 && <span style={styles.linkBadge}>🔗 {lc}</span>}
                       <span style={{ color: unit.color, whiteSpace: 'nowrap', fontWeight: 700 }}>{fmtN(Number(g.current_value))}/{fmtN(Number(g.target))}{p >= 100 ? ' ✅' : ''}</span>
                       {deadlineBadge(g.deadline, p >= 100)}
@@ -645,8 +645,8 @@ function Tab2OKR({ objectives, keyResults, birimGoals, krData, onEditOKR, onDele
   return (
     <>
       <div style={styles.descBox}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy, #1a3a5c)', marginBottom: 6 }}>🎯 OKR — Objectives & Key Results</h2>
-        <p style={{ fontSize: 13, color: 'var(--text, #374151)', lineHeight: 1.6 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)', marginBottom: 6 }}>🎯 OKR — Objectives & Key Results</h2>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
           Anahtar sonuçlar birim hedeflerine <strong>bağlanabilir</strong> — bağlı olanlar otomatik senkronize olur.{' '}
           <span style={styles.tag}>🔗</span> simgesi birim hedefine bağlı anahtar sonuçları gösterir. Puanlama 0.0-1.0.
         </p>
@@ -662,7 +662,7 @@ function Tab2OKR({ objectives, keyResults, birimGoals, krData, onEditOKR, onDele
       {objectives.length === 0 ? (
         <div style={styles.emptyState}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
-          <p style={{ fontSize: 14, color: 'var(--text-muted, #9ca3af)' }}>Bu dönem için OKR yok.</p>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Bu dönem için OKR yok.</p>
         </div>
       ) : objectives.map((o, idx) => {
         const unit = U(o.unit);
@@ -706,11 +706,11 @@ function Tab2OKR({ objectives, keyResults, birimGoals, krData, onEditOKR, onDele
                 <div key={kr.id} style={{ ...styles.card, display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 10, marginTop: kri === 0 ? 10 : 0 }}>
                   <div style={{ width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, flexShrink: 0, ...scoreCSS }}>{sf}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text, #111827)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                       KS{kri + 1}: {kr.title}
                       {linked && <span onClick={() => onSwitchTab(1)} style={styles.linkBadge} title={`Birim hedefinden çekiliyor: ${linked.title}`}>🔗 Senkron</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted, #6b7280)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       Hedef: {fmtN(d.target)} · Mevcut: {fmtN(d.current)}{score >= 1 ? ' · ✅ Tamamlandı' : ''}
                       {deadlineBadge(d.deadline, score >= 1)}
                     </div>
@@ -826,24 +826,24 @@ function LinkBirimForm({ available, currentLinks, onSave, onCancel }) {
 
   return (
     <>
-      <p style={{ fontSize: 13, color: 'var(--text-muted, #6b7280)', marginBottom: 12 }}>Departman hedefine bağlamak istediğiniz birim hedeflerini seçin:</p>
-      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border, #e5e7eb)', borderRadius: 10, padding: 8 }}>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Departman hedefine bağlamak istediğiniz birim hedeflerini seçin:</p>
+      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 8 }}>
         {available.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted, #9ca3af)' }}>Bu dönemde birim hedefi yok.</div>
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>Bu dönemde birim hedefi yok.</div>
         ) : available.map(b => {
           const unit = U(b.unit);
           const isLinked = selected.includes(b.id);
           return (
             <div key={b.id} onClick={() => toggle(b.id)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-              background: isLinked ? 'var(--bg-accent, #eff6ff)' : 'transparent',
-              border: isLinked ? '1px solid var(--border-accent, #bfdbfe)' : '1px solid transparent',
+              background: isLinked ? 'var(--bg-accent)' : 'transparent',
+              border: isLinked ? '1px solid var(--border-accent)' : '1px solid transparent',
               marginBottom: 4, transition: 'all 0.15s',
             }}>
               <input type="checkbox" checked={isLinked} readOnly style={{ accentColor: '#2563eb', width: 16, height: 16 }} />
               <span>{unit.icon}</span>
-              <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: 'var(--text, #111827)' }}>{b.title}</span>
-              <span style={{ color: 'var(--text-muted, #6b7280)', fontSize: 11 }}>{fmtN(Number(b.current_value))}/{fmtN(Number(b.target))}</span>
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: 'var(--text)' }}>{b.title}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{fmtN(Number(b.current_value))}/{fmtN(Number(b.target))}</span>
             </div>
           );
         })}
@@ -974,9 +974,9 @@ function KeyResultForm({ initial, availableBirim, birimGoals, onSave, onCancel }
 // ═══════════════════════════════════════════════════
 function KpiCard({ value, label, color, borderColor }) {
   return (
-    <div style={{ flex: 1, minWidth: 100, background: 'var(--card-bg, #fff)', border: `1px solid ${borderColor || 'var(--border, #e5e7eb)'}`, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+    <div style={{ flex: 1, minWidth: 100, background: 'var(--bg-card)', border: `1px solid ${borderColor || 'var(--border)'}`, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
       <div style={{ fontSize: 26, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted, #6b7280)', marginTop: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
     </div>
   );
 }
@@ -986,7 +986,7 @@ function KpiCard({ value, label, color, borderColor }) {
 // ═══════════════════════════════════════════════════
 const styles = {
   tabBar: {
-    display: 'flex', alignItems: 'center', borderBottom: '2px solid var(--border, #e5e7eb)',
+    display: 'flex', alignItems: 'center', borderBottom: '2px solid var(--border)',
     marginBottom: 20, paddingTop: 8, flexWrap: 'wrap', gap: 0,
   },
   tabBtn: {
@@ -996,20 +996,20 @@ const styles = {
   },
   periodBar: { display: 'flex', gap: 6, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' },
   periodBtn: {
-    padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--border, #e5e7eb)',
+    padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--border)',
     fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
   },
   card: {
-    background: 'var(--card-bg, #fff)', border: '1px solid var(--border, #e5e7eb)',
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
     borderRadius: 14, padding: 20, marginBottom: 16, transition: 'box-shadow 0.2s',
   },
   kpiStrip: { display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
   descBox: {
-    background: 'var(--bg-accent, #eff6ff)', border: '1px solid var(--border-accent, #bfdbfe)',
+    background: 'var(--bg-accent)', border: '1px solid var(--border-accent)',
     borderRadius: 12, padding: '16px 20px', marginBottom: 24,
   },
   tag: {
-    display: 'inline-block', background: 'var(--navy, #1a3a5c)', color: '#fff',
+    display: 'inline-block', background: 'var(--navy)', color: '#fff',
     padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
   },
   badge: { padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
@@ -1019,31 +1019,31 @@ const styles = {
     color: '#7c3aed', background: '#f3e8ff', padding: '2px 8px', borderRadius: 6, cursor: 'pointer',
   },
   progressRow: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 },
-  progressWrap: { background: 'var(--bg-secondary, #f3f4f6)', borderRadius: 8, height: 10, overflow: 'hidden', flex: 1 },
+  progressWrap: { background: 'var(--bg-secondary)', borderRadius: 8, height: 10, overflow: 'hidden', flex: 1 },
   progressBar: { height: '100%', borderRadius: 8, transition: 'width 0.6s ease' },
-  treeLabel: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted, #6b7280)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  treeLabel: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   avatar: { width: 24, height: 24, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 },
   actionBtn: {
-    width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border, #e5e7eb)',
-    background: 'var(--card-bg, #fff)', cursor: 'pointer', display: 'flex', alignItems: 'center',
+    width: 28, height: 28, borderRadius: 8, border: '1px solid var(--border)',
+    background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center',
     justifyContent: 'center', fontSize: 12, transition: 'all 0.15s',
   },
   deleteBtn: {},
   addSubBtn: {
     display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8,
-    border: '1.5px dashed var(--border, #d1d5db)', background: 'transparent', cursor: 'pointer',
-    fontSize: 12, fontWeight: 600, color: 'var(--text-muted, #6b7280)', transition: 'all 0.15s',
+    border: '1.5px dashed var(--border)', background: 'transparent', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', transition: 'all 0.15s',
     marginTop: 8, fontFamily: 'inherit', width: '100%',
   },
   primaryBtn: {
     padding: '8px 16px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit', background: 'var(--navy, #1a3a5c)', color: '#fff',
+    cursor: 'pointer', fontFamily: 'inherit', background: 'var(--navy)', color: '#fff',
     transition: 'all 0.15s',
   },
   outlineBtn: {
-    padding: '8px 16px', borderRadius: 10, border: '1.5px solid var(--border, #e5e7eb)',
-    background: 'var(--card-bg, #fff)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    fontFamily: 'inherit', color: 'var(--text, #374151)', transition: 'all 0.15s',
+    padding: '8px 16px', borderRadius: 10, border: '1.5px solid var(--border)',
+    background: 'var(--bg-card)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    fontFamily: 'inherit', color: 'var(--text)', transition: 'all 0.15s',
   },
   emptyState: { textAlign: 'center', padding: '60px 20px' },
   unitGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 },
@@ -1052,15 +1052,15 @@ const styles = {
     zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   modal: {
-    background: 'var(--card-bg, #fff)', borderRadius: 16, padding: 28, width: '90%', maxWidth: 560,
+    background: 'var(--bg-card)', borderRadius: 16, padding: 28, width: '90%', maxWidth: 560,
     maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
   },
   formGroup: { marginBottom: 16 },
-  formLabel: { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text, #374151)', marginBottom: 6 },
+  formLabel: { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 6 },
   formInput: {
-    width: '100%', padding: '10px 14px', border: '1.5px solid var(--border, #e5e7eb)', borderRadius: 10,
-    fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--card-bg, #fff)',
-    color: 'var(--text, #111827)', boxSizing: 'border-box',
+    width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
+    fontSize: 13, fontFamily: 'inherit', outline: 'none', background: 'var(--bg-card)',
+    color: 'var(--text)', boxSizing: 'border-box',
   },
   formRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   modalActions: { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 },

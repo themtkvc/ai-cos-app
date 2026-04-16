@@ -27,7 +27,7 @@ const STATUS_COLORS = {
 function KpiCard({ icon, label, value, color }) {
   return (
     <div style={{
-      background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
       borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14,
       boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
     }}>
@@ -59,7 +59,7 @@ function EmailDetailModal({ email, onClose }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-card, #fff)', borderRadius: 16, width: '100%', maxWidth: 560,
+        background: 'var(--bg-card)', borderRadius: 16, width: '100%', maxWidth: 560,
         maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
         {/* Header */}
@@ -104,7 +104,7 @@ function EmailDetailModal({ email, onClose }) {
                 Ek Bilgiler
               </div>
               <pre style={{
-                background: 'var(--bg-sidebar, #f8fafc)', borderRadius: 8, padding: 12,
+                background: 'var(--bg-sidebar)', borderRadius: 8, padding: 12,
                 fontSize: 12, overflow: 'auto', maxHeight: 200,
                 color: 'var(--text)', border: '1px solid var(--border)',
               }}>{JSON.stringify(email.metadata, null, 2)}</pre>
@@ -229,7 +229,7 @@ export default function SystemEmails() {
       {/* Filtreler */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20,
-        background: 'var(--bg-card, #fff)', padding: '14px 18px', borderRadius: 12,
+        background: 'var(--bg-card)', padding: '14px 18px', borderRadius: 12,
         border: '1px solid var(--border)',
       }}>
         <input
@@ -239,26 +239,26 @@ export default function SystemEmails() {
           onChange={e => { setSearch(e.target.value); setPage(0); }}
           style={{
             flex: 1, minWidth: 200, padding: '8px 14px', borderRadius: 8,
-            border: '1px solid var(--border)', background: 'var(--bg-input, #fff)',
+            border: '1px solid var(--border)', background: 'var(--bg-input)',
             color: 'var(--text)', fontSize: 13,
           }}
         />
         <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0); }}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input, #fff)', color: 'var(--text)', fontSize: 13 }}>
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 13 }}>
           <option value="all">Tüm Türler</option>
           {Object.entries(EMAIL_TYPES).map(([key, { label, icon }]) => (
             <option key={key} value={key}>{icon} {label}</option>
           ))}
         </select>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input, #fff)', color: 'var(--text)', fontSize: 13 }}>
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 13 }}>
           <option value="all">Tüm Durumlar</option>
           <option value="sent">✅ Gönderildi</option>
           <option value="failed">❌ Başarısız</option>
           <option value="pending">⏳ Bekliyor</option>
         </select>
         <select value={dateFilter} onChange={e => { setDateFilter(e.target.value); setPage(0); }}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input, #fff)', color: 'var(--text)', fontSize: 13 }}>
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', fontSize: 13 }}>
           <option value="all">Tüm Zamanlar</option>
           <option value="today">Bugün</option>
           <option value="week">Son 7 Gün</option>
@@ -266,17 +266,17 @@ export default function SystemEmails() {
         </select>
         <button onClick={fetchEmails} style={{
           padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
-          background: 'var(--bg-input, #fff)', color: 'var(--text)', cursor: 'pointer', fontSize: 13,
+          background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer', fontSize: 13,
         }}>🔄 Yenile</button>
       </div>
 
       {/* Tablo */}
       <div style={{
-        background: 'var(--bg-card, #fff)', borderRadius: 12,
+        background: 'var(--bg-card)', borderRadius: 12,
         border: '1px solid var(--border)', overflow: 'hidden',
       }}>
         {loading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>Yükleniyor...</div>
+          <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>
             {emails.length === 0 ? '📭 Henüz gönderilmiş mail yok' : '🔍 Filtrelerle eşleşen mail bulunamadı'}
@@ -285,7 +285,7 @@ export default function SystemEmails() {
           <>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: 'var(--bg-sidebar, #f8fafc)' }}>
+                <tr style={{ background: 'var(--bg-sidebar)' }}>
                   <th style={thStyle}>Tür</th>
                   <th style={thStyle}>Alıcı</th>
                   <th style={thStyle}>Konu</th>
@@ -301,7 +301,7 @@ export default function SystemEmails() {
                     <tr key={email.id}
                       onClick={() => setSelectedEmail(email)}
                       style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-sidebar, #f8fafc)'}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-sidebar)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={tdStyle}>
                         <span style={{
@@ -382,7 +382,7 @@ const tdStyle = {
 const pageBtnStyle = (disabled) => ({
   padding: '6px 16px', borderRadius: 8, fontSize: 13,
   border: '1px solid var(--border)',
-  background: disabled ? 'transparent' : 'var(--bg-input, #fff)',
+  background: disabled ? 'transparent' : 'var(--bg-input)',
   color: disabled ? 'var(--text-secondary)' : 'var(--text)',
   cursor: disabled ? 'default' : 'pointer',
   opacity: disabled ? 0.5 : 1,

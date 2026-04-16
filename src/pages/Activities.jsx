@@ -104,10 +104,10 @@ function ActivityTable({ data, page, setPage, pageSize }) {
   const paged = data.slice(page * pageSize, (page + 1) * pageSize);
 
   return (
-    <div style={{ background: 'var(--bg-card, #fff)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ background: 'var(--bg-sidebar, #f8fafc)' }}>
+          <tr style={{ background: 'var(--bg-sidebar)' }}>
             <th style={thStyle}>Kullanıcı</th>
             <th style={thStyle}>İşlem</th>
             <th style={thStyle}>Modül</th>
@@ -122,7 +122,7 @@ function ActivityTable({ data, page, setPage, pageSize }) {
             const verb = ACTION_VERBS[item.action] || { icon: '•', color: '#6b7280' };
             return (
               <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-sidebar, #f8fafc)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-sidebar)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <td style={tdStyle}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{item.user_name}</div>
@@ -295,7 +295,7 @@ export default function Activities() {
       {/* Filtreler */}
       <div style={{
         display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20,
-        background: 'var(--bg-card, #fff)', padding: '14px 18px', borderRadius: 12,
+        background: 'var(--bg-card)', padding: '14px 18px', borderRadius: 12,
         border: '1px solid var(--border)',
       }}>
         <input type="text" placeholder="Kullanıcı, işlem, modül ara..." value={search}
@@ -330,23 +330,23 @@ export default function Activities() {
 
         <button onClick={fetchActivities} style={{
           padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
-          background: 'var(--bg-input, #fff)', color: 'var(--text)', cursor: 'pointer', fontSize: 13,
+          background: 'var(--bg-input)', color: 'var(--text)', cursor: 'pointer', fontSize: 13,
         }}>🔄</button>
       </div>
 
       {/* İçerik */}
       {loading ? (
-        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>Yükleniyor...</div>
+        <div style={{ display:'flex', justifyContent:'center', padding: 60 }}><div className="loading-spinner" /></div>
       ) : filtered.length === 0 ? (
         <div style={{
           padding: 60, textAlign: 'center', color: 'var(--text-secondary)',
-          background: 'var(--bg-card, #fff)', borderRadius: 12, border: '1px solid var(--border)',
+          background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
         }}>
           {activities.length === 0 ? '📭 Henüz aktivite kaydı yok. Sistemde işlem yapıldıkça burada görünecek.' : '🔍 Filtrelerle eşleşen aktivite bulunamadı'}
         </div>
       ) : viewMode === 'timeline' ? (
         <div style={{
-          background: 'var(--bg-card, #fff)', borderRadius: 12,
+          background: 'var(--bg-card)', borderRadius: 12,
           border: '1px solid var(--border)', padding: '8px 20px',
         }}>
           {Object.entries(groupedByDay).map(([day, items]) => (
@@ -355,7 +355,7 @@ export default function Activities() {
                 fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)',
                 padding: '14px 0 6px', borderBottom: '2px solid var(--border)',
                 textTransform: 'capitalize', position: 'sticky', top: 0,
-                background: 'var(--bg-card, #fff)', zIndex: 1,
+                background: 'var(--bg-card)', zIndex: 1,
               }}>{day}</div>
               {items.map(item => <TimelineCard key={item.id} item={item} />)}
             </div>
@@ -380,7 +380,7 @@ export default function Activities() {
 function KpiCard({ icon, label, value, color }) {
   return (
     <div style={{
-      background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
       borderRadius: 12, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14,
       boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
     }}>
@@ -420,23 +420,23 @@ const thStyle = {
 const tdStyle = { padding: '12px 16px', fontSize: 13 };
 const inputStyle = {
   flex: 1, minWidth: 200, padding: '8px 14px', borderRadius: 8,
-  border: '1px solid var(--border)', background: 'var(--bg-input, #fff)',
+  border: '1px solid var(--border)', background: 'var(--bg-input)',
   color: 'var(--text)', fontSize: 13,
 };
 const selectStyle = {
   padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
-  background: 'var(--bg-input, #fff)', color: 'var(--text)', fontSize: 13,
+  background: 'var(--bg-input)', color: 'var(--text)', fontSize: 13,
 };
 const tabBtnStyle = (active) => ({
   padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
   border: active ? '2px solid #2563eb' : '1px solid var(--border)',
-  background: active ? '#2563eb12' : 'var(--bg-input, #fff)',
+  background: active ? '#2563eb12' : 'var(--bg-input)',
   color: active ? '#2563eb' : 'var(--text)',
 });
 const pageBtnStyle = (disabled) => ({
   padding: '6px 16px', borderRadius: 8, fontSize: 13,
   border: '1px solid var(--border)',
-  background: disabled ? 'transparent' : 'var(--bg-input, #fff)',
+  background: disabled ? 'transparent' : 'var(--bg-input)',
   color: disabled ? 'var(--text-secondary)' : 'var(--text)',
   cursor: disabled ? 'default' : 'pointer',
   opacity: disabled ? 0.5 : 1,
