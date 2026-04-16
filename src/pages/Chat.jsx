@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { sendMessage, buildContext } from '../lib/claude';
 import { getChatHistory, saveChatMessage, clearChatHistory, getDeadlines, getDonors, getMeetingActions, getUnitReports } from '../lib/supabase';
 
@@ -160,7 +161,12 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
       .map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const reply = await sendMessage(history, context);
+      const reply = await sendMessage(history, context, {
+        role: profile?.role,
+        name: profile?.full_name,
+        unit: profile?.unit,
+        userId: user.id,
+      });
       const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: reply, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMsg]);
       try { await saveChatMessage(user.id, 'assistant', reply); }
@@ -230,7 +236,7 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
             <div>
               <div
                 className={`message-bubble ${msg.role}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
               />
               <div className="message-time">{formatTime(msg.created_at)}</div>
             </div>

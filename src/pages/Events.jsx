@@ -165,7 +165,7 @@ function EventCard({ event, onClick }) {
 }
 
 // ── Ana Bileşen ───────────────────────────────────────────────────────────────
-export default function Events({ user, profile }) {
+export default function Events({ user, profile, onNavigate }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { supabase, logActivity } from '../lib/supabase';
 
 // ── Renk paleti (Google Keep tarzı) ──────────────────────────────────────────
@@ -332,7 +333,7 @@ function NoteEditor({ note, onSave, onClose, onDelete, userId }) {
 
   useEffect(() => {
     if (editorRef.current && note?.content) {
-      editorRef.current.innerHTML = note.content;
+      editorRef.current.innerHTML = DOMPurify.sanitize(note.content);
     }
   }, []);
 
@@ -567,7 +568,7 @@ function NoteCard({ note, onClick, onPin }) {
             fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5,
             maxHeight: 120, overflow: 'hidden', opacity: 0.85,
           }}
-            dangerouslySetInnerHTML={{ __html: note.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
           />
         )}
 
@@ -607,7 +608,7 @@ function NoteCard({ note, onClick, onPin }) {
 }
 
 // ── Ana Notes bileşeni ───────────────────────────────────────────────────────
-export default function Notes({ user }) {
+export default function Notes({ user, profile, onNavigate }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null | 'new' | note object
