@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getOrgChart, getAllProfiles } from '../lib/supabase';
+import { getOrgChart, getAllProfiles, updateUserProfile } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 const UNIT_COLORS = [
@@ -214,10 +214,36 @@ function UnitCard({ unit, color, profiles, search, onSelect }) {
 }
 
 // ── Direktör/Genel Müdür kartı + Yönetici Asistanı ──────────────────────────
-function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
+function DirectorCard({ profile, label = 'Direktör', assistants = [], isDirektor, allProfiles, onReload }) {
   const [err, setErr] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
   const name = profile?.full_name || profile?.email || label;
   const initials = name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+
+  const assignAsistant = async (userId) => {
+    setSaving(true);
+    await updateUserProfile(userId, { role: 'asistan' });
+    setSaving(false);
+    setShowPicker(false);
+    if (onReload) onReload();
+  };
+
+  const removeAsistant = async (userId) => {
+    if (!window.confirm('Bu kişinin yönetici asistanlığını kaldırmak istiyor musunuz?')) return;
+    setSaving(true);
+    await updateUserProfile(userId, { role: 'personel' });
+    setSaving(false);
+    if (onReload) onReload();
+  };
+
+  // Asistan olarak atanabilecek kişiler (direktör ve mevcut asistanlar hariç)
+  const assignable = (allProfiles || []).filter(p =>
+    p.user_id !== profile?.user_id &&
+    p.role !== 'direktor' &&
+    p.role !== 'asistan' &&
+    p.role !== 'direktor_yardimcisi'
+  );
 
   return (
     <div style={{
@@ -250,13 +276,62 @@ function DirectorCard({ profile, label = 'Direktör', assistants = [] }) {
       </div>
 
       {/* Yönetici Asistanı */}
-      {assistants.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-          {assistants.map(a => (
-            <AssistantRow key={a.user_id} profile={a} />
-          ))}
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Yönetici Asistanı</span>
+          {isDirektor && (
+            <button onClick={() => setShowPicker(!showPicker)} disabled={saving}
+              style={{ fontSize: 11, fontWeight: 600, color: 'var(--navy)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+              {showPicker ? '✕ İptal' : '+ Ata'}
+            </button>
+          )}
         </div>
-      )}
+
+        {assistants.length > 0 ? assistants.map(a => (
+          <div key={a.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <AssistantRow profile={a} />
+            {isDirektor && (
+              <button onClick={() => removeAsistant(a.user_id)} disabled={saving}
+                title="Asistanlıktan çıkar"
+                style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', opacity: saving ? 0.5 : 1 }}>
+                ✕
+              </button>
+            )}
+          </div>
+        )) : (
+          <div style={{ fontSize: 12, color: 'var(--text-light)', fontStyle: 'italic' }}>Henüz atanmamış</div>
+        )}
+
+        {/* Kişi seçici */}
+        {showPicker && (
+          <div style={{
+            marginTop: 8, padding: 10, borderRadius: 10,
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            maxHeight: 180, overflowY: 'auto',
+          }}>
+            {assignable.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 8 }}>Atanabilecek kişi yok</div>
+            ) : assignable.map(p => (
+              <button key={p.user_id} onClick={() => assignAsistant(p.user_id)} disabled={saving}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '6px 8px', borderRadius: 8, border: 'none',
+                  background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 12, color: 'var(--text)', textAlign: 'left',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover, #f3f4f6)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <span style={{ fontWeight: 600 }}>{p.full_name || p.email}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                  {ROLE_LABELS[p.role] || p.role}{p.unit ? ` · ${p.unit}` : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -303,13 +378,15 @@ export default function OrgChart({ user, profile, onNavigate }) {
 
   const isDirektor = ['direktor', 'direktor_yardimcisi', 'asistan'].includes(profile?.role);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.all([getOrgChart(), getAllProfiles()]).then(([{ data: c }, { data: p }]) => {
       setChart(c);
       setProfiles(p || []);
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const openProfile = (p, isCoord, color) => {
     setSelected(p);
@@ -392,6 +469,9 @@ export default function OrgChart({ user, profile, onNavigate }) {
           profile={headProfile}
           label={ROLE_LABELS[headProfile.role] || 'Direktör'}
           assistants={profiles.filter(p => p.role === 'asistan' && p.user_id !== headProfile.user_id)}
+          isDirektor={isDirektor}
+          allProfiles={profiles}
+          onReload={loadData}
         />
       )}
 

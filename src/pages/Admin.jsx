@@ -36,15 +36,15 @@ function StatusDot({ ok }) {
 // ── USER MANAGEMENT COMPONENT ──
 const ROLE_OPTIONS = [
   { value: 'direktor',            label: 'Direktör' },
-  { value: 'direktor_yardimcisi', label: 'Direktör Yardımcısı' },
-  { value: 'asistan',             label: 'Asistan' },
+  { value: 'direktor_yardimcisi', label: 'Direktör Yardımcısı (Hibeler)' },
+  { value: 'asistan',             label: 'Yönetici Asistanı' },
   { value: 'koordinator',         label: 'Koordinatör' },
   { value: 'personel',            label: 'Personel' },
 ];
 
 const UNIT_OPTIONS = [
-  'Partnerships', 'Humanitarian Affairs', 'Traditional Donors',
-  'Grants', 'Accreditations', 'Policy & Governance',
+  'Fonlar', 'Hibeler', 'İnsani İşler',
+  'Partnerlikler', 'Politika, Yönetişim ve Güvence',
 ];
 
 function UserManagement({ currentUser, notify }) {
