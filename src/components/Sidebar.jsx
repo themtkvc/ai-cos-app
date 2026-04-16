@@ -33,7 +33,6 @@ const ALL_NAV = [
 
 const ADMIN_NAV = [
   { id: 'admin', icon: '⚙️', label: 'Admin Paneli' },
-  { id: 'users', icon: '👥', label: 'Kullanıcı Yönetimi' },
 ];
 
 // Küçük avatar bileşeni — foto varsa göster, yoksa baş harfi

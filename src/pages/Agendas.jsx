@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getAgendaTypes,
+  createAgendaType,
+  updateAgendaType,
+  deleteAgendaType,
   getAgendasV2,
   getAgendaDetail,
   createAgenda,
@@ -1218,6 +1221,202 @@ function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, on
   );
 }
 
+// ── GÜNDEM TÜRÜ YÖNETİMİ ──────────────────────────────────────────────────────
+const TYPE_COLOR_OPTIONS = [
+  '#6366f1', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#84cc16',
+];
+
+const TYPE_ICON_OPTIONS = ['📋', '🎉', '👥', '🚀', '📚', '🤝', '🌍', '🏗️', '🎓', '💡', '📊', '🔬'];
+
+function AgendaTypeManagement({ notify }) {
+  const [types, setTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [form, setForm] = useState({ name: '', icon: '📋', color: '#6366f1', fields: [] });
+  const [saving, setSaving] = useState(false);
+  const [newField, setNewField] = useState({ key: '', label: '', type: 'text', required: false, placeholder: '' });
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await getAgendaTypes();
+    setTypes(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const openCreate = () => {
+    setEditItem(null);
+    setForm({ name: '', icon: '📋', color: '#6366f1', fields: [] });
+    setModal(true);
+  };
+
+  const openEdit = (t) => {
+    setEditItem(t);
+    setForm({ name: t.name, icon: t.icon, color: t.color, fields: t.fields || [] });
+    setModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    if (editItem) {
+      await updateAgendaType(editItem.id, { name: form.name.trim(), icon: form.icon, color: form.color, fields: form.fields });
+      notify('Tür güncellendi ✓');
+    } else {
+      await createAgendaType({ name: form.name.trim(), icon: form.icon, color: form.color, fields: form.fields, sort_order: types.length });
+      notify('Tür oluşturuldu ✓');
+    }
+    setSaving(false);
+    setModal(false);
+    load();
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`"${name}" türü silinsin mi? Bu türe bağlı gündemler etkilenmez.`)) return;
+    await deleteAgendaType(id);
+    notify('Tür silindi');
+    load();
+  };
+
+  const addField = () => {
+    if (!newField.key.trim() || !newField.label.trim()) return;
+    setForm(prev => ({ ...prev, fields: [...prev.fields, { ...newField, key: newField.key.trim(), label: newField.label.trim() }] }));
+    setNewField({ key: '', label: '', type: 'text', required: false, placeholder: '' });
+  };
+
+  const removeField = (idx) => {
+    setForm(prev => ({ ...prev, fields: prev.fields.filter((_, i) => i !== idx) }));
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div className="card-title" style={{ margin: 0 }}>📋 Gündem Türleri</div>
+        <button className="btn btn-primary btn-sm" onClick={openCreate}>+ Yeni Tür</button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center' }}><div className="loading-spinner" /></div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {types.map(t => (
+            <div key={t.id} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+              background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)',
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: t.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                {t.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{t.name}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  {(t.fields || []).length > 0 ? `${t.fields.length} özel alan` : 'Özel alan yok'}
+                  {' · '}
+                  <span style={{ color: t.color }}>●</span> {t.color}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-sm btn-outline" onClick={() => openEdit(t)}>✏️ Düzenle</button>
+                <button className="btn btn-sm btn-outline" style={{ color: 'var(--red)' }} onClick={() => handleDelete(t.id, t.name)}>🗑 Sil</button>
+              </div>
+            </div>
+          ))}
+          {types.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13.5 }}>
+              Henüz gündem türü yok. + Yeni Tür ile ekleyin.
+            </div>
+          )}
+        </div>
+      )}
+
+      {modal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <h2 className="modal-title">{editItem ? '✏️ Tür Düzenle' : '+ Yeni Gündem Türü'}</h2>
+
+            <div className="form-group">
+              <label className="form-label">Tür Adı *</label>
+              <input className="form-input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Etkinlik, Proje, Misafir…" />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">İkon</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {TYPE_ICON_OPTIONS.map(ic => (
+                    <button key={ic} onClick={() => setForm(p => ({ ...p, icon: ic }))}
+                      style={{ fontSize: 20, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', border: `2px solid ${form.icon === ic ? 'var(--accent)' : 'var(--border)'}`, background: form.icon === ic ? 'var(--accent)22' : 'var(--bg)' }}>
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Renk</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {TYPE_COLOR_OPTIONS.map(c => (
+                    <button key={c} onClick={() => setForm(p => ({ ...p, color: c }))}
+                      style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `3px solid ${form.color === c ? '#000' : 'transparent'}`, cursor: 'pointer' }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Özel Alanlar */}
+            <div className="form-group">
+              <label className="form-label" style={{ marginBottom: 8 }}>Özel Form Alanları</label>
+              {form.fields.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                  {form.fields.map((f, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
+                      <span style={{ flex: 1 }}><strong>{f.label}</strong> <span style={{ color: 'var(--text-muted)' }}>({f.type})</span> {f.required ? '· zorunlu' : ''}</span>
+                      <button onClick={() => removeField(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1 1 120px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Alan Anahtarı</div>
+                  <input className="form-input" style={{ fontSize: 12 }} placeholder="orn: lokasyon" value={newField.key} onChange={e => setNewField(p => ({ ...p, key: e.target.value }))} />
+                </div>
+                <div style={{ flex: '1 1 120px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Etiket</div>
+                  <input className="form-input" style={{ fontSize: 12 }} placeholder="orn: Lokasyon" value={newField.label} onChange={e => setNewField(p => ({ ...p, label: e.target.value }))} />
+                </div>
+                <div style={{ flex: '0 1 100px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Tür</div>
+                  <select className="form-select" style={{ fontSize: 12 }} value={newField.type} onChange={e => setNewField(p => ({ ...p, type: e.target.value }))}>
+                    <option value="text">Metin</option>
+                    <option value="textarea">Uzun Metin</option>
+                    <option value="number">Sayı</option>
+                    <option value="date">Tarih</option>
+                    <option value="select">Seçim</option>
+                  </select>
+                </div>
+                <div style={{ flex: '0 0 auto' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Zorunlu</div>
+                  <input type="checkbox" checked={newField.required} onChange={e => setNewField(p => ({ ...p, required: e.target.checked }))} style={{ width: 18, height: 18, marginTop: 4 }} />
+                </div>
+                <button className="btn btn-sm btn-outline" style={{ flex: '0 0 auto', alignSelf: 'flex-end' }} onClick={addField}>+ Ekle</button>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={() => setModal(false)}>İptal</button>
+              <button className="btn btn-primary" disabled={saving || !form.name.trim()} onClick={handleSave}>
+                {saving ? '…' : (editItem ? 'Güncelle' : 'Oluştur')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ANA BİLEŞEN ───────────────────────────────────────────────────────────────
 export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAgenda }) {
   const [agendas, setAgendas] = useState([]);
@@ -1235,6 +1434,12 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   // Sekmeler: unit | mine | assigned_to_me | assigned_by_me | assigned_tasks | my_tasks
   const [personalTab, setPersonalTab] = useState('unit');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'gallery' | 'table'
+  const [notification, setNotification] = useState(null);
+
+  const notify = (msg, type = 'success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
 
   const myId   = user?.id;
   const role   = profile?.role || 'personel';
@@ -1256,6 +1461,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   const isMyTasksTab       = isPersonel && personalTab === 'my_tasks';
   const isPendingApprovalTab = (isDirektor || isKoordinator) && personalTab === 'pending_approval';
   const isArsivTab           = personalTab === 'arsiv';
+  const isSettingsTab        = (isDirektor || isKoordinator) && personalTab === 'settings';
 
   // Tab başlığı role göre
   const unitTabLabel = (isDirektor || isAsistan) ? 'Departmanın Gündemleri' : 'Birimin Gündemleri';
@@ -1681,7 +1887,9 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📋 Gündemler</h1>
           <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            {isAssignedByMeTab
+            {isSettingsTab
+              ? 'Gündem türlerini ve özel alanları yönetin'
+              : isAssignedByMeTab
               ? `${filteredAgendas.length} gündem · atadığım`
               : isAssignedToMeTab
                 ? `${filteredAgendas.length} gündem · bana atanan`
@@ -1696,7 +1904,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                         : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
           </p>
         </div>
-        {canCreate && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isPendingApprovalTab && !isArsivTab && (
+        {canCreate && !isSettingsTab && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isPendingApprovalTab && !isArsivTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1723,6 +1931,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               ...((isDirektor || isKoordinator) ? [{ id: 'pending_approval', icon: '⏳', label: 'Onay Bekleyenler' }] : []),
               { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
               { id: 'arsiv',          icon: '📦',        label: 'Arşiv' },
+              ...((isDirektor || isKoordinator) ? [{ id: 'settings', icon: '⚙️', label: 'Tür Ayarları' }] : []),
             ]),
           ].map(tab => {
             const isActive = personalTab === tab.id;
@@ -1762,8 +1971,26 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         </div>
       )}
 
+      {/* Notification toast */}
+      {notification && (
+        <div style={{
+          position:'fixed', top:20, right:20, zIndex:9999,
+          padding:'12px 20px', borderRadius:10, fontWeight:500, fontSize:13.5,
+          background: notification.type === 'error' ? 'var(--red)' : 'var(--navy)',
+          color:'white', boxShadow:'0 8px 24px rgba(0,0,0,0.25)',
+          animation:'slideIn 0.2s ease',
+        }}>
+          {notification.msg}
+        </div>
+      )}
+
+      {/* Gündem Türleri Ayarları */}
+      {isSettingsTab && (
+        <AgendaTypeManagement notify={notify} />
+      )}
+
       {/* Birim sekmeleri — departman tabında direktör */}
-      {canSeeAllUnits && !isMineTab && !isAssignedToMeTab && !isAssignedByMeTab && availableUnits.length > 1 && (
+      {!isSettingsTab && canSeeAllUnits && !isMineTab && !isAssignedToMeTab && !isAssignedByMeTab && availableUnits.length > 1 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4, flexWrap: 'wrap' }}>
           <button
             onClick={() => setFilterUnit('all')}
@@ -1793,6 +2020,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         </div>
       )}
 
+      {!isSettingsTab && <>
       {/* Tür + durum + arama filtreleri + görünüm seçici */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="form-input" style={{ width: 200, fontSize: 13 }} placeholder="🔍 Ara…"
@@ -2062,6 +2290,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
           }}
         />
       )}
+      </>}
     </div>
   );
 }

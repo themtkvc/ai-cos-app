@@ -44,7 +44,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','emails','admin','users','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','emails','admin','profile'],
   direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
   asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
   koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
@@ -309,7 +309,6 @@ export default function App() {
     goals:            Goals,
     emails:           SystemEmails,
     admin:     Admin,
-    users:     Admin,
   };
 
   const PageComponent = pages[activePage];
@@ -383,7 +382,7 @@ export default function App() {
               user={user}
               profile={profile}
               onNavigate={navigate}
-              defaultTab={activePage === 'users' ? 'users' : undefined}
+              defaultTab={undefined}
               onProfileUpdate={() => loadProfile(user)}
               linkedTask={activePage === 'dailylog' ? dailyLogLinkedTask : undefined}
               linkedAgendaId={activePage === 'agendas' ? linkedAgendaId : undefined}
