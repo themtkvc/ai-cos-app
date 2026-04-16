@@ -669,7 +669,10 @@ export default function Documents({ user }) {
   // ── Editör görünümü ────────────────────────────────────────────────────────
   if (activeDoc) {
     if (activeDoc.file_url) {
-      window.open(activeDoc.file_url, '_blank');
+      const url = activeDoc.file_url;
+      if (url.startsWith('https://') || url.startsWith('http://')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
       setActiveDoc(null);
       return null;
     }
