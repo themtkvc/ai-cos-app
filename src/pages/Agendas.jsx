@@ -1078,7 +1078,6 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
           {agenda.date && (
             <span>📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
           )}
-          {agenda.unit && <span>🏗 {agenda.unit}</span>}
           {agenda.assigned_to_name && <span>👤 {agenda.assigned_to_name.split(' ')[0]}</span>}
         </div>
       </div>
@@ -1722,7 +1721,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <span style={{ fontSize:10.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:0.4, textTransform:'uppercase' }}>{type?.name||'Gündem'}</span>
                 <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {statusMeta.label}</span>
-                {agenda.unit && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {agenda.unit}</span>}
                 {agenda.date && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span>}
                 {agenda.assigned_to_name && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {agenda.assigned_to_name}</span>}
               </div>
@@ -1987,7 +1985,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{agenda.title}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {type?.name || 'Gündem'} {agenda.unit ? `· ${agenda.unit}` : ''}
+                      {type?.name || 'Gündem'}
                     </div>
                   </div>
                   <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>{tasks.length} görev</span>
