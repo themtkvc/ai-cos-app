@@ -1722,3 +1722,178 @@ export const deleteOkrKeyResult = async (id) => {
   if (!error) logActivity({ action: 'sildi', module: 'hedefler', entityType: 'anahtar_sonuç' });
   return { error };
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// POLITIKA VE YÖNETİŞİM MODÜLÜ
+// Sayfalar + gömülü tablolar (Notion benzeri)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── SAYFALAR ────────────────────────────────────────────────────────
+export const getPolicyPages = async () => {
+  const { data, error } = await supabase
+    .from('policy_pages')
+    .select('*')
+    .eq('is_archived', false)
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const getPolicyPage = async (id) => {
+  const { data, error } = await supabase
+    .from('policy_pages').select('*').eq('id', id).single();
+  return { data, error };
+};
+
+export const createPolicyPage = async (page) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const payload = {
+    title: page?.title || 'Yeni Sayfa',
+    icon: page?.icon || '📄',
+    parent_id: page?.parent_id || null,
+    content: page?.content ?? [],
+    order_index: page?.order_index ?? 0,
+    created_by: user?.id || null,
+    updated_by: user?.id || null,
+  };
+  const { data, error } = await supabase
+    .from('policy_pages').insert([payload]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'politika', entityType: 'sayfa', entityName: payload.title });
+  return { data, error };
+};
+
+export const updatePolicyPage = async (id, updates) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('policy_pages')
+    .update({ ...updates, updated_by: user?.id || null, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  if (!error) logActivity({ action: 'güncelledi', module: 'politika', entityType: 'sayfa', entityName: data?.[0]?.title || updates?.title });
+  return { data, error };
+};
+
+export const deletePolicyPage = async (id) => {
+  const { error } = await supabase.from('policy_pages').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'politika', entityType: 'sayfa' });
+  return { error };
+};
+
+// ── GÖMÜLÜ TABLOLAR (DATABASES) ─────────────────────────────────────
+export const getPolicyDatabases = async (pageId) => {
+  const { data, error } = await supabase
+    .from('policy_databases').select('*')
+    .eq('page_id', pageId)
+    .order('order_index', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const createPolicyDatabase = async (db) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const payload = {
+    page_id: db?.page_id || null,
+    name: db?.name || 'Yeni Tablo',
+    icon: db?.icon || '📋',
+    default_view: db?.default_view || 'table',
+    order_index: db?.order_index ?? 0,
+    created_by: user?.id || null,
+  };
+  const { data, error } = await supabase
+    .from('policy_databases').insert([payload]).select();
+  if (!error) logActivity({ action: 'oluşturdu', module: 'politika', entityType: 'tablo', entityName: payload.name });
+  return { data, error };
+};
+
+export const updatePolicyDatabase = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('policy_databases')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+export const deletePolicyDatabase = async (id) => {
+  const { error } = await supabase.from('policy_databases').delete().eq('id', id);
+  if (!error) logActivity({ action: 'sildi', module: 'politika', entityType: 'tablo' });
+  return { error };
+};
+
+// ── SÜTUNLAR ────────────────────────────────────────────────────────
+export const getPolicyColumns = async (databaseId) => {
+  const { data, error } = await supabase
+    .from('policy_columns').select('*')
+    .eq('database_id', databaseId)
+    .order('order_index', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const createPolicyColumn = async (col) => {
+  const payload = {
+    database_id: col.database_id,
+    name: col.name || 'Sütun',
+    type: col.type || 'text',
+    options: col.options || [],
+    order_index: col.order_index ?? 0,
+    width: col.width || 200,
+  };
+  const { data, error } = await supabase
+    .from('policy_columns').insert([payload]).select();
+  return { data, error };
+};
+
+export const updatePolicyColumn = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('policy_columns').update(updates).eq('id', id).select();
+  return { data, error };
+};
+
+export const deletePolicyColumn = async (id) => {
+  const { error } = await supabase.from('policy_columns').delete().eq('id', id);
+  return { error };
+};
+
+// ── SATIRLAR ────────────────────────────────────────────────────────
+export const getPolicyRows = async (databaseId) => {
+  const { data, error } = await supabase
+    .from('policy_rows').select('*')
+    .eq('database_id', databaseId)
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const createPolicyRow = async (row) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const payload = {
+    database_id: row.database_id,
+    data: row.data || {},
+    order_index: row.order_index ?? 0,
+    created_by: user?.id || null,
+    updated_by: user?.id || null,
+  };
+  const { data, error } = await supabase
+    .from('policy_rows').insert([payload]).select();
+  return { data, error };
+};
+
+export const updatePolicyRow = async (id, updates) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('policy_rows')
+    .update({ ...updates, updated_by: user?.id || null, updated_at: new Date().toISOString() })
+    .eq('id', id).select();
+  return { data, error };
+};
+
+export const deletePolicyRow = async (id) => {
+  const { error } = await supabase.from('policy_rows').delete().eq('id', id);
+  return { error };
+};
+
+// Profilleri toplu getir (kişi sütunu için)
+export const getAllUserProfiles = async () => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('user_id, full_name, role, unit, avatar_url')
+    .order('full_name', { ascending: true });
+  return { data: data || [], error };
+};

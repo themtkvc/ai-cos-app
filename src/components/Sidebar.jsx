@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, getMeetingActions, getUnreadNotificationCount, signOut } from '../lib/supabase';
-import { ROLE_ACCESS, useTheme } from '../App';
+import { ROLE_ACCESS, canAccessPolicy, useTheme } from '../App';
 import { ROLE_LABELS } from '../lib/constants';
 
 const ALL_NAV = [
@@ -28,6 +28,7 @@ const ALL_NAV = [
   { id: 'capacity',         icon: '📚', label: 'Kapasite Geliştirme' },
   { id: 'activities',       icon: '📊', label: 'Aktiviteler' },
   { id: 'goals',            icon: '🎯', label: 'Hedefler' },
+  { id: 'policy',           icon: '⚖️', label: 'Politikalar ve Yönetişim' },
   { id: 'emails',           icon: '📧', label: 'Mailler' },
 ];
 
@@ -69,7 +70,11 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
   const { theme, toggleTheme } = useTheme();
 
   const role = profile?.role || 'personel';
-  const allowed = ROLE_ACCESS[role] || ROLE_ACCESS['personel'];
+  const baseAllowed = ROLE_ACCESS[role] || ROLE_ACCESS['personel'];
+  // Politika birimi üyeleri rolden bağımsız 'policy' sayfasına erişebilir
+  const allowed = canAccessPolicy(profile)
+    ? Array.from(new Set([...baseAllowed, 'policy']))
+    : baseAllowed;
 
   useEffect(() => {
     if (!user) return;

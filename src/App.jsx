@@ -28,6 +28,7 @@ import DirectorAgendas from './pages/DirectorAgendas';
 import SystemEmails from './pages/SystemEmails';
 import Activities from './pages/Activities';
 import Goals from './pages/Goals';
+import PolicyGovernance from './pages/PolicyGovernance';
 import PublicFormFill from './pages/PublicFormFill';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
@@ -44,12 +45,21 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','emails','admin','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','policy','emails','admin','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','policy','profile'],
   asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
   koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
   personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
 };
+
+// Politika birimi üyeleri (rolden bağımsız) "policy" sayfasına erişebilir.
+// Bu hook App.jsx'de navigate + pageFromHash içinde kullanılır.
+export const POLICY_UNIT_NAMES = ['Politika, Yönetişim ve Güvence'];
+export function canAccessPolicy(profile) {
+  if (!profile) return false;
+  if (['direktor', 'direktor_yardimcisi'].includes(profile.role)) return true;
+  return POLICY_UNIT_NAMES.includes(profile.unit);
+}
 
 // Re-export: asıl tanım constants.js'de — geriye uyumluluk için burada da export
 export const ROLE_LABELS = _ROLE_LABELS;
@@ -169,11 +179,19 @@ export default function App() {
     };
   }, []);
 
+  // Profil'e göre erişilebilir sayfa listesi (rol + birim tabanlı istisnalar)
+  const getAllowedPages = (p) => {
+    const base = ROLE_ACCESS[p?.role] || ROLE_ACCESS['personel'];
+    const extras = [];
+    if (canAccessPolicy(p)) extras.push('policy');
+    return Array.from(new Set([...base, ...extras]));
+  };
+
   // Browser geri/ileri tuşu desteği
   useEffect(() => {
     const onHashChange = () => {
       const page = pageFromHash();
-      const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
+      const allowed = getAllowedPages(profile);
       if (allowed.includes(page)) setActivePage(page);
     };
     window.addEventListener('hashchange', onHashChange);
@@ -238,8 +256,8 @@ export default function App() {
   const [linkedAgendaId, setLinkedAgendaId] = useState(null);
 
   const navigate = (page, opts = {}) => {
-    // Check role access
-    const allowed = ROLE_ACCESS[profile?.role] || ROLE_ACCESS['personel'];
+    // Check role + unit access
+    const allowed = getAllowedPages(profile);
     if (!allowed.includes(page)) return;
     setActivePage(page);
     setMobileNavOpen(false);
@@ -307,6 +325,7 @@ export default function App() {
     direktor_agendas: DirectorAgendas,
     activities:       Activities,
     goals:            Goals,
+    policy:           PolicyGovernance,
     emails:           SystemEmails,
     admin:     Admin,
   };
@@ -337,6 +356,7 @@ export default function App() {
     capacity:         '📚 Kapasite Geliştirme',
     direktor_agendas: '🗂 Direktör Gündemleri',
     goals:      '🎯 Hedefler',
+    policy:     '⚖️ Politikalar ve Yönetişim',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',
