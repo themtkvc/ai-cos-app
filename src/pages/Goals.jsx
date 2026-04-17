@@ -579,17 +579,9 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
 
                     return (
                       <div key={bg.id} style={{
-                        flexGrow: Math.max(contribution * 100, 1),
-                        flexShrink: 1,
-                        flexBasis: `${Math.max(contribution * 100, 22)}%`,
-                        minWidth: 220,
+                        ...styles.birimCard,
                         background: `${unit.color}12`,
                         border: `1px solid ${unit.color}33`,
-                        borderRadius: 16,
-                        padding: 16,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        position: 'relative',
                       }}>
                         {/* Üst: ikon + BİRİM etiketi + aksiyonlar */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -1209,11 +1201,18 @@ const styles = {
   },
   deptBody: { padding: 22, background: 'var(--bg-card)' },
   birimRow: {
-    display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'stretch',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: 12, alignItems: 'stretch',
+  },
+  birimCard: {
+    borderRadius: 16, padding: 16,
+    display: 'flex', flexDirection: 'column',
+    position: 'relative',
+    minHeight: 260,
   },
   birimAddPlaceholder: {
-    flexGrow: 0.5, flexShrink: 1, flexBasis: '18%',
-    minWidth: 200, minHeight: 240,
+    minHeight: 260,
     border: '2px dashed var(--border)', borderRadius: 16,
     background: 'transparent', cursor: 'pointer',
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
