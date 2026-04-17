@@ -1897,3 +1897,46 @@ export const getAllUserProfiles = async () => {
     .order('full_name', { ascending: true });
   return { data: data || [], error };
 };
+
+// ── GOOGLE DRIVE UPLOAD (Documents modülü) ──
+// Dosyayı drive-upload edge function'ına XHR ile POST eder ve progress callback'i tetikler.
+// Başarılıda { fileId, name, mimeType, size, webViewLink, webContentLink } döner.
+export const uploadDocumentToDrive = (file, { displayName = null, onProgress = null } = {}) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { reject(new Error('not_authenticated')); return; }
+      if (!supabaseUrl || !supabaseAnonKey) { reject(new Error('missing_supabase_config')); return; }
+
+      const url = `${supabaseUrl}/functions/v1/drive-upload`;
+      const form = new FormData();
+      form.append('file', file);
+      if (displayName) form.append('name', displayName);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('apikey', supabaseAnonKey);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && typeof onProgress === 'function') {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('invalid_response')); }
+        } else {
+          let detail = xhr.responseText;
+          try { detail = JSON.parse(xhr.responseText)?.error || detail; } catch {}
+          reject(new Error(`drive_upload_http_${xhr.status}: ${detail}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('network_error'));
+      xhr.send(form);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};

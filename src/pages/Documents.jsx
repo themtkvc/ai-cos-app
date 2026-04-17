@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase, logActivity } from '../lib/supabase';
+import { supabase, logActivity, uploadDocumentToDrive } from '../lib/supabase';
 import { useProfile } from '../App';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -463,13 +463,21 @@ function NewDocModal({ onClose, onCreate }) {
 function UploadModal({ onClose, onUpload }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState(null);
 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    await onUpload(file);
-    setUploading(false);
-    onClose();
+    setError(null);
+    setProgress(0);
+    try {
+      await onUpload(file, (p) => setProgress(p));
+      onClose();
+    } catch (err) {
+      setError(err?.message || String(err));
+      setUploading(false);
+    }
   };
 
   return (
@@ -481,9 +489,19 @@ function UploadModal({ onClose, onUpload }) {
         width: 440, background: 'var(--bg-card)', borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
       }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-          📎 Dosya Yükle
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+            📎 Dosya Yükle
+          </h3>
+          <span style={{
+            fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+            padding: '3px 8px', borderRadius: 6,
+            background: 'rgba(66, 133, 244, 0.12)', color: '#1a73e8',
+            border: '1px solid rgba(66, 133, 244, 0.35)',
+          }}>
+            ☁ Google Drive
+          </span>
+        </div>
         <div style={{
           border: '2px dashed var(--border)', borderRadius: 12, padding: 32,
           textAlign: 'center', marginBottom: 16, cursor: 'pointer',
@@ -517,11 +535,41 @@ function UploadModal({ onClose, onUpload }) {
             </>
           )}
         </div>
+        {uploading && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', fontSize: 12,
+              color: 'var(--text-muted)', marginBottom: 4,
+            }}>
+              <span>{progress < 100 ? 'Drive\'a yükleniyor…' : 'Metadata kaydediliyor…'}</span>
+              <span>{progress}%</span>
+            </div>
+            <div style={{
+              width: '100%', height: 6, background: 'var(--border)',
+              borderRadius: 4, overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${progress}%`, height: '100%',
+                background: 'linear-gradient(90deg, #1a73e8, #4285f4)',
+                transition: 'width 0.2s',
+              }} />
+            </div>
+          </div>
+        )}
+        {error && (
+          <div style={{
+            marginBottom: 12, padding: 10, borderRadius: 8,
+            background: '#fef2f2', color: '#991b1b', fontSize: 12,
+            border: '1px solid #fecaca',
+          }}>
+            ⚠ {error}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{
-            padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+          <button onClick={onClose} disabled={uploading} style={{
+            padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: uploading ? 'default' : 'pointer',
             border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
-            color: 'var(--text-secondary)',
+            color: 'var(--text-secondary)', opacity: uploading ? 0.6 : 1,
           }}>İptal</button>
           <button onClick={handleUpload} disabled={!file || uploading}
             style={{
@@ -561,8 +609,18 @@ function DocCard({ doc, onClick }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <span style={{ fontSize: 28 }}>{isFile ? fileIcon : type.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {doc.title}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {doc.title}
+            </div>
+            {isFile && (
+              <span title="Google Drive" style={{
+                fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+                padding: '2px 6px', borderRadius: 5, flexShrink: 0,
+                background: 'rgba(66, 133, 244, 0.12)', color: '#1a73e8',
+                border: '1px solid rgba(66, 133, 244, 0.3)',
+              }}>☁ Drive</span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {isFile ? (doc.file_name || 'Dosya') : type.label}
@@ -628,29 +686,26 @@ export default function Documents({ user }) {
     }
   };
 
-  // ── Dosya yükle ────────────────────────────────────────────────────────────
-  const uploadFile = async (file) => {
-    const ext = file.name.split('.').pop();
-    const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from('documents').upload(path, file);
-    if (uploadError) { alert('Yükleme hatası: ' + uploadError.message); return; }
+  // ── Dosya yükle (Google Drive üzerinden) ───────────────────────────────────
+  const uploadFile = async (file, onProgress) => {
+    // Edge function -> Service Account JWT -> Drive Shared Drive (IRDP-App-Files)
+    const result = await uploadDocumentToDrive(file, { onProgress });
+    // result: { fileId, name, mimeType, size, webViewLink, webContentLink }
 
-    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
-    const fileUrl = urlData?.publicUrl;
-
-    await supabase.from('documents').insert({
-      title: file.name.replace(/\.[^.]+$/, ''),
+    const { error: dbError } = await supabase.from('documents').insert({
+      title: (result.name || file.name).replace(/\.[^.]+$/, ''),
       doc_type: 'document',
       unit: profile?.unit || null,
       created_by: user.id,
       created_by_name: profile?.full_name || user.email,
       updated_by: user.id,
       updated_by_name: profile?.full_name || user.email,
-      file_url: fileUrl,
-      file_name: file.name,
-      file_type: file.type,
-      file_size: file.size,
+      file_url: result.webViewLink,
+      file_name: result.name || file.name,
+      file_type: result.mimeType || file.type,
+      file_size: result.size || file.size,
     });
+    if (dbError) throw new Error('Metadata kaydedilemedi: ' + dbError.message);
     loadDocs();
     logActivity({ action: 'yükledi', module: 'dokümanlar', entityType: 'dosya', entityName: file.name });
   };
