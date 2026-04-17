@@ -1051,171 +1051,181 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
   );
 }
 
-// ── GÜNDEM KARTI ──────────────────────────────────────────────────────────────
-function AgendaCard({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify }) {
+// ── GÜNDEM ÇERÇEVESİ (ana kart — Hedefler tarzı) ──────────────────────────────
+function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify, onAddTask, onEditTask }) {
   const type = agenda.agenda_types;
   const typeColor = type?.color || '#6366f1';
   const typeIcon = type?.icon || '📋';
   const tasks = agenda.agenda_tasks || [];
   const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
   const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
+  const pctDone = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
   const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
-
   const canEdit = CREATOR_ROLES.includes(role) && (agenda.created_by === myId || ['direktor', 'direktor_yardimcisi'].includes(role));
+  const canAddTask = canEdit;
+
+  const iconBtn = {
+    width: 26, height: 26, borderRadius: 6, border: 'none',
+    background: 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer',
+    fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
 
   return (
-    <div
-      className="card"
-      style={{
-        cursor: 'pointer',
-        borderTop: `3px solid ${typeColor}`,
-        background: `linear-gradient(135deg, ${typeColor}08 0%, ${typeColor}04 100%)`,
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        padding: 0,
-        overflow: 'hidden',
-      }}
-      onClick={() => onOpen(agenda)}
-    >
-      {/* Kart Başlığı */}
-      <div style={{ padding: '14px 16px 10px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 10,
-            background: typeColor + '22',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, flexShrink: 0,
-          }}>
-            {typeIcon}
-          </div>
+    <div style={{
+      borderRadius: 14, overflow: 'hidden',
+      border: '1px solid var(--border)', background: 'var(--bg-card)',
+      boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
+    }}>
+      {/* Banner — tür rengiyle gradient */}
+      <div onClick={() => onOpen(agenda)} style={{
+        padding: '14px 18px', color: '#fff', cursor: 'pointer',
+        background: `linear-gradient(135deg, ${typeColor}, ${typeColor}D0)`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: typeColor, background: typeColor + '18', padding: '2px 7px', borderRadius: 20 }}>
-                {type?.name || 'Gündem'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+              <span style={{ background: 'rgba(255,255,255,0.22)', padding: '3px 9px', borderRadius: 999, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8 }}>
+                {typeIcon} {(type?.name || 'Gündem').toUpperCase()}
               </span>
-              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{statusMeta.label}</span>
+              <span style={{ background: 'rgba(255,255,255,0.28)', padding: '3px 9px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>
+                {statusMeta.label}
+              </span>
+              {agenda.unit && <span style={{ fontSize: 10.5, opacity: 0.92 }}>🏗 {agenda.unit}</span>}
             </div>
-            <div style={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.25, marginBottom: 4, wordBreak: 'break-word' }}>
               {agenda.title}
             </div>
+            <div style={{ fontSize: 11.5, opacity: 0.92, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {agenda.date && (
+                <span>📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              )}
+              {agenda.assigned_to_name && <span>· 👤 {agenda.assigned_to_name}</span>}
+              {agenda.created_by_name && <span style={{ opacity: 0.78 }}>· oluşturan: {agenda.created_by_name}</span>}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-            {/* Gündem mail bildirimi: atanmış gündem varsa direktör görebilir */}
-            {onNotify && agenda.assigned_to && agenda.assigned_to !== myId && (
-              <button
-                className="btn btn-sm"
-                onClick={() => onNotify(agenda)}
-                title={`${agenda.assigned_to_name || ''} adresine mail gönder`}
-                style={{ background: 'var(--green-pale)', color: 'var(--green)', border: '1px solid var(--green)', padding: '3px 8px', fontSize: 12 }}>
-                📧
-              </button>
-            )}
-            {canEdit && (
-              <>
-                <button className="btn btn-sm btn-outline" onClick={() => onEdit(agenda)} title="Düzenle" style={{ padding: '3px 8px' }}>✏️</button>
-                <button className="btn btn-sm btn-outline" onClick={() => onDelete(agenda.id)} title="Sil" style={{ padding: '3px 8px', color: 'var(--red)' }}>🗑</button>
-              </>
-            )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 }}>{pctDone}%</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {onNotify && agenda.assigned_to && agenda.assigned_to !== myId && (
+                <button onClick={() => onNotify(agenda)} title="Mail gönder" style={iconBtn}>📧</button>
+              )}
+              {canEdit && <button onClick={() => onEdit(agenda)} title="Düzenle" style={iconBtn}>✏️</button>}
+              {canEdit && <button onClick={() => onDelete(agenda.id)} title="Sil" style={iconBtn}>🗑</button>}
+            </div>
           </div>
         </div>
-
-        {agenda.description && (
-          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.4,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-            {agenda.description}
-          </p>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {agenda.date && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </span>
-          )}
-          {agenda.assigned_to_name && (
-            <span style={{
-              fontSize: 11, fontWeight: 600, color: 'var(--primary)',
-              background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: 12,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-              👤 {agenda.assigned_to_name}
-            </span>
-          )}
-          {agenda.created_by_name && (
-            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontStyle: 'italic', opacity: 0.7 }}>
-              oluşturan: {agenda.created_by_name}
-            </span>
-          )}
+        {/* İlerleme çubuğu (beyaz) */}
+        <div style={{ marginTop: 10, height: 5, background: 'rgba(255,255,255,0.28)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: '#fff', borderRadius: 999, width: `${pctDone}%`, transition: 'width 0.4s' }} />
         </div>
       </div>
 
-      {/* Görevler bölümü */}
-      {tasks.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '10px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>
-              📌 {tasks.length} Görev
-            </span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {pendingTasks.length > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '2px 6px', borderRadius: 20 }}>
-                  ⏳ {pendingTasks.length} onay
-                </span>
-              )}
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                {doneTasks.length}/{tasks.length} tamam
+      {/* Body — görev mini kartları */}
+      <div style={{ padding: '12px 14px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+            📌 Görevler ({tasks.length})
+            {pendingTasks.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '2px 7px', borderRadius: 20, marginLeft: 6 }}>
+                ⏳ {pendingTasks.length} onay
               </span>
-            </div>
-          </div>
-
-          {/* İlerleme çubuğu */}
-          <div style={{ height: 4, background: 'var(--border)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: tasks.length > 0 ? `${(doneTasks.length / tasks.length) * 100}%` : '0%',
-              background: typeColor,
-              borderRadius: 4,
-              transition: 'width 0.3s',
-            }} />
-          </div>
-
-          {/* İlk 3 görevi listele */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {tasks.slice(0, 3).map(task => (
-              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12 }}>
-                  {task.completion_status === 'approved' || task.status === 'tamamlandi' ? '✅' :
-                   task.completion_status === 'pending_review' ? '⏳' :
-                   task.completion_status === 'revision_requested' ? '🔄' : '⚪'}
-                </span>
-                <span style={{
-                  fontSize: 12, color: 'var(--text)',
-                  textDecoration: (task.completion_status === 'approved' || task.status === 'tamamlandi') ? 'line-through' : 'none',
-                  opacity: (task.completion_status === 'approved' || task.status === 'tamamlandi') ? 0.5 : 1,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-                }}>
-                  {task.title}
-                </span>
-                {task.assigned_to_name && (
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>{task.assigned_to_name.split(' ')[0]}</span>
-                )}
-              </div>
-            ))}
-            {tasks.length > 3 && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 18 }}>+{tasks.length - 3} görev daha…</div>
             )}
           </div>
+          {canAddTask && onAddTask && (
+            <button onClick={() => onAddTask(agenda)} style={{
+              fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 8,
+              border: `1px solid ${typeColor}44`, background: `${typeColor}0f`,
+              cursor: 'pointer', color: typeColor, fontFamily: 'inherit',
+            }}>+ Görev</button>
+          )}
         </div>
-      )}
 
-      {tasks.length === 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px' }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📌 Henüz görev yok</span>
-        </div>
-      )}
+        {tasks.length === 0 ? (
+          <button
+            onClick={() => canAddTask && onAddTask && onAddTask(agenda)}
+            style={{
+              width: '100%', padding: 14, borderRadius: 10,
+              border: '1.5px dashed var(--border)', background: 'transparent',
+              cursor: canAddTask ? 'pointer' : 'default',
+              color: 'var(--text-muted)', fontSize: 12, fontFamily: 'inherit',
+            }}>
+            Henüz görev yok{canAddTask ? ' — ilk görevi ekle' : ''}
+          </button>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {tasks.map(task => (
+              <TaskMiniCard
+                key={task.id}
+                task={task}
+                typeColor={typeColor}
+                profiles={profiles}
+                onClick={() => onEditTask && onEditTask(agenda, task)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── GÖREV MİNİ KARTI ──────────────────────────────────────────────────────────
+function TaskMiniCard({ task, typeColor, profiles = [], onClick }) {
+  const prio = prioMeta(task.priority);
+  const assignee = profiles.find(p => p.user_id === task.assigned_to);
+  const isDone = task.completion_status === 'approved' || task.status === 'tamamlandi';
+  const isPending = task.completion_status === 'pending_review';
+  const isRevise = task.completion_status === 'revision_requested';
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  if (dueDate) dueDate.setHours(0, 0, 0, 0);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const overdue = !isDone && dueDate && dueDate < now;
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: '9px 11px', borderRadius: 10,
+        border: `1px solid ${typeColor}33`, background: `${typeColor}08`,
+        cursor: 'pointer', transition: 'all 0.15s',
+        display: 'flex', flexDirection: 'column', gap: 6, minHeight: 72,
+        opacity: isDone ? 0.65 : 1,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = `${typeColor}16`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = `${typeColor}08`; e.currentTarget.style.transform = 'none'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <span title={prio.label.replace(/^[^\s]+ /, '')} style={{ width: 8, height: 8, borderRadius: '50%', background: prio.color, flexShrink: 0, marginTop: 5 }} />
+        <span style={{
+          fontSize: 12.5, fontWeight: 600, lineHeight: 1.3, color: 'var(--text)',
+          textDecoration: isDone ? 'line-through' : 'none',
+          flex: 1, minWidth: 0, overflow: 'hidden',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        }}>{task.title}</span>
+        {isPending && <span title="Onay bekliyor" style={{ fontSize: 11 }}>⏳</span>}
+        {isRevise && <span title="Revize istendi" style={{ fontSize: 11 }}>🔄</span>}
+        {isDone && <span title="Tamamlandı" style={{ fontSize: 11 }}>✅</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', flexWrap: 'wrap' }}>
+        {task.assigned_to_name && (
+          <>
+            <Avatar name={task.assigned_to_name} url={assignee?.avatar_url} size={18} />
+            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 500 }}>
+              {task.assigned_to_name.split(' ')[0]}
+            </span>
+          </>
+        )}
+        {task.due_date && (
+          <span style={{
+            fontSize: 10, color: overdue ? 'var(--red)' : 'var(--text-muted)',
+            fontWeight: overdue ? 700 : 500, marginLeft: 'auto',
+          }}>
+            {overdue ? '🔴 ' : '📅 '}
+            {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -1432,7 +1442,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   const [searchQ, setSearchQ] = useState('');
   // Sekmeler: unit | mine | assigned_to_me | assigned_by_me | assigned_tasks | my_tasks
   const [personalTab, setPersonalTab] = useState('unit');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list' | 'gallery' | 'table'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [inlineTask, setInlineTask] = useState(null); // { agenda, task } | null
   const [notification, setNotification] = useState(null);
 
   const notify = (msg, type = 'success') => {
@@ -1686,61 +1697,17 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
     onNotify: handleNotifyAgenda,
   });
 
-  // GRID (mevcut kart grid)
+  // GRID (Hedefler tarzı çerçeveli kartlar — iç görev mini kartları ile)
   const CardGrid = ({ items }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-      {items.map(agenda => <AgendaCard {...cardProps(agenda)} />)}
-    </div>
-  );
-
-  // GALLERY (daha geniş, yatay kartlar - 2 sütun)
-  const GalleryView = ({ items }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 20 }}>
-      {items.map(agenda => {
-        const type = agenda.agenda_types;
-        const typeColor = type?.color || '#6366f1';
-        const typeIcon = type?.icon || '📋';
-        const tasks = agenda.agenda_tasks || [];
-        const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
-        const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
-        return (
-          <div key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
-            className="card" style={{ cursor:'pointer', overflow:'hidden', padding:0, display:'flex', flexDirection:'row', transition:'transform 0.15s, box-shadow 0.15s', background:`linear-gradient(135deg, ${typeColor}08 0%, ${typeColor}04 100%)` }}
-            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)';}}
-            onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='';}}
-          >
-            {/* Sol renk şeridi */}
-            <div style={{ width:6, background:typeColor, flexShrink:0 }} />
-            {/* Sol: ikon */}
-            <div style={{ width:80, display:'flex', alignItems:'center', justifyContent:'center', background:typeColor+'0a', flexShrink:0 }}>
-              <span style={{ fontSize:32 }}>{typeIcon}</span>
-            </div>
-            {/* Orta: bilgi */}
-            <div style={{ flex:1, padding:'16px 20px', minWidth:0 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, flexWrap:'wrap' }}>
-                <span style={{ fontSize:10.5, fontWeight:700, color:typeColor, background:typeColor+'18', padding:'2px 7px', borderRadius:20 }}>{type?.name||'Gündem'}</span>
-                <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>{statusMeta.label}</span>
-                {agenda.unit && <span style={{ fontSize:10, color:'var(--text-muted)', background:'var(--bg)', padding:'1px 6px', borderRadius:8 }}>🏗 {agenda.unit}</span>}
-              </div>
-              <div style={{ fontWeight:700, fontSize:15, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{agenda.title}</div>
-              {agenda.description && (
-                <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:'0 0 6px', lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{agenda.description}</p>
-              )}
-              {agenda.date && <div style={{ fontSize:11, color:'var(--text-muted)' }}>📅 {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'})}</div>}
-            </div>
-            {/* Sağ: görev bilgisi */}
-            <div style={{ width:120, borderLeft:'1px solid var(--border)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:16, gap:8, flexShrink:0 }}>
-              <div style={{ fontSize:24, fontWeight:800, color:typeColor }}>{doneTasks.length}/{tasks.length}</div>
-              <div style={{ fontSize:10.5, color:'var(--text-muted)', textAlign:'center' }}>görev tamamlandı</div>
-              {tasks.length > 0 && (
-                <div style={{ width:'100%', height:4, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${tasks.length>0?(doneTasks.length/tasks.length)*100:0}%`, background:typeColor, borderRadius:4 }} />
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {items.map(agenda => (
+        <AgendaFrame
+          key={agenda.id}
+          {...cardProps(agenda)}
+          onAddTask={(a) => setInlineTask({ agenda: a, task: null })}
+          onEditTask={(a, t) => setInlineTask({ agenda: a, task: t })}
+        />
+      ))}
     </div>
   );
 
@@ -1807,75 +1774,9 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
     </div>
   );
 
-  // TABLE (tablo görünümü)
-  const TableView = ({ items }) => (
-    <div className="card" style={{ padding:0, overflow:'auto' }}>
-      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-        <thead>
-          <tr style={{ background:'var(--bg)', borderBottom:'2px solid var(--border)' }}>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Gündem</th>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tür</th>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Durum</th>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Birim</th>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Tarih</th>
-            <th style={{ textAlign:'left', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Sorumlu</th>
-            <th style={{ textAlign:'center', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Görevler</th>
-            <th style={{ textAlign:'center', padding:'10px 14px', fontWeight:700, fontSize:11.5, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>İlerleme</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((agenda, i) => {
-            const type = agenda.agenda_types;
-            const typeColor = type?.color || '#6366f1';
-            const tasks = agenda.agenda_tasks || [];
-            const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
-            const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
-            const pct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
-            return (
-              <tr key={agenda.id} onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMineTab); }}
-                style={{ cursor:'pointer', borderBottom:'1px solid var(--border)', transition:'background 0.1s' }}
-                onMouseEnter={e=>e.currentTarget.style.background='var(--bg)'}
-                onMouseLeave={e=>e.currentTarget.style.background='transparent'}
-              >
-                <td style={{ padding:'10px 14px', fontWeight:600 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span style={{ fontSize:16 }}>{type?.icon||'📋'}</span>
-                    <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:240 }}>{agenda.title}</span>
-                  </div>
-                </td>
-                <td style={{ padding:'10px 14px' }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:typeColor, background:typeColor+'18', padding:'2px 8px', borderRadius:12 }}>{type?.name||'Gündem'}</span>
-                </td>
-                <td style={{ padding:'10px 14px', fontSize:12 }}>{statusMeta.label}</td>
-                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>{agenda.unit || '—'}</td>
-                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>
-                  {agenda.date ? new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'}) : '—'}
-                </td>
-                <td style={{ padding:'10px 14px', fontSize:12, color:'var(--text-muted)' }}>{agenda.assigned_to_name || '—'}</td>
-                <td style={{ padding:'10px 14px', textAlign:'center', fontSize:12, fontWeight:600 }}>
-                  <span style={{ color:typeColor }}>{doneTasks.length}</span>/{tasks.length}
-                </td>
-                <td style={{ padding:'10px 14px' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}>
-                    <div style={{ width:60, height:5, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${pct}%`, background:typeColor, borderRadius:4 }} />
-                    </div>
-                    <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>%{pct}</span>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-
   // Genel render yardımcısı — seçilen viewMode'a göre
   const RenderItems = ({ items }) => {
-    if (viewMode === 'list')    return <ListView items={items} />;
-    if (viewMode === 'gallery') return <GalleryView items={items} />;
-    if (viewMode === 'table')   return <TableView items={items} />;
+    if (viewMode === 'list') return <ListView items={items} />;
     return <CardGrid items={items} />;
   };
 
@@ -2038,10 +1939,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         {/* Görünüm seçici */}
         <div style={{ marginLeft:'auto', display:'flex', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:10, padding:2, gap:2 }}>
           {[
-            { id:'grid',    icon:'▦', tip:'Grid' },
-            { id:'list',    icon:'☰', tip:'Liste' },
-            { id:'gallery', icon:'▬', tip:'Galeri' },
-            { id:'table',   icon:'▤', tip:'Tablo' },
+            { id:'grid', icon:'▦', tip:'Kartlar' },
+            { id:'list', icon:'☰', tip:'Liste' },
           ].map(v => (
             <button key={v.id} title={v.tip} onClick={()=>setViewMode(v.id)}
               style={{
@@ -2287,6 +2186,46 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
             setDetailAgenda(prev => prev ? { ...prev, status: newStatus } : null);
             setAgendas(prev => prev.map(a => a.id === agendaId ? { ...a, status: newStatus } : a));
           }}
+        />
+      )}
+
+      {/* Inline Görev Modal (AgendaFrame üzerinden + Görev / görev kartı düzenle) */}
+      {inlineTask && (
+        <TaskModal
+          task={inlineTask.task}
+          agendaId={inlineTask.agenda.id}
+          myId={myId}
+          myName={profile?.full_name || ''}
+          myUnit={myUnit}
+          role={role}
+          allProfiles={allProfiles}
+          allowSelfAssign={personalTab === 'mine'}
+          onSave={async (data) => {
+            const ag = inlineTask.agenda;
+            const myFullName = profile?.full_name || myName;
+            try {
+              if (inlineTask.task) {
+                await updateAgendaTask(inlineTask.task.id, data);
+                if (data.assigned_to && data.assigned_to !== myId && data.assigned_to !== inlineTask.task.assigned_to) {
+                  try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${ag.title} gündeminde`, linkType: 'agenda', linkId: ag.id, createdBy: myId, createdByName: myFullName }); } catch (e) { console.error('Task assign notif error:', e); }
+                  try { await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: `Bağlı Gündem: ${ag.title}${data.description ? '\n\n' + data.description : ''}`, taskPriority: data.priority, taskDueDate: data.due_date, taskUnit: ag.unit || '', createdByName: myFullName }); } catch (e) { console.error('Task mail error:', e); }
+                }
+              } else {
+                await createAgendaTask({ ...data, agenda_id: ag.id, created_by: myId, created_by_name: myFullName });
+                if (data.assigned_to && data.assigned_to !== myId) {
+                  try { await createNotification({ userId: data.assigned_to, type: 'task_assigned', title: `"${data.title}" görevi size atandı`, body: `${ag.title} gündeminde`, linkType: 'agenda', linkId: ag.id, createdBy: myId, createdByName: myFullName }); } catch (e) { console.error('Task assign notif error:', e); }
+                  try { await notifyTaskAssigned({ assignedToUserId: data.assigned_to, taskTitle: data.title, taskDescription: `Bağlı Gündem: ${ag.title}${data.description ? '\n\n' + data.description : ''}`, taskPriority: data.priority, taskDueDate: data.due_date, taskUnit: ag.unit || '', createdByName: myFullName }); } catch (e) { console.error('Task mail error:', e); }
+                }
+              }
+              setInlineTask(null);
+              await loadAll();
+              notify(inlineTask.task ? 'Görev güncellendi' : 'Görev oluşturuldu');
+            } catch (e) {
+              console.error('Task save error:', e);
+              notify('Görev kaydedilemedi', 'error');
+            }
+          }}
+          onClose={() => setInlineTask(null)}
         />
       )}
       </>}
