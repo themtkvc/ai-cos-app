@@ -9,12 +9,24 @@ import {
 
 // ── Sabitler ─────────────────────────────────────────────────────────
 const COLUMN_TYPES = [
-  { type: 'text',     label: 'Metin',    icon: 'Aa' },
-  { type: 'number',   label: 'Sayı',     icon: '#' },
-  { type: 'date',     label: 'Tarih',    icon: '📅' },
-  { type: 'select',   label: 'Durum',    icon: '●' },
-  { type: 'person',   label: 'Kişi',     icon: '👤' },
-  { type: 'checkbox', label: 'Checkbox', icon: '☑' },
+  { type: 'text',      label: 'Metin',         icon: 'Aa' },
+  { type: 'number',    label: 'Sayı',          icon: '#' },
+  { type: 'date',      label: 'Tarih',         icon: '📅' },
+  { type: 'daterange', label: 'Tarih Aralığı', icon: '📆' },
+  { type: 'select',    label: 'Durum',         icon: '●' },
+  { type: 'priority',  label: 'Öncelik',       icon: '⚑' },
+  { type: 'person',    label: 'Kişi',          icon: '👤' },
+  { type: 'checkbox',  label: 'Checkbox',      icon: '☑' },
+  { type: 'url',       label: 'URL / Dosya',   icon: '🔗' },
+  { type: 'autoid',    label: 'ID',            icon: '№' },
+];
+
+// Önceden tanımlı Öncelik seçenekleri
+const PRIORITY_OPTIONS = [
+  { value: 'critical', label: 'Kritik', color: '#fecaca', text: '#991b1b' },
+  { value: 'high',     label: 'High',   color: '#fed7aa', text: '#9a3412' },
+  { value: 'medium',   label: 'Medium', color: '#fef3c7', text: '#92400e' },
+  { value: 'low',      label: 'Low',    color: '#d1fae5', text: '#065f46' },
 ];
 
 const STATUS_COLORS = [
@@ -384,6 +396,13 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(db.name);
+  const [groupBy, setGroupBy] = useState(() => {
+    try { return localStorage.getItem(`policy_group_${db.id}`) || null; } catch { return null; }
+  });
+  const changeGroupBy = (val) => {
+    setGroupBy(val);
+    try { val ? localStorage.setItem(`policy_group_${db.id}`, val) : localStorage.removeItem(`policy_group_${db.id}`); } catch {}
+  };
 
   useEffect(() => {
     setName(db.name);
@@ -400,17 +419,60 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [db.id]);
 
+  // PGA Task Tracker şablonu — tek tıkla tablo sütunlarını kurar
+  const applyPgaTemplate = async () => {
+    const statusOpts = [
+      { value: 'not_started', label: 'Not started', color: '#e5e7eb', text: '#374151' },
+      { value: 'general',     label: 'General',     color: '#e9d5ff', text: '#6b21a8' },
+      { value: 'in_progress', label: 'In progress', color: '#dbeafe', text: '#1e40af' },
+      { value: 'postponed',   label: 'Postponed',   color: '#fed7aa', text: '#9a3412' },
+      { value: 'done',        label: 'Done',        color: '#d1fae5', text: '#065f46' },
+    ];
+    const tpl = [
+      { name: 'Done',           type: 'checkbox',  width: 70 },
+      { name: 'Status',         type: 'select',    width: 140, options: statusOpts },
+      { name: 'Task',           type: 'text',      width: 280 },
+      { name: 'Priority',       type: 'priority',  width: 100 },
+      { name: 'Notes',          type: 'text',      width: 240 },
+      { name: 'Sub-Task Notes', type: 'text',      width: 200 },
+      { name: 'Due Date',       type: 'daterange', width: 240 },
+      { name: 'Files & Media',  type: 'url',       width: 180 },
+      { name: 'Done Date',      type: 'date',      width: 130 },
+      { name: 'Done By',        type: 'person',    width: 160 },
+      { name: '№ ID',           type: 'autoid',    width: 80, options: { prefix: 'TT' } },
+      { name: 'Reminder Date',  type: 'date',      width: 130 },
+    ];
+    for (let i = 0; i < tpl.length; i++) {
+      await createPolicyColumn({
+        database_id: db.id, name: tpl[i].name, type: tpl[i].type,
+        order_index: i, width: tpl[i].width,
+        options: tpl[i].options || [],
+      });
+    }
+    await loadAll();
+  };
+
   const addColumn = async (type) => {
     const ord = columns.length;
     const defaultName = {
-      text: 'Metin', number: 'Sayı', date: 'Tarih', select: 'Durum', person: 'Kişi', checkbox: 'Tamam?'
+      text: 'Metin', number: 'Sayı', date: 'Tarih', daterange: 'Tarih Aralığı',
+      select: 'Durum', priority: 'Öncelik', person: 'Kişi', checkbox: 'Tamam?',
+      url: 'Link', autoid: 'ID',
     }[type] || 'Sütun';
-    const options = type === 'select' ? [
-      { value: 'yeni', label: 'Yeni', color: STATUS_COLORS[0].color, text: STATUS_COLORS[0].text },
-      { value: 'devam', label: 'Devam', color: STATUS_COLORS[2].color, text: STATUS_COLORS[2].text },
-      { value: 'tamam', label: 'Tamam', color: STATUS_COLORS[3].color, text: STATUS_COLORS[3].text },
-    ] : [];
-    await createPolicyColumn({ database_id: db.id, name: `${defaultName} ${ord + 1}`, type, order_index: ord, options });
+    let options = [];
+    let width = 200;
+    if (type === 'select') {
+      options = [
+        { value: 'not_started', label: 'Not started', color: STATUS_COLORS[0].color, text: STATUS_COLORS[0].text },
+        { value: 'in_progress', label: 'In progress', color: STATUS_COLORS[2].color, text: STATUS_COLORS[2].text },
+        { value: 'done',        label: 'Done',        color: STATUS_COLORS[3].color, text: STATUS_COLORS[3].text },
+        { value: 'postponed',   label: 'Postponed',   color: STATUS_COLORS[4].color, text: STATUS_COLORS[4].text },
+      ];
+    }
+    if (type === 'autoid') { options = { prefix: 'TT' }; width = 70; }
+    if (type === 'checkbox') { width = 80; }
+    if (type === 'daterange') { width = 240; }
+    await createPolicyColumn({ database_id: db.id, name: `${defaultName}${type === 'autoid' || type === 'checkbox' ? '' : ' ' + (ord + 1)}`, type, order_index: ord, options, width });
     await loadAll();
   };
 
@@ -440,8 +502,24 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
 
   const saveCell = async (rowId, colId, value) => {
     const row = rows.find(r => r.id === rowId);
-    const newData = { ...(row?.data || {}), [colId]: value };
-    updateCellLocal(rowId, colId, value);
+    const col = columns.find(c => c.id === colId);
+    let newData = { ...(row?.data || {}), [colId]: value };
+    // Done checkbox işaretlenince "Done Date" ve "Done By" otomatik doldur
+    if (col && col.type === 'checkbox' && /done|tamam/i.test(col.name)) {
+      const dateCol = columns.find(c => c.type === 'date' && /done|tamam/i.test(c.name));
+      const personCol = columns.find(c => c.type === 'person' && /done|tamam/i.test(c.name));
+      if (value === true) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (dateCol && !newData[dateCol.id]) newData[dateCol.id] = today;
+        if (personCol && !newData[personCol.id]) {
+          const { data: { user } } = await (await import('../lib/supabase')).supabase.auth.getUser();
+          if (user) newData[personCol.id] = user.id;
+        }
+      } else {
+        if (dateCol) newData[dateCol.id] = null;
+      }
+    }
+    setRows(rs => rs.map(r => r.id === rowId ? { ...r, data: newData } : r));
     await updatePolicyRow(rowId, { data: newData });
   };
 
@@ -504,6 +582,9 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
           onAddRow={addRow}
           onSaveCell={saveCell}
           onRemoveRow={removeRow}
+          groupBy={groupBy}
+          onGroupByChange={changeGroupBy}
+          onApplyTemplate={applyPgaTemplate}
         />
       ) : view === 'kanban' ? (
         <KanbanView columns={columns} rows={rows} people={people} onSaveCell={saveCell} onAddRow={addRow} />
@@ -514,64 +595,129 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
   );
 }
 
-// ── Tablo Görünümü ───────────────────────────────────────────────────
-function TableView({ columns, rows, people, onAddColumn, onSaveColumn, onRemoveColumn, onAddRow, onSaveCell, onRemoveRow }) {
+// ── Tablo Görünümü (grupsuz + gruplu) ────────────────────────────────
+function TableView({ columns, rows, people, onAddColumn, onSaveColumn, onRemoveColumn, onAddRow, onSaveCell, onRemoveRow, groupBy, onGroupByChange, onApplyTemplate }) {
   const [addColOpen, setAddColOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState({});
 
   if (columns.length === 0) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <div style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
-          Tabloyu kullanmak için sütun ekleyin
+      <div style={{ padding: 28, textAlign: 'center' }}>
+        <div style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 14 }}>
+          Tabloyu kullanmak için sütun ekleyin veya bir şablon uygulayın
         </div>
-        <AddColumnBtn open={addColOpen} setOpen={setAddColOpen} onAdd={onAddColumn} />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            style={{ ...S.btnPrimary, padding: '10px 18px' }}
+            onClick={onApplyTemplate}
+            title="Done · Status · Task · Priority · Notes · Due Date · Done Date · Done By · ID · Reminder"
+          >📋 PGA Task Tracker Şablonu Uygula</button>
+          <AddColumnBtn open={addColOpen} setOpen={setAddColOpen} onAdd={onAddColumn} />
+        </div>
       </div>
     );
   }
 
+  const groupableCols = columns.filter(c => c.type === 'select' || c.type === 'priority');
+  const groupCol = groupBy ? columns.find(c => c.id === groupBy) : null;
+
+  const renderRow = (row, idx) => (
+    <tr key={row.id} style={S.tr}>
+      {columns.map(col => (
+        <td key={col.id} style={{ ...S.td, width: col.width || 200 }}>
+          <CellEditor
+            column={col}
+            value={row.data?.[col.id]}
+            people={people}
+            rowNumber={String(idx + 1).padStart(2, '0')}
+            onSave={(v) => onSaveCell(row.id, col.id, v)}
+          />
+        </td>
+      ))}
+      <td style={S.td}>
+        <button style={S.rowDel} onClick={() => onRemoveRow(row.id)} title="Sil">×</button>
+      </td>
+    </tr>
+  );
+
+  // Grup bilgisi hesapla
+  let groups = [];
+  if (groupCol) {
+    const opts = groupCol.type === 'priority'
+      ? PRIORITY_OPTIONS
+      : (groupCol.options || []);
+    const buckets = {};
+    rows.forEach((r, idx) => {
+      const val = r.data?.[groupCol.id] || '';
+      if (!buckets[val]) buckets[val] = [];
+      buckets[val].push({ row: r, idx });
+    });
+    const ordered = [...opts, { value: '', label: '— Atanmadı —', color: '#e5e7eb', text: '#374151' }];
+    groups = ordered
+      .map(o => ({ ...o, rows: buckets[o.value] || [] }))
+      .filter(g => g.rows.length > 0);
+  }
+
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={S.table}>
-        <thead>
-          <tr>
-            {columns.map(col => (
-              <ColumnHeader
-                key={col.id}
-                column={col}
-                onSave={(patch) => onSaveColumn(col.id, patch)}
-                onRemove={() => onRemoveColumn(col.id)}
-              />
-            ))}
-            <th style={{ ...S.th, width: 60, position: 'relative' }}>
-              <AddColumnBtn open={addColOpen} setOpen={setAddColOpen} onAdd={onAddColumn} compact />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(row => (
-            <tr key={row.id} style={S.tr}>
+    <div>
+      <div style={S.tvToolbar}>
+        <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Gruplama:</label>
+        <select
+          value={groupBy || ''}
+          onChange={e => onGroupByChange(e.target.value || null)}
+          style={S.tvSelect}
+        >
+          <option value="">Grup yok</option>
+          {groupableCols.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={S.table}>
+          <thead>
+            <tr>
               {columns.map(col => (
-                <td key={col.id} style={{ ...S.td, width: col.width || 200 }}>
-                  <CellEditor
-                    column={col}
-                    value={row.data?.[col.id]}
-                    people={people}
-                    onSave={(v) => onSaveCell(row.id, col.id, v)}
-                  />
-                </td>
+                <ColumnHeader
+                  key={col.id}
+                  column={col}
+                  onSave={(patch) => onSaveColumn(col.id, patch)}
+                  onRemove={() => onRemoveColumn(col.id)}
+                />
               ))}
-              <td style={S.td}>
-                <button style={S.rowDel} onClick={() => onRemoveRow(row.id)} title="Sil">×</button>
+              <th style={{ ...S.th, width: 60, position: 'relative' }}>
+                <AddColumnBtn open={addColOpen} setOpen={setAddColOpen} onAdd={onAddColumn} compact />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupCol ? groups.map(g => {
+              const isOpen = !collapsed[g.value];
+              return (
+                <React.Fragment key={g.value || '_none_'}>
+                  <tr>
+                    <td colSpan={columns.length + 1} style={{ ...S.groupHead, background: g.color, color: g.text }}>
+                      <button
+                        onClick={() => setCollapsed(c => ({ ...c, [g.value]: isOpen }))}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
+                      >
+                        {isOpen ? '▾' : '▸'} <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{g.label}</span>
+                        <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>({g.rows.length})</span>
+                      </button>
+                    </td>
+                  </tr>
+                  {isOpen && g.rows.map(({ row, idx }) => renderRow(row, idx))}
+                </React.Fragment>
+              );
+            }) : rows.map((row, idx) => renderRow(row, idx))}
+            <tr>
+              <td colSpan={columns.length + 1} style={S.tdFooter}>
+                <button style={S.addRowBtn} onClick={onAddRow}>+ Yeni satır</button>
               </td>
             </tr>
-          ))}
-          <tr>
-            <td colSpan={columns.length + 1} style={S.tdFooter}>
-              <button style={S.addRowBtn} onClick={onAddRow}>+ Yeni satır</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -714,10 +860,61 @@ function AddColumnBtn({ open, setOpen, onAdd, compact = false }) {
 }
 
 // ── Hücre Editörü (tüm tipler) ───────────────────────────────────────
-function CellEditor({ column, value, people, onSave, compact = false }) {
+function CellEditor({ column, value, people, onSave, rowNumber, compact = false }) {
   const [v, setV] = useState(value ?? '');
   useEffect(() => { setV(value ?? ''); }, [value]);
 
+  if (column.type === 'autoid') {
+    const prefix = (column.options && column.options.prefix) || 'TT';
+    return <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{prefix}-{rowNumber}</span>;
+  }
+  if (column.type === 'url') {
+    return (
+      <UrlCell
+        value={v}
+        onChange={setV}
+        onSave={() => { if (v !== value) onSave(v); }}
+      />
+    );
+  }
+  if (column.type === 'daterange') {
+    const val = (typeof v === 'object' && v) ? v : {};
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <input
+          type="date"
+          value={val.start || ''}
+          onChange={e => { const nv = { ...val, start: e.target.value || null }; setV(nv); onSave(nv); }}
+          style={{ ...S.cellInput, width: '45%' }}
+        />
+        <span style={{ opacity: 0.5 }}>→</span>
+        <input
+          type="date"
+          value={val.end || ''}
+          onChange={e => { const nv = { ...val, end: e.target.value || null }; setV(nv); onSave(nv); }}
+          style={{ ...S.cellInput, width: '45%' }}
+        />
+      </div>
+    );
+  }
+  if (column.type === 'priority') {
+    const opt = PRIORITY_OPTIONS.find(o => o.value === v);
+    return (
+      <select
+        value={v || ''}
+        onChange={e => { setV(e.target.value); onSave(e.target.value || null); }}
+        style={{
+          ...S.cellInput,
+          background: opt?.color || 'transparent',
+          color: opt?.text || 'var(--text)',
+          fontWeight: 600, borderRadius: 6, textAlign: 'center',
+        }}
+      >
+        <option value="">—</option>
+        {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    );
+  }
   if (column.type === 'text') {
     return (
       <input
@@ -799,20 +996,52 @@ function CellEditor({ column, value, people, onSave, compact = false }) {
   return null;
 }
 
+// ── URL Hücresi (tıkla-düzenle / tıkla-aç) ───────────────────────────
+function UrlCell({ value, onChange, onSave }) {
+  const [editing, setEditing] = useState(false);
+  if (!editing && value) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 6px' }}>
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--navy, #1a3a5c)', textDecoration: 'underline', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >🔗 {value.replace(/^https?:\/\//, '').slice(0, 40)}</a>
+        <button
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}
+          onClick={() => setEditing(true)}
+        >✏️</button>
+      </div>
+    );
+  }
+  return (
+    <input
+      autoFocus={editing}
+      style={S.cellInput}
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      onBlur={() => { setEditing(false); onSave(); }}
+      placeholder="https://..."
+    />
+  );
+}
+
 // ── Kanban Görünümü ──────────────────────────────────────────────────
 function KanbanView({ columns, rows, people, onSaveCell, onAddRow }) {
-  const selectCol = columns.find(c => c.type === 'select');
+  const selectCol = columns.find(c => c.type === 'select') || columns.find(c => c.type === 'priority');
   const titleCol = columns.find(c => c.type === 'text') || columns[0];
 
   if (!selectCol) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-        Kanban görünümü için bir <b>Durum</b> sütunu ekleyin.
+        Kanban görünümü için bir <b>Durum</b> veya <b>Öncelik</b> sütunu ekleyin.
       </div>
     );
   }
 
-  const opts = [{ value: '', label: 'Atanmadı', color: '#e5e7eb', text: '#374151' }, ...(selectCol.options || [])];
+  const baseOpts = selectCol.type === 'priority' ? PRIORITY_OPTIONS : (selectCol.options || []);
+  const opts = [{ value: '', label: 'Atanmadı', color: '#e5e7eb', text: '#374151' }, ...baseOpts];
 
   return (
     <div style={S.kanbanWrap}>
@@ -830,17 +1059,23 @@ function KanbanView({ columns, rows, people, onSaveCell, onAddRow }) {
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
                     {row.data?.[titleCol?.id] || '—'}
                   </div>
-                  {columns.filter(c => c.id !== titleCol?.id && c.id !== selectCol.id).slice(0, 3).map(c => {
+                  {columns.filter(c => c.id !== titleCol?.id && c.id !== selectCol.id && c.type !== 'autoid').slice(0, 4).map(c => {
                     const val = row.data?.[c.id];
                     if (val === null || val === undefined || val === '') return null;
                     let display = val;
                     if (c.type === 'date') display = fmtDate(val);
+                    if (c.type === 'daterange') display = `${fmtDate(val?.start)} → ${fmtDate(val?.end)}`;
                     if (c.type === 'person') display = people.find(p => p.user_id === val)?.full_name || '';
                     if (c.type === 'checkbox') display = val ? '✅' : '';
                     if (c.type === 'select') {
                       const o = (c.options || []).find(o => o.value === val);
                       display = o?.label || val;
                     }
+                    if (c.type === 'priority') {
+                      const o = PRIORITY_OPTIONS.find(o => o.value === val);
+                      display = o?.label || val;
+                    }
+                    if (c.type === 'url') display = '🔗 bağlantı';
                     return (
                       <div key={c.id} style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>
                         <span style={{ opacity: 0.6 }}>{c.name}:</span> {display}
@@ -852,7 +1087,7 @@ function KanbanView({ columns, rows, people, onSaveCell, onAddRow }) {
                     onChange={e => onSaveCell(row.id, selectCol.id, e.target.value)}
                     style={S.kanbanMove}
                   >
-                    {(selectCol.options || []).map(o => (
+                    {baseOpts.map(o => (
                       <option key={o.value} value={o.value}>→ {o.label}</option>
                     ))}
                   </select>
@@ -871,7 +1106,7 @@ function KanbanView({ columns, rows, people, onSaveCell, onAddRow }) {
 
 // ── Takvim Görünümü ──────────────────────────────────────────────────
 function CalendarView({ columns, rows, people }) {
-  const dateCol = columns.find(c => c.type === 'date');
+  const dateCol = columns.find(c => c.type === 'date') || columns.find(c => c.type === 'daterange');
   const titleCol = columns.find(c => c.type === 'text') || columns[0];
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); return d; });
 
@@ -899,7 +1134,9 @@ function CalendarView({ columns, rows, people }) {
 
   const rowsByDay = {};
   rows.forEach(r => {
-    const d = r.data?.[dateCol.id];
+    const raw = r.data?.[dateCol.id];
+    if (!raw) return;
+    const d = typeof raw === 'object' ? raw.start : raw;
     if (d) {
       const key = d.substring(0, 10);
       if (!rowsByDay[key]) rowsByDay[key] = [];
@@ -1044,6 +1281,18 @@ const S = {
   dbDelBtn: {
     padding: '5px 8px', background: 'transparent', border: 'none',
     color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14,
+  },
+  tvToolbar: {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+    borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)',
+  },
+  tvSelect: {
+    padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6,
+    background: 'var(--bg-card)', color: 'var(--text)', fontSize: 12, fontWeight: 600, outline: 'none',
+  },
+  groupHead: {
+    padding: '10px 14px', fontWeight: 700, fontSize: 13,
+    borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)',
   },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
   th: {
