@@ -218,11 +218,6 @@ function UploadModal({ onClose, onUpload }) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
 
-  // Dosya seçilince başlığı otomatik doldur
-  useEffect(() => {
-    if (file && !title) setTitle(stripExt(file.name));
-  }, [file]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
