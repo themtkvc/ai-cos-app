@@ -42,7 +42,6 @@ function linkifyText(text) {
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const PRIORITIES = [
-  { value: 'kritik', label: '🔴 Kritik',  color: 'var(--red)', bg: 'var(--red-pale)' },
   { value: 'yuksek', label: '🟠 Yüksek', color: 'var(--orange)', bg: 'var(--orange-pale)' },
   { value: 'orta',   label: '🟡 Orta',   color: 'var(--gold)', bg: 'var(--orange-pale)' },
   { value: 'dusuk',  label: '🟢 Düşük',  color: 'var(--green)', bg: 'var(--green-pale)' },
@@ -82,7 +81,7 @@ function getAllowedStatuses(role, agenda, myId, allProfiles = []) {
   return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
 }
 
-const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES[2];
+const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES.find(p => p.value === 'orta') || PRIORITIES[0];
 
 const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
 const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];

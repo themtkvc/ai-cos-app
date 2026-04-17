@@ -63,7 +63,7 @@ export const ASSISTANT_TOOLS = [
         agenda_title: { type: 'string', description: 'Görevin ekleneceği gündem başlığı' },
         title: { type: 'string', description: 'Görev başlığı' },
         assigned_to_name: { type: 'string', description: 'Atanacak kişi adı' },
-        priority: { type: 'string', description: 'Öncelik: kritik, yuksek, orta, dusuk' },
+        priority: { type: 'string', description: 'Öncelik: yuksek, orta, dusuk' },
         due_date: { type: 'string', description: 'Bitiş tarihi (YYYY-MM-DD)' },
       },
       required: ['agenda_title', 'title'],
