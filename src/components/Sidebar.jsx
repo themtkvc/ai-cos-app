@@ -30,6 +30,7 @@ const ALL_NAV = [
   { id: 'goals',            icon: '🎯', label: 'Hedefler' },
   { id: 'policy',           icon: '⚖️', label: 'Politikalar ve Yönetişim' },
   { id: 'emails',           icon: '📧', label: 'Mailler' },
+  { id: 'feedback',         icon: '💬', label: 'Geri Bildirim' },
 ];
 
 const ADMIN_NAV = [

@@ -30,9 +30,11 @@ import Activities from './pages/Activities';
 import Goals from './pages/Goals';
 import PolicyGovernance from './pages/PolicyGovernance';
 import PublicFormFill from './pages/PublicFormFill';
+import Feedback from './pages/Feedback';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import AIChatPanel from './components/AIChatPanel';
+import FeedbackButton from './components/FeedbackButton';
 import './App.css';
 
 // ── Role Context ──
@@ -45,7 +47,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','policy','emails','admin','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','policy','emails','feedback','admin','profile'],
   direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','policy','profile'],
   asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
   koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
@@ -327,6 +329,7 @@ export default function App() {
     goals:            Goals,
     policy:           PolicyGovernance,
     emails:           SystemEmails,
+    feedback:         Feedback,
     admin:     Admin,
   };
 
@@ -357,6 +360,7 @@ export default function App() {
     direktor_agendas: '🗂 Direktör Gündemleri',
     goals:      '🎯 Hedefler',
     policy:     '⚖️ Politikalar ve Yönetişim',
+    feedback:   '💬 Geri Bildirim',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
     users:      '👥 Kullanıcılar',
@@ -412,6 +416,9 @@ export default function App() {
             <Dashboard user={user} profile={profile} onNavigate={navigate} />
           )}
         </main>
+
+        {/* Global feedback ikonu — tüm kullanıcılar için */}
+        <FeedbackButton user={user} profile={profile} />
 
         {/* AI Asistan Chat — sadece direktör */}
         {profile?.role === 'direktor' && (

@@ -1970,3 +1970,64 @@ export const deleteDocumentFromDrive = async (fileIdOrUrl) => {
   }
   try { return JSON.parse(text); } catch { return { ok: true }; }
 };
+
+// ── FEEDBACK MODÜLÜ ─────────────────────────────────────────────
+// Kullanıcıların site genelinden ticket açtığı modül. Direktör yönetir.
+
+export const createFeedbackTicket = async (ticket) => {
+  return await supabase.from('feedback_tickets').insert([ticket]).select();
+};
+
+export const getFeedbackTickets = async (filters = {}) => {
+  let q = supabase.from('feedback_tickets').select('*').order('created_at', { ascending: false });
+  if (filters.status)     q = q.eq('status', filters.status);
+  if (filters.type)       q = q.eq('type', filters.type);
+  if (filters.reporterId) q = q.eq('reporter_id', filters.reporterId);
+  return await q;
+};
+
+export const getFeedbackTicket = async (id) => {
+  return await supabase.from('feedback_tickets').select('*').eq('id', id).single();
+};
+
+export const updateFeedbackTicket = async (id, updates) => {
+  return await supabase.from('feedback_tickets').update(updates).eq('id', id).select();
+};
+
+export const deleteFeedbackTicket = async (id) => {
+  return await supabase.from('feedback_tickets').delete().eq('id', id);
+};
+
+export const getFeedbackComments = async (ticketId) => {
+  return await supabase
+    .from('feedback_comments')
+    .select('*')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true });
+};
+
+export const addFeedbackComment = async (comment) => {
+  return await supabase.from('feedback_comments').insert([comment]).select();
+};
+
+// Screenshot upload: dataURL veya Blob kabul eder. URL döner.
+export const uploadFeedbackScreenshot = async (dataUrlOrBlob, userId) => {
+  let blob;
+  if (typeof dataUrlOrBlob === 'string' && dataUrlOrBlob.startsWith('data:')) {
+    const resp = await fetch(dataUrlOrBlob);
+    blob = await resp.blob();
+  } else if (dataUrlOrBlob instanceof Blob) {
+    blob = dataUrlOrBlob;
+  } else {
+    throw new Error('invalid_screenshot_input');
+  }
+  const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png';
+  const path = `${userId || 'anon'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('feedback-screenshots').upload(path, blob, {
+    contentType: blob.type,
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data: pub } = supabase.storage.from('feedback-screenshots').getPublicUrl(path);
+  return pub?.publicUrl || null;
+};
