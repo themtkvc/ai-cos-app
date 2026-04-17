@@ -41,47 +41,40 @@ function linkifyText(text) {
 }
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
-const PRIORITIES = [
-  { value: 'yuksek', label: '🟠 Yüksek', color: 'var(--orange)', bg: 'var(--orange-pale)' },
-  { value: 'orta',   label: '🟡 Orta',   color: 'var(--gold)', bg: 'var(--orange-pale)' },
-  { value: 'dusuk',  label: '🟢 Düşük',  color: 'var(--green)', bg: 'var(--green-pale)' },
-];
-
 const AGENDA_STATUSES = [
-  { value: 'aktif',         label: '🟢 Aktif' },
-  { value: 'devam',         label: '🔵 Devam Ediyor' },
-  { value: 'tamamlandi',    label: '✅ Tamamlandı' },
-  { value: 'onay_bekliyor', label: '⏳ Onay Bekliyor' },
-  { value: 'arsiv',         label: '📦 Arşiv' },
+  { value: 'devam',      label: 'Devam Ediyor' },
+  { value: 'tamamlandi', label: 'Tamamlandı' },
+  { value: 'arsiv',      label: 'Arşiv' },
 ];
 
 // Rol + sahiplik bazlı izin verilen statü geçişleri
-function getAllowedStatuses(role, agenda, myId, allProfiles = []) {
+// - Herkes tamamlandı işaretleyebilir
+// - Koordinatör tamamlanan bir gündemi devam'a veya arşive alabilir
+function getAllowedStatuses(role, agenda, myId /*, allProfiles = [] */) {
   const isOwn      = agenda.created_by === myId;
   const isAssigned = agenda.assigned_to === myId;
-  // Gündem oluşturucusunun rolünü allProfiles'dan bul
-  const creatorProfile = allProfiles.find(p => p.user_id === agenda.created_by);
-  const creatorRole    = creatorProfile?.role || '';
-  const assignedByDirektor = isAssigned && (creatorRole === 'direktor' || creatorRole === 'direktor_yardimcisi');
 
   if (role === 'direktor' || role === 'direktor_yardimcisi') {
-    return ['aktif', 'devam', 'tamamlandi', 'onay_bekliyor', 'arsiv'];
+    return ['devam', 'tamamlandi', 'arsiv'];
   }
   if (role === 'koordinator') {
-    if (isOwn) return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
-    // Direktör tarafından koordinatöre atanmış → sadece onaya gönder
-    if (assignedByDirektor) return ['onay_bekliyor'];
-    // Personelin gündemi → tamamlandı + arşiv
-    return ['tamamlandi', 'arsiv'];
+    // Koordinatör her gündemi yönetebilir (kendi, personelinin, atanan)
+    return ['devam', 'tamamlandi', 'arsiv'];
+  }
+  if (role === 'asistan') {
+    return ['devam', 'tamamlandi', 'arsiv'];
   }
   if (role === 'personel') {
-    if (isOwn) return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
+    // Personel kendi gündemini / atandığı gündemi tamamlandı işaretleyebilir
+    // Tamamlandıktan sonra geri alamaz — koordinatör devreye girer
+    if (isOwn || isAssigned) {
+      if (agenda.status === 'tamamlandi' || agenda.status === 'arsiv') return [];
+      return ['devam', 'tamamlandi'];
+    }
     return [];
   }
-  return ['aktif', 'devam', 'tamamlandi', 'arsiv'];
+  return ['devam', 'tamamlandi', 'arsiv'];
 }
-
-const prioMeta = (v) => PRIORITIES.find(p => p.value === v) || PRIORITIES.find(p => p.value === 'orta') || PRIORITIES[0];
 
 const CREATOR_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
 const ASSIGNER_ROLES = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator', 'personel'];
@@ -103,16 +96,6 @@ function Avatar({ name, url, size = 28 }) {
       color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.42, fontWeight: 700, flexShrink: 0,
     }}>{initial}</div>
-  );
-}
-
-function PriorityBadge({ value }) {
-  const m = prioMeta(value);
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-      color: m.color, background: m.bg,
-    }}>{m.label}</span>
   );
 }
 
@@ -269,7 +252,6 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
           <div style={{ fontWeight: 600, fontSize: 13.5 }}>{task.title}</div>
           {task.description && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>{task.description}</div>}
         </div>
-        <PriorityBadge value={task.priority} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -513,8 +495,6 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
   const agendaComments = (detail?.comments || []).filter(c => !c.task_id);
 
   const type = agenda.agenda_types;
-  const typeColor = type?.color || '#6366f1';
-  const typeIcon = type?.icon || '📋';
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -522,16 +502,17 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: typeColor + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
-              {typeIcon}
-            </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: typeColor, background: typeColor + '18', padding: '2px 8px', borderRadius: 20 }}>
-                  {typeIcon} {type?.name || 'Gündem'}
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                  {type?.name || 'Gündem'}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
-                  {AGENDA_STATUSES.find(s => s.value === agenda.status)?.label || 'Aktif'}
+                <span style={{
+                  fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                  padding: '2px 8px', borderRadius: 20,
+                }}>
+                  {AGENDA_STATUSES.find(s => s.value === agenda.status)?.label || '—'}
                 </span>
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 700, margin: '4px 0 0' }}>{agenda.title}</h2>
@@ -549,29 +530,21 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
 
           {/* Statü aksiyon butonları */}
           {(() => {
-            const allowed = getAllowedStatuses(role, agenda, myId, allProfiles).filter(s => s !== agenda.status);
+            const allowed = getAllowedStatuses(role, agenda, myId).filter(s => s !== agenda.status);
             if (!allowed.length) return null;
             const statusColors = {
-              aktif: '#22c55e', devam: '#3b82f6', tamamlandi: '#10b981',
-              onay_bekliyor: '#f59e0b', arsiv: '#6b7280',
+              devam: '#3b82f6', tamamlandi: '#10b981', arsiv: '#6b7280',
+            };
+            const statusLabels = {
+              devam: 'Devam Ediyor\'a Al', tamamlandi: 'Tamamlandı', arsiv: 'Arşive Al',
             };
             return (
               <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                 {allowed.map(s => {
-                  const meta = AGENDA_STATUSES.find(x => x.value === s);
                   const color = statusColors[s] || '#6366f1';
                   return (
                     <button key={s} onClick={async () => {
                       await updateAgenda(agenda.id, { status: s });
-                      // Direktöre bildirim: koordinatör onaya gönderdi
-                      if (s === 'onay_bekliyor') {
-                        const direktorProfile = profiles.find(p => p.role === 'direktor');
-                        if (direktorProfile) {
-                          try {
-                            await createNotification({ userId: direktorProfile.user_id, type: 'agenda_assigned', title: `"${agenda.title}" onay bekliyor`, body: `${myName || ''} tarafından onaya gönderildi`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myName || '' });
-                          } catch (e) { console.error('Notification error:', e); }
-                        }
-                      }
                       onStatusChange?.(agenda.id, s);
                       onRefresh?.();
                     }} style={{
@@ -579,7 +552,7 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
                       background: color + '15', color: color, fontWeight: 700, fontSize: 12,
                       cursor: 'pointer', fontFamily: 'inherit',
                     }}>
-                      {meta?.label || s}
+                      {statusLabels[s] || s}
                     </button>
                   );
                 })}
@@ -809,17 +782,9 @@ function TaskModal({ task, agendaId, myId, myName, myUnit, role, allProfiles = [
           <label className="form-label">Açıklama</label>
           <textarea className="form-textarea" rows={3} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Detaylar…" />
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Öncelik</label>
-            <select className="form-select" value={form.priority} onChange={e => set('priority', e.target.value)}>
-              {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Bitiş Tarihi</label>
-            <input className="form-input" type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
-          </div>
+        <div className="form-group">
+          <label className="form-label">Bitiş Tarihi</label>
+          <input className="form-input" type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} />
         </div>
         <div className="form-group">
           <label className="form-label">Atanan Kişi</label>
@@ -852,7 +817,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
     title: agenda?.title || '',
     description: agenda?.description || '',
     type_id: agenda?.type_id || (agendaTypes[0]?.id || ''),
-    status: agenda?.status || 'aktif',
+    status: agenda?.status || 'devam',
     date: agenda?.date ? agenda.date.substring(0, 10) : '',
     unit: agenda?.unit || myUnit || '',
     is_private: agenda?.is_private || false,
@@ -924,22 +889,25 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
         <div className="form-group">
           <label className="form-label">Gündem Türü</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {agendaTypes.map(t => (
-              <button
-                key={t.id}
-                onClick={() => set('type_id', t.id)}
-                style={{
-                  padding: '6px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-                  border: `2px solid ${form.type_id === t.id ? t.color : 'var(--border)'}`,
-                  background: form.type_id === t.id ? t.color + '18' : 'var(--bg)',
-                  color: form.type_id === t.id ? t.color : 'var(--text)',
-                  fontWeight: form.type_id === t.id ? 700 : 400,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {t.icon} {t.name}
-              </button>
-            ))}
+            {agendaTypes.map(t => {
+              const active = form.type_id === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => set('type_id', t.id)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                    border: `1.5px solid ${active ? 'var(--navy)' : 'var(--border)'}`,
+                    background: active ? 'var(--navy)' : 'var(--bg)',
+                    color: active ? '#fff' : 'var(--text)',
+                    fontWeight: active ? 700 : 400,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.name}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -962,10 +930,8 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
             <label className="form-label">Durum</label>
             <select className="form-select" value={form.status} onChange={e => set('status', e.target.value)}>
               {AGENDA_STATUSES.filter(s => {
-                // Personel: arşiv ve onay_bekliyor seçemez (sadece oluşturma sırasında)
-                if (role === 'personel') return ['aktif', 'devam', 'tamamlandi'].includes(s.value);
-                // Koordinatör: onay_bekliyor modaldan değil, detail butonundan yönetilir
-                if (role === 'koordinator') return s.value !== 'onay_bekliyor';
+                // Personel oluştururken arşive direkt gönderemez
+                if (role === 'personel') return s.value !== 'arsiv';
                 return true;
               }).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
@@ -1054,7 +1020,6 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
 // ── GÜNDEM ÇERÇEVESİ (ana kart — kompakt, beyaz, 4 sütuna sığar) ─────────────
 function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify, onAddTask, onEditTask }) {
   const type = agenda.agenda_types;
-  const typeIcon = type?.icon || '📋';
   const tasks = agenda.agenda_tasks || [];
   const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
   const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
@@ -1091,7 +1056,6 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
         borderBottom: '1px solid var(--border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13 }}>{typeIcon}</span>
           <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
             {type?.name || 'Gündem'}
           </span>
@@ -1200,7 +1164,6 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
 
 // ── GÖREV MİNİ KARTI (beyaz, tek satır) ───────────────────────────────────────
 function TaskMiniCard({ task, profiles = [], onClick }) {
-  const prio = prioMeta(task.priority);
   const assignee = profiles.find(p => p.user_id === task.assigned_to);
   const isDone = task.completion_status === 'approved' || task.status === 'tamamlandi';
   const isPending = task.completion_status === 'pending_review';
@@ -1223,7 +1186,6 @@ function TaskMiniCard({ task, profiles = [], onClick }) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
     >
-      <span title={prio.label.replace(/^[^\s]+ /, '')} style={{ width: 6, height: 6, borderRadius: '50%', background: prio.color, flexShrink: 0 }} />
       <span style={{
         fontSize: 11.5, fontWeight: 500, color: 'var(--text)', lineHeight: 1.3,
         textDecoration: isDone ? 'line-through' : 'none',
@@ -1738,8 +1700,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
     <div className="card" style={{ padding:0, overflow:'hidden' }}>
       {items.map((agenda, i) => {
         const type = agenda.agenda_types;
-        const typeColor = type?.color || '#6366f1';
-        const typeIcon = type?.icon || '📋';
         const tasks = agenda.agenda_tasks || [];
         const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
         const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
@@ -1750,33 +1710,32 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
             style={{
               display:'flex', alignItems:'center', gap:14, padding:'12px 20px', cursor:'pointer',
               borderBottom: i<items.length-1 ? '1px solid var(--border)' : 'none',
-              borderLeft:`3px solid ${typeColor}`, transition:'background 0.1s',
+              transition:'background 0.1s',
             }}
-            onMouseEnter={e=>e.currentTarget.style.background=typeColor+'0c'}
-            onMouseLeave={e=>e.currentTarget.style.background=typeColor+'05'}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--bg)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
           >
-            <span style={{ fontSize:20, flexShrink:0 }}>{typeIcon}</span>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
                 <span style={{ fontWeight:700, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{agenda.title}</span>
               </div>
               <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <span style={{ fontSize:10.5, fontWeight:600, color:typeColor, background:typeColor+'18', padding:'1px 6px', borderRadius:12 }}>{type?.name||'Gündem'}</span>
-                <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>{statusMeta.label}</span>
-                {agenda.unit && <span style={{ fontSize:10, color:'var(--text-muted)' }}>🏗 {agenda.unit}</span>}
-                {agenda.date && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>📅 {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span>}
-                {agenda.assigned_to_name && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>👤 {agenda.assigned_to_name}</span>}
+                <span style={{ fontSize:10.5, fontWeight:700, color:'var(--text-muted)', letterSpacing:0.4, textTransform:'uppercase' }}>{type?.name||'Gündem'}</span>
+                <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {statusMeta.label}</span>
+                {agenda.unit && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {agenda.unit}</span>}
+                {agenda.date && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {new Date(agenda.date).toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span>}
+                {agenda.assigned_to_name && <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>· {agenda.assigned_to_name}</span>}
               </div>
             </div>
             {/* Görev sayacı */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
               {pendingTasks.length > 0 && (
-                <span style={{ fontSize:10, fontWeight:700, background:'var(--orange-pale)', color:'var(--gold)', padding:'2px 6px', borderRadius:20 }}>⏳ {pendingTasks.length}</span>
+                <span style={{ fontSize:10, fontWeight:700, background:'var(--orange-pale)', color:'var(--gold)', padding:'2px 6px', borderRadius:20 }}>{pendingTasks.length} onay</span>
               )}
-              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>📌 {doneTasks.length}/{tasks.length}</span>
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>{doneTasks.length}/{tasks.length}</span>
               {tasks.length > 0 && (
                 <div style={{ width:48, height:4, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${(doneTasks.length/tasks.length)*100}%`, background:typeColor, borderRadius:4 }} />
+                  <div style={{ height:'100%', width:`${(doneTasks.length/tasks.length)*100}%`, background:'var(--navy)', borderRadius:4 }} />
                 </div>
               )}
             </div>
@@ -1950,7 +1909,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
 
         <select className="form-select" style={{ width: 155, fontSize: 13 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
           <option value="all">Tüm Türler</option>
-          {agendaTypes.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+          {agendaTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
 
         <select className="form-select" style={{ width: 155, fontSize: 13 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -2017,27 +1976,24 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                 : (t.assigned_to === myId && t.created_by === myId)
             );
             const type = agenda.agenda_types;
-            const typeColor = type?.color || '#6366f1';
             return (
               <div key={agenda.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 {/* Gündem başlığı */}
                 <div onClick={() => { setDetailAgenda(agenda); setDetailIsMine(isMyTasksTab); }}
                   style={{
-                    padding: '12px 20px', background: typeColor + '08', borderBottom: '1px solid var(--border)',
+                    padding: '12px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
                   }}>
-                  <span style={{ fontSize: 18 }}>{type?.icon || '📋'}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{agenda.title}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {type?.name || 'Gündem'} {agenda.unit ? `· 🏗 ${agenda.unit}` : ''}
+                      {type?.name || 'Gündem'} {agenda.unit ? `· ${agenda.unit}` : ''}
                     </div>
                   </div>
-                  <span style={{ fontSize: 11.5, color: typeColor, fontWeight: 600 }}>{tasks.length} görev</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>{tasks.length} görev</span>
                 </div>
                 {/* Görevler */}
                 {tasks.map((task, i) => {
-                  const prio = prioMeta(task.priority);
                   return (
                     <div key={task.id} style={{
                       padding: '10px 20px 10px 36px', display: 'flex', alignItems: 'center', gap: 10,
@@ -2047,7 +2003,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                          <PriorityBadge value={task.priority} />
                           {task.due_date && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>📅 {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>}
                         </div>
                       </div>
