@@ -407,7 +407,8 @@ function UserManagement({ currentUser, notify }) {
 
   const startEdit = (p) => {
     setEditingId(p.user_id);
-    setEditDraft({ full_name: p.full_name || '', role: p.role, unit: p.unit || '' });
+    // Birim değişikliği Org Şeması sekmesinden yapılır; burada yalnızca ad ve rol düzenlenir
+    setEditDraft({ full_name: p.full_name || '', role: p.role });
   };
 
   const saveEdit = async (userId) => {
@@ -521,14 +522,7 @@ function UserManagement({ currentUser, notify }) {
               onChange={e => setEditDraft(d => ({...d, role: e.target.value}))}>
               {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
-            {['koordinator','personel'].includes(editDraft.role) && (
-              <select className="form-input" style={{width:170,padding:'4px 8px',fontSize:12}}
-                value={editDraft.unit}
-                onChange={e => setEditDraft(d => ({...d, unit: e.target.value}))}>
-                <option value="">— Birim seç —</option>
-                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            )}
+            {/* Birim ataması Org Şeması sekmesinden yapılır; burada düzenlenmez */}
           </div>
         ) : (
           <>
