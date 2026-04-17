@@ -265,6 +265,13 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
   const [taskModal, setTaskModal] = useState(false);
   const [editTask, setEditTask] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState(() => new Set());
+  const toggleTask = (taskId) => setExpandedTasks(prev => {
+    const next = new Set(prev);
+    if (next.has(taskId)) next.delete(taskId);
+    else next.add(taskId);
+    return next;
+  });
 
   const canAssign = ASSIGNER_ROLES.includes(role);
   const myProfile = profiles.find(p => p.user_id === myId);
@@ -467,52 +474,106 @@ function AgendaDetailView({ agenda, myId, myName, myUnit, role, profiles, allPro
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {tasks.map(task => {
                   const taskComments = (detail?.comments || []).filter(c => c.task_id === task.id);
+                  const isExpanded = expandedTasks.has(task.id);
+                  const isDone = task.status === 'tamamlandi';
+                  const assigneeProfile = profiles.find(p => p.user_id === task.assigned_to);
                   return (
                     <div key={task.id} style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                      <div style={{ padding: '10px 12px' }}>
-                        <TaskCard
-                          task={task}
-                          myId={myId}
-                          myName={myProfile?.full_name || ''}
-                          role={role}
-                          profiles={profiles}
-                          onRefresh={loadDetail}
-                          agendaCreatedBy={agenda.created_by}
-                          onNotify={handleNotifyTask}
-                          agendaId={agenda.id}
-                          agendaTitle={agenda.title}
-                          isPersonalAgenda={!!agenda.is_personal}
-                        />
-                        {canAssign && (
-                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                            <button className="btn btn-sm btn-outline" onClick={() => { setEditTask(task); setTaskModal(true); }}>✏️ Düzenle</button>
-                            <button className="btn btn-sm btn-outline" style={{ color: 'var(--red)' }} onClick={() => handleDeleteTask(task.id)}>🗑 Sil</button>
+                      {/* Başlık satırı — tıklanabilir, sadeleşmiş */}
+                      <div
+                        onClick={() => toggleTask(task.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px', cursor: 'pointer',
+                          background: isExpanded ? 'var(--bg)' : '#fff',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--bg)'; }}
+                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#fff'; }}
+                      >
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 12, textAlign: 'center', flexShrink: 0 }}>
+                          {isExpanded ? '▾' : '▸'}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontWeight: 600, fontSize: 13.5,
+                            textDecoration: isDone ? 'line-through' : 'none',
+                            opacity: isDone ? 0.6 : 1,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {task.title}
                           </div>
-                        )}
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
+                            <TaskStatusBadge status={task.status} />
+                            {task.due_date && (
+                              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                                📅 {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                            {task.assigned_to_name && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--text-muted)' }}>
+                                <Avatar name={task.assigned_to_name} url={assigneeProfile?.avatar_url} size={16} />
+                                {task.assigned_to_name}
+                              </span>
+                            )}
+                            {taskComments.length > 0 && (
+                              <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                                💬 {taskComments.length}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Görev yorumları */}
-                      {taskComments.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', background: 'var(--bg-sidebar)' }}>
-                          {taskComments.map(c => (
-                            <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} profiles={allProfiles} />
-                          ))}
-                        </div>
+                      {/* Genişletildiğinde — TaskCard + yorumlar + yorum kutusu */}
+                      {isExpanded && (
+                        <>
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+                            <TaskCard
+                              task={task}
+                              myId={myId}
+                              myName={myProfile?.full_name || ''}
+                              role={role}
+                              profiles={profiles}
+                              onRefresh={loadDetail}
+                              agendaCreatedBy={agenda.created_by}
+                              onNotify={handleNotifyTask}
+                              agendaId={agenda.id}
+                              agendaTitle={agenda.title}
+                              isPersonalAgenda={!!agenda.is_personal}
+                            />
+                            {canAssign && (
+                              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                <button className="btn btn-sm btn-outline" onClick={() => { setEditTask(task); setTaskModal(true); }}>✏️ Düzenle</button>
+                                <button className="btn btn-sm btn-outline" style={{ color: 'var(--red)' }} onClick={() => handleDeleteTask(task.id)}>🗑 Sil</button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Görev yorumları */}
+                          {taskComments.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', background: 'var(--bg-sidebar)' }}>
+                              {taskComments.map(c => (
+                                <CommentBubble key={c.id} comment={c} myId={myId} onDelete={handleDeleteComment} profiles={allProfiles} />
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', display: 'flex', gap: 6 }}>
+                            <MentionInput
+                              value={taskCommentTexts[task.id] || ''}
+                              onChange={v => setTaskCommentTexts(prev => ({ ...prev, [task.id]: v }))}
+                              onSubmit={() => handleAddComment(task.id)}
+                              profiles={allProfiles}
+                              myId={myId}
+                              myUnit={myUnit}
+                              isDirektor={role === 'direktor'}
+                              placeholder="Yorum yaz… @ ile etiketle"
+                              disabled={saving}
+                            />
+                            <button className="btn btn-sm btn-primary" disabled={saving} onClick={() => handleAddComment(task.id)}>↑</button>
+                          </div>
+                        </>
                       )}
-                      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 12px', display: 'flex', gap: 6 }}>
-                        <MentionInput
-                          value={taskCommentTexts[task.id] || ''}
-                          onChange={v => setTaskCommentTexts(prev => ({ ...prev, [task.id]: v }))}
-                          onSubmit={() => handleAddComment(task.id)}
-                          profiles={allProfiles}
-                          myId={myId}
-                          myUnit={myUnit}
-                          isDirektor={role === 'direktor'}
-                          placeholder="Yorum yaz… @ ile etiketle"
-                          disabled={saving}
-                        />
-                        <button className="btn btn-sm btn-primary" disabled={saving} onClick={() => handleAddComment(task.id)}>↑</button>
-                      </div>
                     </div>
                   );
                 })}
@@ -1655,8 +1716,8 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               // Diğer roller için mevcut sekmeler
               { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
               ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
-              ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
-              { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
+              ...(isDirektor ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
+              ...(!isDirektor ? [{ id: 'mine',           icon: '📋',        label: 'Gündemlerim' }] : []),
               { id: 'arsiv',          icon: '📦',        label: 'Arşiv' },
               ...((isDirektor || isKoordinator) ? [{ id: 'settings', icon: '⚙️', label: 'Tür Ayarları' }] : []),
             ]),
