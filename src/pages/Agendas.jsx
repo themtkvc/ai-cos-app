@@ -12,11 +12,7 @@ import {
   createAgendaTask,
   updateAgendaTask,
   deleteAgendaTask,
-  markAgendaTaskDone,
   markAgendaTaskDoneSelf,
-  approveAgendaTask,
-  requestAgendaTaskRevision,
-  archiveAgendaTask,
   addAgendaComment,
   deleteAgendaComment,
   getAllProfiles,
@@ -99,13 +95,7 @@ function Avatar({ name, url, size = 28 }) {
   );
 }
 
-function TaskStatusBadge({ status, completionStatus }) {
-  if (completionStatus === 'pending_review')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--gold)', background: 'var(--orange-pale)' }}>⏳ Onay Bekliyor</span>;
-  if (completionStatus === 'approved')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--green)', background: 'var(--green-pale)' }}>✅ Onaylandı</span>;
-  if (completionStatus === 'revision_requested')
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--red)', background: 'var(--red-pale)' }}>🔄 Revize İstendi</span>;
+function TaskStatusBadge({ status }) {
   if (status === 'tamamlandi')
     return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, color: 'var(--green)', background: 'var(--green-pale)' }}>✅ Tamamlandı</span>;
   if (status === 'devam_ediyor')
@@ -165,58 +155,17 @@ function CommentBubble({ comment, myId, onDelete, profiles = [] }) {
   );
 }
 
-// ── REVİZE NOTU MODAL ─────────────────────────────────────────────────────────
-function RevisionModal({ task, onConfirm, onClose }) {
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 460 }}>
-        <h2 className="modal-title">🔄 Revizeye Gönder</h2>
-        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-          <strong>{task.title}</strong> görevi personele geri gönderilecek.
-        </p>
-        <div className="form-group">
-          <label className="form-label">Revize Notu (isteğe bağlı)</label>
-          <textarea className="form-textarea" rows={3}
-            placeholder="Neyin düzeltilmesi gerektiğini açıklayın…"
-            value={note} onChange={e => setNote(e.target.value)} />
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-outline" onClick={onClose}>İptal</button>
-          <button className="btn btn-danger" disabled={saving}
-            onClick={async () => { setSaving(true); await onConfirm(note); setSaving(false); }}>
-            🔄 Revizeye Gönder
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── GÖREV KARTI ───────────────────────────────────────────────────────────────
 function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreatedBy, onNotify, agendaId, agendaTitle, isPersonalAgenda = false }) {
-  const [revModal, setRevModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
   const isAssigned = task.assigned_to === myId;
-  const isCreator  = task.created_by === myId || agendaCreatedBy === myId;
   const isKoord    = ['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role);
-  // Onay yetkisi: direktör oluşturduysa → sadece direktör onaylar, diğerleri → koordinatör onaylar
-  const creatorProfile = profiles.find(p => p.user_id === (task.created_by || agendaCreatedBy));
-  const createdByDirektor = creatorProfile?.role === 'direktor' || creatorProfile?.role === 'direktor_yardimcisi';
-  const canApprove = task.completion_status === 'pending_review' && (
-    createdByDirektor
-      ? ['direktor', 'direktor_yardimcisi'].includes(role)
-      : role === 'koordinator'
-  );
-  const canMarkDone = isAssigned && task.completion_status !== 'approved' && task.completion_status !== 'pending_review';
+  const canMarkDone = isAssigned && task.status !== 'tamamlandi';
   const canNotifyTask = onNotify && task.assigned_to && task.assigned_to !== myId && isKoord;
 
   const assigneeProfile = profiles.find(p => p.user_id === task.assigned_to);
-  // Direktörü bul (bildirim göndermek için)
-  const direktorProfile = profiles.find(p => p.role === 'direktor');
 
   const act = async (fn, notifList) => {
     setSaving(true);
@@ -255,7 +204,7 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <TaskStatusBadge status={task.status} completionStatus={task.completion_status} />
+        <TaskStatusBadge status={task.status} />
         {task.due_date && (
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             📅 {new Date(task.due_date).toLocaleDateString('tr-TR')}
@@ -274,76 +223,24 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
         )}
       </div>
 
-      {task.completion_status === 'revision_requested' && task.revision_note && (
-        <div style={{ background: 'var(--red-pale)', border: '1px solid var(--red)', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: 'var(--red)' }}>
-          🔄 Revize notu: {task.revision_note}
-        </div>
-      )}
-
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {canMarkDone && (
           <button className="btn btn-sm btn-primary" disabled={saving}
             onClick={() => {
-              if (isPersonalAgenda) {
-                // Kişisel gündem: direkt tamamla, onay gerekmez
-                act(async () => {
-                  await markAgendaTaskDoneSelf(task.id);
-                  // XP: sadece personel
-                  if (role === 'personel') {
-                    await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
-                    // Zamanında tamamlama bonusu
-                    if (task.due_date && new Date() <= new Date(task.due_date)) {
-                      await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
-                    }
+              act(async () => {
+                await markAgendaTaskDoneSelf(task.id);
+                // XP: sadece personel
+                if (role === 'personel') {
+                  await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
+                  // Zamanında tamamlama bonusu
+                  if (task.due_date && new Date() <= new Date(task.due_date)) {
+                    await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
                   }
-                }, null);
-              } else {
-                // Birim gündemi: onay bekliyor → koordinatöre/gündem sahibine bildirim
-                const notifications = [];
-                const notifyTo = task.created_by && task.created_by !== myId ? task.created_by : (agendaCreatedBy && agendaCreatedBy !== myId ? agendaCreatedBy : null);
-                if (notifyTo) {
-                  notifications.push({ userId: notifyTo, type: 'task_status', title: `"${task.title}" görevi onay bekliyor`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' });
                 }
-                act(() => markAgendaTaskDone(task.id), notifications);
-              }
+              }, null);
             }}>
             ✅ Tamamlandı İşaretle
           </button>
-        )}
-        {canApprove && (
-          <>
-            <button className="btn btn-sm btn-primary" disabled={saving}
-              onClick={() => {
-                const notifications = [];
-                // Personele bildirim: görev onaylandı
-                if (task.assigned_to && task.assigned_to !== myId) {
-                  notifications.push({ userId: task.assigned_to, type: 'task_status', title: `"${task.title}" görevi onaylandı`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' });
-                }
-                // Koordinatör onayladığında → direktöre bildirim
-                if (role === 'koordinator' && direktorProfile && direktorProfile.user_id !== myId) {
-                  notifications.push({ userId: direktorProfile.user_id, type: 'task_status', title: `"${task.title}" görevi koordinatör tarafından onaylandı`, body: agendaTitle ? `${agendaTitle} gündeminde` : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' });
-                }
-                act(async () => {
-                  await approveAgendaTask(task.id);
-                  // XP: onay sonrası personele XP ver
-                  if (task.assigned_to) {
-                    const assignee = profiles.find(p => p.user_id === task.assigned_to);
-                    if (assignee?.role === 'personel') {
-                      await awardXP(task.assigned_to, 'task_complete', `Görev onaylandı: ${task.title}`, task.id);
-                      if (task.due_date && new Date(task.completed_at || Date.now()) <= new Date(task.due_date)) {
-                        await awardXP(task.assigned_to, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
-                      }
-                    }
-                  }
-                }, notifications);
-              }}>
-              👍 Onayla
-            </button>
-            <button className="btn btn-sm btn-danger" disabled={saving}
-              onClick={() => setRevModal(true)}>
-              🔄 Revize İste
-            </button>
-          </>
         )}
         {canNotifyTask && (
           <button
@@ -355,21 +252,6 @@ function TaskCard({ task, myId, myName, role, profiles, onRefresh, agendaCreated
           </button>
         )}
       </div>
-
-      {revModal && (
-        <RevisionModal
-          task={task}
-          onConfirm={async (note) => {
-            await requestAgendaTaskRevision(task.id, note);
-            if (task.assigned_to && task.assigned_to !== myId) {
-              try { await createNotification({ userId: task.assigned_to, type: 'task_status', title: `"${task.title}" görevi için revize istendi`, body: note ? note.substring(0, 100) : '', linkType: 'agenda', linkId: agendaId, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); }
-            }
-            await onRefresh();
-            setRevModal(false);
-          }}
-          onClose={() => setRevModal(false)}
-        />
-      )}
     </div>
   );
 }
@@ -1021,8 +903,7 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
 function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify, onAddTask, onEditTask }) {
   const type = agenda.agenda_types;
   const tasks = agenda.agenda_tasks || [];
-  const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
-  const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
+  const doneTasks = tasks.filter(t => t.status === 'tamamlandi');
   const pctDone = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
   const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
@@ -1108,11 +989,6 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
             Görevler
-            {pendingTasks.length > 0 && (
-              <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '1px 5px', borderRadius: 10, marginLeft: 6 }}>
-                ⏳ {pendingTasks.length}
-              </span>
-            )}
           </div>
           {canAddTask && onAddTask && (
             <button onClick={() => onAddTask(agenda)} title="Görev ekle" style={{
@@ -1164,9 +1040,7 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
 // ── GÖREV MİNİ KARTI (beyaz, tek satır) ───────────────────────────────────────
 function TaskMiniCard({ task, profiles = [], onClick }) {
   const assignee = profiles.find(p => p.user_id === task.assigned_to);
-  const isDone = task.completion_status === 'approved' || task.status === 'tamamlandi';
-  const isPending = task.completion_status === 'pending_review';
-  const isRevise = task.completion_status === 'revision_requested';
+  const isDone = task.status === 'tamamlandi';
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   if (dueDate) dueDate.setHours(0, 0, 0, 0);
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -1190,8 +1064,6 @@ function TaskMiniCard({ task, profiles = [], onClick }) {
         textDecoration: isDone ? 'line-through' : 'none',
         flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>{task.title}</span>
-      {isPending && <span title="Onay bekliyor" style={{ fontSize: 10 }}>⏳</span>}
-      {isRevise && <span title="Revize istendi" style={{ fontSize: 10 }}>🔄</span>}
       {isDone && <span title="Tamamlandı" style={{ fontSize: 10 }}>✅</span>}
       {task.assigned_to_name && (
         <Avatar name={task.assigned_to_name} url={assignee?.avatar_url} size={16} />
@@ -1448,7 +1320,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
   const isAssignedByMeTab  = (isDirektor || isKoordinator) && personalTab === 'assigned_by_me';
   const isAssignedTasksTab = isPersonel && personalTab === 'assigned_tasks';
   const isMyTasksTab       = isPersonel && personalTab === 'my_tasks';
-  const isPendingApprovalTab = (isDirektor || isKoordinator) && personalTab === 'pending_approval';
   const isArsivTab           = personalTab === 'arsiv';
   const isSettingsTab        = (isDirektor || isKoordinator) && personalTab === 'settings';
 
@@ -1508,14 +1379,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
       // ── Diğer sekmeler: arşivlenmiş gündemleri gizle ──
       if (a.status === 'arsiv') return false;
 
-      if (isPendingApprovalTab) {
-        // "Onay Bekleyenler" sekmesi: pending_review olan görev içeren gündemler
-        if (a.is_personal) return false;
-        if (!canSeeAllUnits && a.unit !== myUnit) return false;
-        const tasks = a.agenda_tasks || [];
-        const hasPending = tasks.some(t => t.completion_status === 'pending_review');
-        if (!hasPending) return false;
-      } else if (isAssignedByMeTab) {
+      if (isAssignedByMeTab) {
         // "Atadığım Gündemler" sekmesi (direktör/koordinatör): başkasına atanmış gündemler
         if (!(a.assigned_to && a.assigned_to !== myId && a.created_by === myId && !a.is_personal)) return false;
       } else if (isAssignedToMeTab) {
@@ -1558,7 +1422,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
       }
       return true;
     });
-  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, isAssignedTasksTab, isMyTasksTab, isPendingApprovalTab, isArsivTab, myId, myUnit, isKoordinator, isDirektor, allProfiles]);
+  }, [agendas, filterType, filterStatus, filterUnit, searchQ, canSeeAllUnits, isMineTab, isAssignedToMeTab, isAssignedByMeTab, isAssignedTasksTab, isMyTasksTab, isArsivTab, myId, myUnit, isKoordinator, isDirektor, allProfiles]);
 
   // Departman tabında gündemleri birime göre grupla
   const groupedByUnit = useMemo(() => {
@@ -1652,17 +1516,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
     else alert('✅ Mail gönderildi → ' + (agenda.assigned_to_name || agenda.assigned_to));
   };
 
-  const pendingApprovalCount = useMemo(() => {
-    if (!['direktor', 'direktor_yardimcisi', 'asistan', 'koordinator'].includes(role)) return 0;
-    // Gündem bazında say (görev değil) — ekrandaki görüntüyle tutarlı olması için
-    return agendas.filter(a => {
-      if (a.status === 'arsiv') return false;
-      if (a.is_personal) return false;
-      if (!canSeeAllUnits && a.unit !== myUnit) return false;
-      return (a.agenda_tasks || []).some(t => t.completion_status === 'pending_review');
-    }).length;
-  }, [agendas, role, canSeeAllUnits, myUnit]);
-
   // ── Görünüm yardımcıları ────────────────────────────────────────────────────
   const cardProps = (agenda) => ({
     key: agenda.id,
@@ -1700,8 +1553,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
       {items.map((agenda, i) => {
         const type = agenda.agenda_types;
         const tasks = agenda.agenda_tasks || [];
-        const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
-        const pendingTasks = tasks.filter(t => t.completion_status === 'pending_review');
+        const doneTasks = tasks.filter(t => t.status === 'tamamlandi');
         const statusMeta = AGENDA_STATUSES.find(s => s.value === agenda.status) || AGENDA_STATUSES[0];
         const canEdit = CREATOR_ROLES.includes(role) && (agenda.created_by === myId || ['direktor','direktor_yardimcisi'].includes(role));
         return (
@@ -1727,9 +1579,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
             </div>
             {/* Görev sayacı */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-              {pendingTasks.length > 0 && (
-                <span style={{ fontSize:10, fontWeight:700, background:'var(--orange-pale)', color:'var(--gold)', padding:'2px 6px', borderRadius:20 }}>{pendingTasks.length} onay</span>
-              )}
               <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>{doneTasks.length}/{tasks.length}</span>
               {tasks.length > 0 && (
                 <div style={{ width:48, height:4, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
@@ -1783,7 +1632,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                         : `${agendas.filter(a => !a.is_personal).length} gündem · ${myUnit || 'birimsiz'}`}
           </p>
         </div>
-        {canCreate && !isSettingsTab && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isPendingApprovalTab && !isArsivTab && (
+        {canCreate && !isSettingsTab && !isAssignedToMeTab && !isAssignedByMeTab && !isAssignedTasksTab && !isMyTasksTab && !isArsivTab && (
           <button className="btn btn-primary" onClick={() => { setEditAgenda(null); setAgendaModal(true); }}>
             + Yeni Gündem
           </button>
@@ -1807,7 +1656,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               { id: 'unit',           icon: unitTabIcon, label: unitTabLabel },
               ...((isKoordinator || isAsistan) ? [{ id: 'assigned_to_me',  icon: '📥', label: 'Bana Atanan' }] : []),
               ...((isDirektor || isKoordinator) ? [{ id: 'assigned_by_me',  icon: '📤', label: 'Atadığım Gündemler' }] : []),
-              ...((isDirektor || isKoordinator) ? [{ id: 'pending_approval', icon: '⏳', label: 'Onay Bekleyenler' }] : []),
               { id: 'mine',           icon: '📋',        label: 'Gündemlerim' },
               { id: 'arsiv',          icon: '📦',        label: 'Arşiv' },
               ...((isDirektor || isKoordinator) ? [{ id: 'settings', icon: '⚙️', label: 'Tür Ayarları' }] : []),
@@ -1824,8 +1672,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
               assignedCount = agendas.filter(a => a.status !== 'arsiv').reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by !== myId).length, 0);
             } else if (tab.id === 'my_tasks') {
               assignedCount = agendas.filter(a => a.status !== 'arsiv').reduce((sum, a) => sum + (a.agenda_tasks || []).filter(t => t.assigned_to === myId && t.created_by === myId).length, 0);
-            } else if (tab.id === 'pending_approval') {
-              assignedCount = pendingApprovalCount;
             }
             return (
               <button key={tab.id} onClick={() => { setPersonalTab(tab.id); setFilterUnit('all'); setFilterType('all'); setFilterStatus('all'); setSearchQ(''); }}
@@ -1997,7 +1843,7 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                       padding: '10px 20px 10px 36px', display: 'flex', alignItems: 'center', gap: 10,
                       borderBottom: i < tasks.length - 1 ? '1px solid var(--border)' : 'none',
                     }}>
-                      <TaskStatusBadge status={task.status} completionStatus={task.completion_status} />
+                      <TaskStatusBadge status={task.status} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
@@ -2005,27 +1851,19 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
                         </div>
                       </div>
                       {/* Tamamla butonu — sadece devam eden görevler */}
-                      {task.status !== 'tamamlandi' && task.completion_status !== 'pending_review' && task.completion_status !== 'approved' && (
+                      {task.status !== 'tamamlandi' && (
                         <button className="btn btn-sm btn-primary" style={{ fontSize: 11, padding: '4px 10px' }}
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (isMyTasksTab || agenda.is_personal) {
-                              // Kendi görevi: direkt tamamla
-                              await markAgendaTaskDoneSelf(task.id);
-                              // XP: sadece personel
-                              if (isPersonel) {
-                                try {
-                                  await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
-                                  if (task.due_date && new Date() <= new Date(task.due_date)) {
-                                    await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
-                                  }
-                                } catch (e) { console.error('[XP] task error:', e); }
-                              }
-                            } else {
-                              // Birim gündemi: onay bekliyor
-                              await markAgendaTaskDone(task.id);
-                              const notifyTo = task.created_by && task.created_by !== myId ? task.created_by : (agenda.created_by && agenda.created_by !== myId ? agenda.created_by : null);
-                              if (notifyTo) { try { await createNotification({ userId: notifyTo, type: 'task_status', title: `"${task.title}" görevi onay bekliyor`, body: `${agenda.title} gündeminde`, linkType: 'agenda', linkId: agenda.id, createdBy: myId, createdByName: myName || '' }); } catch (e) { console.error('Notification error:', e); } }
+                            await markAgendaTaskDoneSelf(task.id);
+                            // XP: sadece personel
+                            if (isPersonel) {
+                              try {
+                                await awardXP(myId, 'task_complete', `Görev tamamlandı: ${task.title}`, task.id);
+                                if (task.due_date && new Date() <= new Date(task.due_date)) {
+                                  await awardXP(myId, 'on_time_bonus', `Zamanında tamamlandı: ${task.title}`, task.id);
+                                }
+                              } catch (e) { console.error('[XP] task error:', e); }
                             }
                             loadAll();
                           }}>
