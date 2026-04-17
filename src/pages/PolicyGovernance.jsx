@@ -92,6 +92,8 @@ export default function PolicyGovernance({ user, profile }) {
   const handleAddPage = async (parent_id = null) => {
     const { data } = await createPolicyPage({ parent_id });
     if (data?.[0]) {
+      // Her sayfanın kendi tablosu olsun — sayfa ile birlikte otomatik oluştur
+      await createPolicyDatabase({ page_id: data[0].id, name: data[0].title || 'Tablo', order_index: 0 });
       await loadPages();
       setSelectedPageId(data[0].id);
       if (parent_id) setExpanded(e => ({ ...e, [parent_id]: true }));
@@ -274,57 +276,48 @@ function PageNode({ node, depth, expanded, setExpanded, selectedId, onSelect, on
   );
 }
 
-// ── Sayfa Görünümü ───────────────────────────────────────────────────
+// ── Sayfa Görünümü (her sayfada tek tablo, tam sayfa) ────────────────
 function PageView({ page, onUpdate, user, profile, people }) {
   const [title, setTitle] = useState(page.title);
-  const [html, setHtml] = useState('');
-  const contentRef = useRef(null);
-  const [databases, setDatabases] = useState([]);
+  const [database, setDatabase] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setTitle(page.title);
-    const c = page.content;
-    const initial = (c && typeof c === 'object' && c.html) ? c.html : (typeof c === 'string' ? c : '');
-    setHtml(initial);
-    if (contentRef.current) contentRef.current.innerHTML = initial;
-    loadDatabases();
+    loadDatabase();
     // eslint-disable-next-line
   }, [page.id]);
 
-  const loadDatabases = async () => {
+  // Her sayfada TEK tablo olacak — yoksa otomatik oluştur
+  const loadDatabase = async () => {
+    setLoading(true);
     const { data } = await getPolicyDatabases(page.id);
-    setDatabases(data);
+    if (data && data.length > 0) {
+      setDatabase(data[0]);
+    } else {
+      const { data: created } = await createPolicyDatabase({ page_id: page.id, name: page.title || 'Tablo', order_index: 0 });
+      setDatabase(created?.[0] || null);
+    }
+    setLoading(false);
   };
 
   const saveTitle = () => {
-    if (title !== page.title) onUpdate(page.id, { title: title || 'Yeni Sayfa' });
-  };
-
-  const saveContent = () => {
-    const currentHtml = contentRef.current?.innerHTML || '';
-    if (currentHtml !== html) {
-      setHtml(currentHtml);
-      onUpdate(page.id, { content: { html: currentHtml } });
+    if (title !== page.title) {
+      onUpdate(page.id, { title: title || 'Yeni Sayfa' });
+      // Tablo adını da otomatik senkronize et (eğer kullanıcı özelleştirmediyse)
+      if (database && (database.name === page.title || database.name === 'Tablo' || database.name === 'Yeni Tablo')) {
+        updatePolicyDatabase(database.id, { name: title });
+        setDatabase(d => ({ ...d, name: title }));
+      }
     }
   };
 
-  const addDatabase = async () => {
-    await createPolicyDatabase({ page_id: page.id, name: 'Yeni Tablo', order_index: databases.length });
-    await loadDatabases();
-  };
-
-  const removeDatabase = async (id) => {
-    if (!window.confirm('Bu tabloyu silmek istediğinize emin misiniz?')) return;
-    await deletePolicyDatabase(id);
-    await loadDatabases();
-  };
-
   return (
-    <div style={S.pageView}>
-      <div style={S.pageHeader}>
-        <div style={{ fontSize: 42 }}>{page.icon || '📄'}</div>
+    <div style={S.pageViewFull}>
+      <div style={S.pageHeaderCompact}>
+        <div style={{ fontSize: 28, lineHeight: 1 }}>{page.icon || '📄'}</div>
         <input
-          style={S.pageTitle}
+          style={S.pageTitleCompact}
           value={title}
           onChange={e => setTitle(e.target.value)}
           onBlur={saveTitle}
@@ -333,63 +326,27 @@ function PageView({ page, onUpdate, user, profile, people }) {
         />
       </div>
 
-      <RichTextToolbar />
-
-      <div
-        ref={contentRef}
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={saveContent}
-        style={S.content}
-        data-placeholder="Bir şeyler yaz, notlarını ekle..."
-      />
-
-      <div style={{ marginTop: 32 }}>
-        {databases.map(db => (
-          <DatabaseView
-            key={db.id}
-            db={db}
-            people={people}
-            onRename={(name) => updatePolicyDatabase(db.id, { name }).then(loadDatabases)}
-            onChangeView={(v) => updatePolicyDatabase(db.id, { default_view: v }).then(loadDatabases)}
-            onDelete={() => removeDatabase(db.id)}
-          />
-        ))}
-
-        <button style={S.addDbBtn} onClick={addDatabase}>
-          + Tablo Ekle
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Zengin Metin Basit Toolbar ───────────────────────────────────────
-function RichTextToolbar() {
-  const exec = (cmd, val = null) => { document.execCommand(cmd, false, val); };
-  return (
-    <div style={S.toolbar}>
-      <button style={S.tbBtn} onClick={() => exec('bold')} title="Kalın"><b>B</b></button>
-      <button style={S.tbBtn} onClick={() => exec('italic')} title="İtalik"><i>I</i></button>
-      <button style={S.tbBtn} onClick={() => exec('underline')} title="Altı çizili"><u>U</u></button>
-      <span style={S.tbSep} />
-      <button style={S.tbBtn} onClick={() => exec('formatBlock', '<h2>')} title="Büyük başlık">H1</button>
-      <button style={S.tbBtn} onClick={() => exec('formatBlock', '<h3>')} title="Başlık">H2</button>
-      <button style={S.tbBtn} onClick={() => exec('formatBlock', '<p>')} title="Paragraf">¶</button>
-      <span style={S.tbSep} />
-      <button style={S.tbBtn} onClick={() => exec('insertUnorderedList')} title="Liste">•</button>
-      <button style={S.tbBtn} onClick={() => exec('insertOrderedList')} title="Numaralı">1.</button>
-      <span style={S.tbSep} />
-      <button style={S.tbBtn} onClick={() => {
-        const url = window.prompt('Bağlantı URL:');
-        if (url) exec('createLink', url);
-      }} title="Bağlantı">🔗</button>
+      {loading ? (
+        <div style={{ padding: 24, color: 'var(--text-muted)' }}>Yükleniyor...</div>
+      ) : database ? (
+        <DatabaseView
+          db={database}
+          people={people}
+          fullPage
+          onRename={(name) => updatePolicyDatabase(database.id, { name }).then(() => setDatabase(d => ({ ...d, name })))}
+          onChangeView={(v) => updatePolicyDatabase(database.id, { default_view: v }).then(() => setDatabase(d => ({ ...d, default_view: v })))}
+          // Tek tablo olduğundan silme butonu gösterilmez
+          onDelete={null}
+        />
+      ) : (
+        <div style={{ padding: 24, color: 'var(--text-muted)' }}>Tablo yüklenemedi.</div>
+      )}
     </div>
   );
 }
 
 // ── Gömülü Tablo Görünümü ────────────────────────────────────────────
-function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
+function DatabaseView({ db, people, onRename, onChangeView, onDelete, fullPage = false }) {
   const [columns, setColumns] = useState([]);
   const [rows, setRows] = useState([]);
   const [view, setView] = useState(db.default_view || 'table');
@@ -529,7 +486,7 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
   };
 
   return (
-    <div style={S.db}>
+    <div style={fullPage ? S.dbFull : S.db}>
       <div style={S.dbHeader}>
         {editingName ? (
           <input
@@ -565,32 +522,34 @@ function DatabaseView({ db, people, onRename, onChangeView, onDelete }) {
               {v.icon} {v.label}
             </button>
           ))}
-          <button style={S.dbDelBtn} onClick={onDelete} title="Tabloyu sil">🗑</button>
+          {onDelete && <button style={S.dbDelBtn} onClick={onDelete} title="Tabloyu sil">🗑</button>}
         </div>
       </div>
 
-      {loading ? (
-        <div style={{ padding: 20, color: 'var(--text-muted)' }}>Yükleniyor...</div>
-      ) : view === 'table' ? (
-        <TableView
-          columns={columns}
-          rows={rows}
-          people={people}
-          onAddColumn={addColumn}
-          onSaveColumn={saveColumn}
-          onRemoveColumn={removeColumn}
-          onAddRow={addRow}
-          onSaveCell={saveCell}
-          onRemoveRow={removeRow}
-          groupBy={groupBy}
-          onGroupByChange={changeGroupBy}
-          onApplyTemplate={applyPgaTemplate}
-        />
-      ) : view === 'kanban' ? (
-        <KanbanView columns={columns} rows={rows} people={people} onSaveCell={saveCell} onAddRow={addRow} />
-      ) : (
-        <CalendarView columns={columns} rows={rows} people={people} />
-      )}
+      <div style={fullPage ? { flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' } : {}}>
+        {loading ? (
+          <div style={{ padding: 20, color: 'var(--text-muted)' }}>Yükleniyor...</div>
+        ) : view === 'table' ? (
+          <TableView
+            columns={columns}
+            rows={rows}
+            people={people}
+            onAddColumn={addColumn}
+            onSaveColumn={saveColumn}
+            onRemoveColumn={removeColumn}
+            onAddRow={addRow}
+            onSaveCell={saveCell}
+            onRemoveRow={removeRow}
+            groupBy={groupBy}
+            onGroupByChange={changeGroupBy}
+            onApplyTemplate={applyPgaTemplate}
+          />
+        ) : view === 'kanban' ? (
+          <KanbanView columns={columns} rows={rows} people={people} onSaveCell={saveCell} onAddRow={addRow} />
+        ) : (
+          <CalendarView columns={columns} rows={rows} people={people} />
+        )}
+      </div>
     </div>
   );
 }
@@ -1234,16 +1193,33 @@ const S = {
     width: 28, height: 28, border: 'none', background: 'transparent', fontSize: 16,
     cursor: 'pointer', borderRadius: 4,
   },
-  main: { flex: 1, overflow: 'auto' },
+  main: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   emptyMain: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     height: '100%', textAlign: 'center', color: 'var(--text)', padding: 40,
   },
   pageView: { maxWidth: 960, margin: '0 auto', padding: '32px 48px 80px' },
+  pageViewFull: {
+    width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+    padding: 0, overflow: 'hidden',
+  },
   pageHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
+  pageHeaderCompact: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '12px 20px', borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-card)', flexShrink: 0,
+  },
   pageTitle: {
     flex: 1, fontSize: 34, fontWeight: 800, background: 'transparent', border: 'none',
     outline: 'none', color: 'var(--text)', padding: '4px 0',
+  },
+  pageTitleCompact: {
+    flex: 1, fontSize: 22, fontWeight: 800, background: 'transparent', border: 'none',
+    outline: 'none', color: 'var(--text)', padding: 0,
+  },
+  dbFull: {
+    flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-card)',
+    borderRadius: 0, border: 'none', overflow: 'hidden',
   },
   toolbar: {
     display: 'flex', gap: 4, padding: 6, marginBottom: 8,
