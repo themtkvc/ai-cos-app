@@ -1051,10 +1051,9 @@ function AgendaModal({ agenda, agendaTypes, myId, myName, myUnit, canSeeAllUnits
   );
 }
 
-// ── GÜNDEM ÇERÇEVESİ (ana kart — Hedefler tarzı) ──────────────────────────────
+// ── GÜNDEM ÇERÇEVESİ (ana kart — kompakt, beyaz, 4 sütuna sığar) ─────────────
 function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, onNotify, onAddTask, onEditTask }) {
   const type = agenda.agenda_types;
-  const typeColor = type?.color || '#6366f1';
   const typeIcon = type?.icon || '📋';
   const tasks = agenda.agenda_tasks || [];
   const doneTasks = tasks.filter(t => t.completion_status === 'approved' || t.status === 'tamamlandi');
@@ -1066,78 +1065,99 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
   const canAddTask = canEdit;
 
   const iconBtn = {
-    width: 26, height: 26, borderRadius: 6, border: 'none',
-    background: 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer',
-    fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 22, height: 22, borderRadius: 5, border: '1px solid var(--border)',
+    background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+    fontSize: 10.5, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 0,
   };
+
+  // Görev alt listesi — maksimum 4 göster, kalanını özet
+  const visibleTasks = tasks.slice(0, 4);
+  const hiddenCount = Math.max(0, tasks.length - visibleTasks.length);
 
   return (
     <div style={{
-      borderRadius: 14, overflow: 'hidden',
-      border: '1px solid var(--border)', background: 'var(--bg-card)',
-      boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-    }}>
-      {/* Banner — tür rengiyle gradient */}
+      borderRadius: 10, overflow: 'hidden',
+      border: '1px solid var(--border)', background: '#fff',
+      display: 'flex', flexDirection: 'column',
+      transition: 'box-shadow 0.15s, transform 0.15s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,0.06)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
+    >
+      {/* Başlık bloğu — nötr beyaz */}
       <div onClick={() => onOpen(agenda)} style={{
-        padding: '14px 18px', color: '#fff', cursor: 'pointer',
-        background: `linear-gradient(135deg, ${typeColor}, ${typeColor}D0)`,
+        padding: '10px 12px 8px', cursor: 'pointer',
+        borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-              <span style={{ background: 'rgba(255,255,255,0.22)', padding: '3px 9px', borderRadius: 999, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8 }}>
-                {typeIcon} {(type?.name || 'Gündem').toUpperCase()}
-              </span>
-              <span style={{ background: 'rgba(255,255,255,0.28)', padding: '3px 9px', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>
-                {statusMeta.label}
-              </span>
-              {agenda.unit && <span style={{ fontSize: 10.5, opacity: 0.92 }}>🏗 {agenda.unit}</span>}
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.25, marginBottom: 4, wordBreak: 'break-word' }}>
-              {agenda.title}
-            </div>
-            <div style={{ fontSize: 11.5, opacity: 0.92, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              {agenda.date && (
-                <span>📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              )}
-              {agenda.assigned_to_name && <span>· 👤 {agenda.assigned_to_name}</span>}
-              {agenda.created_by_name && <span style={{ opacity: 0.78 }}>· oluşturan: {agenda.created_by_name}</span>}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 }}>{pctDone}%</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {onNotify && agenda.assigned_to && agenda.assigned_to !== myId && (
-                <button onClick={() => onNotify(agenda)} title="Mail gönder" style={iconBtn}>📧</button>
-              )}
-              {canEdit && <button onClick={() => onEdit(agenda)} title="Düzenle" style={iconBtn}>✏️</button>}
-              {canEdit && <button onClick={() => onDelete(agenda.id)} title="Sil" style={iconBtn}>🗑</button>}
-            </div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13 }}>{typeIcon}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+            {type?.name || 'Gündem'}
+          </span>
+          <span style={{
+            marginLeft: 'auto', fontSize: 9.5, fontWeight: 600, color: 'var(--text-muted)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
+            padding: '1px 6px', borderRadius: 10,
+          }}>
+            {statusMeta.label}
+          </span>
         </div>
-        {/* İlerleme çubuğu (beyaz) */}
-        <div style={{ marginTop: 10, height: 5, background: 'rgba(255,255,255,0.28)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#fff', borderRadius: 999, width: `${pctDone}%`, transition: 'width 0.4s' }} />
+        <div style={{
+          fontSize: 13.5, fontWeight: 700, lineHeight: 1.3, color: 'var(--text)',
+          marginBottom: 4, wordBreak: 'break-word',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {agenda.title}
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {agenda.date && (
+            <span>📅 {new Date(agenda.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
+          )}
+          {agenda.unit && <span>🏗 {agenda.unit}</span>}
+          {agenda.assigned_to_name && <span>👤 {agenda.assigned_to_name.split(' ')[0]}</span>}
+        </div>
+      </div>
+
+      {/* İlerleme + aksiyon şeridi */}
+      <div style={{
+        padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
+        borderBottom: '1px solid var(--border)', background: 'var(--bg)',
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>
+          {doneTasks.length}/{tasks.length}
+        </div>
+        <div style={{ flex: 1, height: 4, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: 'var(--navy)', borderRadius: 999, width: `${pctDone}%`, transition: 'width 0.4s' }} />
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>%{pctDone}</div>
+        <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+          {onNotify && agenda.assigned_to && agenda.assigned_to !== myId && (
+            <button onClick={() => onNotify(agenda)} title="Mail gönder" style={iconBtn}>📧</button>
+          )}
+          {canEdit && <button onClick={() => onEdit(agenda)} title="Düzenle" style={iconBtn}>✏️</button>}
+          {canEdit && <button onClick={() => onDelete(agenda.id)} title="Sil" style={iconBtn}>🗑</button>}
         </div>
       </div>
 
       {/* Body — görev mini kartları */}
-      <div style={{ padding: '12px 14px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-            📌 Görevler ({tasks.length})
+      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+            Görevler
             {pendingTasks.length > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '2px 7px', borderRadius: 20, marginLeft: 6 }}>
-                ⏳ {pendingTasks.length} onay
+              <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--orange-pale)', color: 'var(--gold)', padding: '1px 5px', borderRadius: 10, marginLeft: 6 }}>
+                ⏳ {pendingTasks.length}
               </span>
             )}
           </div>
           {canAddTask && onAddTask && (
-            <button onClick={() => onAddTask(agenda)} style={{
-              fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 8,
-              border: `1px solid ${typeColor}44`, background: `${typeColor}0f`,
-              cursor: 'pointer', color: typeColor, fontFamily: 'inherit',
-            }}>+ Görev</button>
+            <button onClick={() => onAddTask(agenda)} title="Görev ekle" style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+              border: '1px solid var(--border)', background: '#fff',
+              cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit',
+              lineHeight: 1.3,
+            }}>+</button>
           )}
         </div>
 
@@ -1145,24 +1165,32 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
           <button
             onClick={() => canAddTask && onAddTask && onAddTask(agenda)}
             style={{
-              width: '100%', padding: 14, borderRadius: 10,
-              border: '1.5px dashed var(--border)', background: 'transparent',
+              width: '100%', padding: 10, borderRadius: 8,
+              border: '1px dashed var(--border)', background: 'transparent',
               cursor: canAddTask ? 'pointer' : 'default',
-              color: 'var(--text-muted)', fontSize: 12, fontFamily: 'inherit',
+              color: 'var(--text-muted)', fontSize: 11, fontFamily: 'inherit',
             }}>
-            Henüz görev yok{canAddTask ? ' — ilk görevi ekle' : ''}
+            {canAddTask ? '+ ilk görevi ekle' : 'Görev yok'}
           </button>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-            {tasks.map(task => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {visibleTasks.map(task => (
               <TaskMiniCard
                 key={task.id}
                 task={task}
-                typeColor={typeColor}
                 profiles={profiles}
                 onClick={() => onEditTask && onEditTask(agenda, task)}
               />
             ))}
+            {hiddenCount > 0 && (
+              <button onClick={() => onOpen(agenda)} style={{
+                fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6,
+                border: '1px dashed var(--border)', background: 'transparent',
+                cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit', textAlign: 'center',
+              }}>
+                +{hiddenCount} görev daha →
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1170,8 +1198,8 @@ function AgendaFrame({ agenda, myId, role, profiles, onEdit, onDelete, onOpen, o
   );
 }
 
-// ── GÖREV MİNİ KARTI ──────────────────────────────────────────────────────────
-function TaskMiniCard({ task, typeColor, profiles = [], onClick }) {
+// ── GÖREV MİNİ KARTI (beyaz, tek satır) ───────────────────────────────────────
+function TaskMiniCard({ task, profiles = [], onClick }) {
   const prio = prioMeta(task.priority);
   const assignee = profiles.find(p => p.user_id === task.assigned_to);
   const isDone = task.completion_status === 'approved' || task.status === 'tamamlandi';
@@ -1186,46 +1214,36 @@ function TaskMiniCard({ task, typeColor, profiles = [], onClick }) {
     <div
       onClick={onClick}
       style={{
-        padding: '9px 11px', borderRadius: 10,
-        border: `1px solid ${typeColor}33`, background: `${typeColor}08`,
-        cursor: 'pointer', transition: 'all 0.15s',
-        display: 'flex', flexDirection: 'column', gap: 6, minHeight: 72,
-        opacity: isDone ? 0.65 : 1,
+        padding: '6px 8px', borderRadius: 6,
+        border: '1px solid var(--border)', background: '#fff',
+        cursor: 'pointer', transition: 'background 0.1s',
+        display: 'flex', alignItems: 'center', gap: 6,
+        opacity: isDone ? 0.6 : 1,
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${typeColor}16`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = `${typeColor}08`; e.currentTarget.style.transform = 'none'; }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <span title={prio.label.replace(/^[^\s]+ /, '')} style={{ width: 8, height: 8, borderRadius: '50%', background: prio.color, flexShrink: 0, marginTop: 5 }} />
+      <span title={prio.label.replace(/^[^\s]+ /, '')} style={{ width: 6, height: 6, borderRadius: '50%', background: prio.color, flexShrink: 0 }} />
+      <span style={{
+        fontSize: 11.5, fontWeight: 500, color: 'var(--text)', lineHeight: 1.3,
+        textDecoration: isDone ? 'line-through' : 'none',
+        flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{task.title}</span>
+      {isPending && <span title="Onay bekliyor" style={{ fontSize: 10 }}>⏳</span>}
+      {isRevise && <span title="Revize istendi" style={{ fontSize: 10 }}>🔄</span>}
+      {isDone && <span title="Tamamlandı" style={{ fontSize: 10 }}>✅</span>}
+      {task.assigned_to_name && (
+        <Avatar name={task.assigned_to_name} url={assignee?.avatar_url} size={16} />
+      )}
+      {task.due_date && (
         <span style={{
-          fontSize: 12.5, fontWeight: 600, lineHeight: 1.3, color: 'var(--text)',
-          textDecoration: isDone ? 'line-through' : 'none',
-          flex: 1, minWidth: 0, overflow: 'hidden',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-        }}>{task.title}</span>
-        {isPending && <span title="Onay bekliyor" style={{ fontSize: 11 }}>⏳</span>}
-        {isRevise && <span title="Revize istendi" style={{ fontSize: 11 }}>🔄</span>}
-        {isDone && <span title="Tamamlandı" style={{ fontSize: 11 }}>✅</span>}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', flexWrap: 'wrap' }}>
-        {task.assigned_to_name && (
-          <>
-            <Avatar name={task.assigned_to_name} url={assignee?.avatar_url} size={18} />
-            <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 500 }}>
-              {task.assigned_to_name.split(' ')[0]}
-            </span>
-          </>
-        )}
-        {task.due_date && (
-          <span style={{
-            fontSize: 10, color: overdue ? 'var(--red)' : 'var(--text-muted)',
-            fontWeight: overdue ? 700 : 500, marginLeft: 'auto',
-          }}>
-            {overdue ? '🔴 ' : '📅 '}
-            {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-          </span>
-        )}
-      </div>
+          fontSize: 9.5, color: overdue ? 'var(--red)' : 'var(--text-muted)',
+          fontWeight: overdue ? 700 : 500, flexShrink: 0,
+        }}>
+          {overdue ? '🔴' : ''}
+          {new Date(task.due_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+        </span>
+      )}
     </div>
   );
 }
@@ -1697,9 +1715,13 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
     onNotify: handleNotifyAgenda,
   });
 
-  // GRID (Hedefler tarzı çerçeveli kartlar — iç görev mini kartları ile)
+  // GRID — 4 sütuna sığan kompakt kartlar
   const CardGrid = ({ items }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{
+      display: 'grid', gap: 12,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+      alignItems: 'stretch',
+    }}>
       {items.map(agenda => (
         <AgendaFrame
           key={agenda.id}
