@@ -1,465 +1,58 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, logActivity, uploadDocumentToDrive, deleteDocumentFromDrive } from '../lib/supabase';
 import { useProfile } from '../App';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import Highlight from '@tiptap/extension-highlight';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import Underline from '@tiptap/extension-underline';
-import TextAlign from '@tiptap/extension-text-align';
-import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
-import { Table } from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
-import { TextStyle } from '@tiptap/extension-text-style';
-import Color from '@tiptap/extension-color';
 
-// ── Doküman tipleri ──────────────────────────────────────────────────────────
-const DOC_TYPES = [
-  { id: 'document', icon: '📄', label: 'Doküman' },
-  { id: 'meeting',  icon: '🤝', label: 'Toplantı Notu' },
-  { id: 'report',   icon: '📊', label: 'Rapor' },
-  { id: 'plan',     icon: '📋', label: 'Plan' },
-  { id: 'wiki',     icon: '📚', label: 'Wiki' },
+// ══════════════════════════════════════════════════════════════════════════════
+// DOSYA TİPİ METADATA — logo, renk, pastel arkaplan, etiket
+// ══════════════════════════════════════════════════════════════════════════════
+const FILE_TYPES = {
+  pdf:  { icon: '📕', color: '#dc2626', bg: '#fef2f2', label: 'PDF' },
+  doc:  { icon: '📘', color: '#2b579a', bg: '#eff6ff', label: 'Word' },
+  docx: { icon: '📘', color: '#2b579a', bg: '#eff6ff', label: 'Word' },
+  xls:  { icon: '📗', color: '#217346', bg: '#ecfdf5', label: 'Excel' },
+  xlsx: { icon: '📗', color: '#217346', bg: '#ecfdf5', label: 'Excel' },
+  ppt:  { icon: '📙', color: '#d24726', bg: '#fff7ed', label: 'PowerPoint' },
+  pptx: { icon: '📙', color: '#d24726', bg: '#fff7ed', label: 'PowerPoint' },
+  png:  { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  jpg:  { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  jpeg: { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  gif:  { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  webp: { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  svg:  { icon: '🖼', color: '#7c3aed', bg: '#faf5ff', label: 'Resim' },
+  txt:  { icon: '📃', color: '#6b7280', bg: '#f9fafb', label: 'Metin' },
+  csv:  { icon: '📊', color: '#059669', bg: '#ecfdf5', label: 'CSV' },
+  zip:  { icon: '🗜', color: '#ca8a04', bg: '#fefce8', label: 'Arşiv' },
+  rar:  { icon: '🗜', color: '#ca8a04', bg: '#fefce8', label: 'Arşiv' },
+};
+const DEFAULT_TYPE = { icon: '📎', color: '#6b7280', bg: '#f9fafb', label: 'Dosya' };
+
+const FILTER_GROUPS = [
+  { id: '',      label: 'Tüm dosyalar', exts: null },
+  { id: 'pdf',   label: 'PDF',          exts: ['pdf'] },
+  { id: 'word',  label: 'Word',         exts: ['doc', 'docx'] },
+  { id: 'excel', label: 'Excel',        exts: ['xls', 'xlsx'] },
+  { id: 'ppt',   label: 'PowerPoint',   exts: ['ppt', 'pptx'] },
+  { id: 'image', label: 'Resim',        exts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] },
 ];
-const getDocType = (id) => DOC_TYPES.find(t => t.id === id) || DOC_TYPES[0];
 
-// ── Toolbar buton yardımcısı ─────────────────────────────────────────────────
-function ToolBtn({ onClick, active, title, children, style: extraStyle }) {
-  return (
-    <button
-      onClick={onClick} title={title}
-      style={{
-        padding: '4px 8px', borderRadius: 6, fontSize: 13, lineHeight: 1,
-        border: 'none', cursor: 'pointer',
-        background: active ? '#e0e7ff' : 'transparent',
-        color: active ? '#4338ca' : 'var(--text-secondary)',
-        fontWeight: active ? 700 : 500,
-        minWidth: 28, textAlign: 'center',
-        ...extraStyle,
-      }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--gray-light)'; }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-    >
-      {children}
-    </button>
-  );
-}
+const extOf = (name) => (name || '').split('.').pop()?.toLowerCase() || '';
+const typeOf = (name) => FILE_TYPES[extOf(name)] || DEFAULT_TYPE;
 
-// ── TipTap Toolbar ──────────────────────────────────────────────────────────
-function EditorToolbar({ editor }) {
-  if (!editor) return null;
+const formatSize = (bytes) => {
+  if (!bytes || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+};
 
-  const addImage = () => {
-    const url = window.prompt('Resim URL:');
-    if (url) editor.chain().focus().setImage({ src: url }).run();
-  };
+const formatDate = (iso) => new Date(iso).toLocaleDateString('tr-TR', {
+  day: 'numeric', month: 'short', year: 'numeric',
+});
 
-  const setLink = () => {
-    const prev = editor.getAttributes('link').href;
-    const url = window.prompt('Link URL:', prev || 'https://');
-    if (url === null) return;
-    if (url === '') { editor.chain().focus().unsetLink().run(); return; }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  };
-
-  return (
-    <div style={{
-      display: 'flex', gap: 2, flexWrap: 'wrap', padding: '8px 12px',
-      borderBottom: '1px solid var(--border)',
-      background: 'var(--bg-hover)', borderRadius: '12px 12px 0 0',
-      alignItems: 'center',
-    }}>
-      {/* Başlıklar */}
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Başlık 1">H1</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Başlık 2">H2</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Başlık 3">H3</ToolBtn>
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Metin stili */}
-      <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Kalın"><b>B</b></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="İtalik"><i>I</i></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Altı çizili"><u>U</u></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Üstü çizili"><s>S</s></ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleHighlight().run()} active={editor.isActive('highlight')} title="Vurgula" style={{ background: editor.isActive('highlight') ? '#fef08a' : undefined }}>🖍</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive('code')} title="Satır içi kod" style={{ fontFamily: 'monospace' }}>&lt;&gt;</ToolBtn>
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Hizalama */}
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Sola hizala">⫷</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Ortala">☰</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Sağa hizala">⫸</ToolBtn>
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Listeler */}
-      <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Madde listesi">• ─</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numaralı liste">1. ─</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')} title="Görev listesi">☑</ToolBtn>
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Bloklar */}
-      <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Alıntı">❝</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Kod bloğu">{'{ }'}</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Yatay çizgi">─</ToolBtn>
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Tablo */}
-      <ToolBtn onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Tablo ekle">⊞</ToolBtn>
-      {editor.isActive('table') && (
-        <>
-          <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="Sütun ekle">+▮</ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="Satır ekle">+▬</ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Tabloyu sil" style={{ color: 'var(--red)' }}>🗑</ToolBtn>
-        </>
-      )}
-
-      <div style={{ width: 1, height: 20, background: 'var(--gray-mid)', margin: '0 4px' }} />
-
-      {/* Ekleme */}
-      <ToolBtn onClick={setLink} active={editor.isActive('link')} title="Link ekle/düzenle">🔗</ToolBtn>
-      <ToolBtn onClick={addImage} title="Resim ekle">🖼</ToolBtn>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Geri/İleri */}
-      <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="Geri al" style={{ opacity: editor.can().undo() ? 1 : 0.3 }}>↩</ToolBtn>
-      <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="İleri al" style={{ opacity: editor.can().redo() ? 1 : 0.3 }}>↪</ToolBtn>
-    </div>
-  );
-}
-
-// ── Kayıt durumu göstergesi ──────────────────────────────────────────────────
-function SaveIndicator({ status }) {
-  const labels = { unsaved: '● Kaydedilmemiş', saving: '↻ Kaydediliyor…', saved: '✓ Kaydedildi', error: '✕ Kayıt hatası' };
-  const colors = { unsaved: '#f59e0b', saving: 'var(--text-muted)', saved: '#22c55e', error: 'var(--red)' };
-  return (
-    <span style={{ fontSize: 11.5, color: colors[status] || 'var(--text-light)', fontWeight: 500 }}>
-      {labels[status] || ''}
-    </span>
-  );
-}
-
-// ── TipTap Document Editor ──────────────────────────────────────────────────
-function DocumentEditor({ doc, user, profile, onBack }) {
-  const [saveStatus, setSaveStatus] = useState('saved');
-  const savingRef = useRef(false);
-  const lastSavedRef = useRef(null);
-  const contentLoadedRef = useRef(false);
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      Placeholder.configure({
-        placeholder: 'Yazmaya başlayın…',
-      }),
-      Highlight,
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Underline,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-      Image,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      TextStyle,
-      Color,
-    ],
-    editorProps: {
-      attributes: {
-        class: 'tiptap-editor-content',
-        style: 'outline: none; min-height: 500px; padding: 24px 32px; font-size: 15px; line-height: 1.7; color: var(--text);',
-      },
-    },
-    onUpdate: ({ editor: ed }) => {
-      setSaveStatus('unsaved');
-    },
-  });
-
-  // İçeriği yükle
-  useEffect(() => {
-    if (!editor || contentLoadedRef.current) return;
-    contentLoadedRef.current = true;
-    (async () => {
-      const { data } = await supabase.from('documents').select('content').eq('id', doc.id).single();
-      if (data?.content) {
-        try {
-          // TipTap JSON formatı ise direkt yükle
-          if (data.content.type === 'doc') {
-            editor.commands.setContent(data.content);
-          }
-          // BlockNote eski format ise text olarak yükle
-          else if (Array.isArray(data.content)) {
-            const text = data.content.map(b => {
-              if (typeof b === 'string') return b;
-              if (b.content) {
-                return (b.content || []).map(c => c.text || '').join('');
-              }
-              return '';
-            }).filter(Boolean).join('\n');
-            if (text.trim()) {
-              editor.commands.setContent(`<p>${text.split('\n').join('</p><p>')}</p>`);
-            }
-          }
-        } catch (e) {
-          console.error('Content load error:', e);
-        }
-      }
-    })();
-  }, [editor, doc.id]);
-
-  // Kaydet fonksiyonu
-  const saveToSupabase = useCallback(async () => {
-    if (!editor || savingRef.current) return;
-    try {
-      const json = editor.getJSON();
-      const jsonStr = JSON.stringify(json);
-      if (jsonStr === lastSavedRef.current) return;
-      lastSavedRef.current = jsonStr;
-      savingRef.current = true;
-      setSaveStatus('saving');
-      await supabase.from('documents').update({
-        content: json,
-        updated_at: new Date().toISOString(),
-        updated_by: user.id,
-        updated_by_name: profile?.full_name || user.email,
-      }).eq('id', doc.id);
-      setSaveStatus('saved');
-    } catch (err) {
-      console.error('Save error:', err);
-      setSaveStatus('error');
-    } finally {
-      savingRef.current = false;
-    }
-  }, [editor, doc.id, user, profile]);
-
-  // Otomatik kayıt: 30 sn
-  useEffect(() => {
-    const interval = setInterval(() => saveToSupabase(), 30000);
-    return () => clearInterval(interval);
-  }, [saveToSupabase]);
-
-  // Unmount'ta kaydet
-  useEffect(() => {
-    return () => { saveToSupabase(); };
-  }, [saveToSupabase]);
-
-  // Ctrl+S
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        saveToSupabase();
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [saveToSupabase]);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', marginBottom: 8,
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <button onClick={() => { saveToSupabase(); setTimeout(onBack, 300); }} style={{
-          border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px',
-          borderRadius: 8, color: 'var(--text-muted)',
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-        >←</button>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-              {getDocType(doc.doc_type).icon} {doc.title}
-            </span>
-            <SaveIndicator status={saveStatus} />
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {doc.created_by_name} tarafından oluşturuldu · Ctrl+S ile kaydet
-          </div>
-        </div>
-        <button onClick={saveToSupabase} title="Şimdi kaydet" style={{
-          padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-          border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
-          color: 'var(--text-secondary)', cursor: 'pointer',
-        }}>
-          💾 Kaydet
-        </button>
-      </div>
-
-      {/* Editor */}
-      <div style={{
-        flex: 1, overflow: 'hidden', border: '1px solid var(--border)',
-        borderRadius: 12, background: 'var(--bg-card)',
-        display: 'flex', flexDirection: 'column',
-      }}>
-        <EditorToolbar editor={editor} />
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <EditorContent editor={editor} />
-        </div>
-      </div>
-
-      {/* TipTap stilleri */}
-      <style>{`
-        .tiptap-editor-content h1 { font-size: 28px; font-weight: 800; margin: 20px 0 8px; line-height: 1.3; }
-        .tiptap-editor-content h2 { font-size: 22px; font-weight: 700; margin: 18px 0 6px; line-height: 1.3; }
-        .tiptap-editor-content h3 { font-size: 18px; font-weight: 700; margin: 16px 0 4px; line-height: 1.3; }
-        .tiptap-editor-content p { margin: 0 0 8px; }
-        .tiptap-editor-content ul, .tiptap-editor-content ol { padding-left: 24px; margin: 4px 0; }
-        .tiptap-editor-content li { margin: 2px 0; }
-        .tiptap-editor-content li p { margin: 0; }
-        .tiptap-editor-content blockquote {
-          border-left: 3px solid #6366f1; padding-left: 16px; margin: 8px 0;
-          color: var(--text-muted); font-style: italic;
-        }
-        .tiptap-editor-content code {
-          background: var(--gray-light); border-radius: 4px; padding: 2px 6px;
-          font-family: 'Fira Code', monospace; font-size: 13px; color: #e11d48;
-        }
-        .tiptap-editor-content pre {
-          background: #1e1e2e; color: #cdd6f4; border-radius: 10px;
-          padding: 16px 20px; margin: 8px 0; overflow-x: auto;
-          font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.6;
-        }
-        .tiptap-editor-content pre code {
-          background: none; color: inherit; padding: 0; border-radius: 0;
-        }
-        .tiptap-editor-content hr {
-          border: none; border-top: 2px solid var(--border); margin: 16px 0;
-        }
-        .tiptap-editor-content a { color: #6366f1; text-decoration: underline; cursor: pointer; }
-        .tiptap-editor-content img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
-        .tiptap-editor-content mark { background: #fef08a; border-radius: 2px; padding: 0 2px; }
-
-        /* Tablo stilleri */
-        .tiptap-editor-content table {
-          border-collapse: collapse; width: 100%; margin: 12px 0;
-          border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
-        }
-        .tiptap-editor-content th, .tiptap-editor-content td {
-          border: 1px solid var(--border); padding: 8px 12px; text-align: left;
-          min-width: 80px; font-size: 14px;
-        }
-        .tiptap-editor-content th {
-          background: var(--gray-light); font-weight: 700; font-size: 13px;
-        }
-        .tiptap-editor-content td { background: var(--bg-card); }
-
-        /* Task list */
-        .tiptap-editor-content ul[data-type="taskList"] {
-          list-style: none; padding-left: 4px;
-        }
-        .tiptap-editor-content ul[data-type="taskList"] li {
-          display: flex; align-items: flex-start; gap: 8px;
-        }
-        .tiptap-editor-content ul[data-type="taskList"] li label {
-          margin-top: 3px; cursor: pointer;
-        }
-        .tiptap-editor-content ul[data-type="taskList"] li[data-checked="true"] > div > p {
-          text-decoration: line-through; opacity: 0.6;
-        }
-
-        /* Placeholder */
-        .tiptap-editor-content p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left; color: var(--text-light); pointer-events: none; height: 0;
-        }
-
-        .ProseMirror { outline: none; }
-        .ProseMirror-focused { outline: none; }
-
-        /* Tablo seçim */
-        .tiptap-editor-content .selectedCell { background: #eef2ff; }
-      `}</style>
-    </div>
-  );
-}
-
-// ── Yeni doküman oluşturma modalı ────────────────────────────────────────────
-function NewDocModal({ onClose, onCreate }) {
-  const [title, setTitle] = useState('');
-  const [docType, setDocType] = useState('document');
-  const [creating, setCreating] = useState(false);
-
-  const handleCreate = async () => {
-    if (!title.trim()) return;
-    setCreating(true);
-    await onCreate(title.trim(), docType);
-    setCreating(false);
-    onClose();
-  };
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
-    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        width: 440, background: 'var(--bg-card)', borderRadius: 16,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
-      }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-          📄 Yeni Doküman
-        </h3>
-        <input value={title} onChange={e => setTitle(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleCreate()}
-          placeholder="Doküman başlığı…" autoFocus
-          style={{
-            width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 14,
-            border: '1.5px solid var(--border)', outline: 'none',
-            background: 'var(--bg-hover)', color: 'var(--text)',
-            boxSizing: 'border-box', marginBottom: 12,
-          }} />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-          {DOC_TYPES.map(t => (
-            <button key={t.id} onClick={() => setDocType(t.id)}
-              style={{
-                padding: '6px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                border: '1.5px solid var(--border)', transition: 'all 0.1s',
-                background: docType === t.id ? 'var(--navy)' : 'var(--bg-hover)',
-                color: docType === t.id ? '#fff' : 'var(--text-secondary)',
-              }}>
-              {t.icon} {t.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{
-            padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
-            border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
-            color: 'var(--text-secondary)',
-          }}>İptal</button>
-          <button onClick={handleCreate} disabled={!title.trim() || creating}
-            style={{
-              padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              border: 'none', cursor: !title.trim() || creating ? 'default' : 'pointer',
-              background: !title.trim() || creating ? 'var(--border)' : 'var(--navy)',
-              color: '#fff',
-            }}>
-            {creating ? 'Oluşturuluyor…' : 'Oluştur'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Dosya yükleme modalı ─────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// YÜKLEME MODALI
+// ══════════════════════════════════════════════════════════════════════════════
 function UploadModal({ onClose, onUpload }) {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -480,13 +73,16 @@ function UploadModal({ onClose, onUpload }) {
     }
   };
 
+  const t = file ? typeOf(file.name) : null;
+
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'fixed', inset: 0, zIndex: 10001, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        width: 440, background: 'var(--bg-card)', borderRadius: 16,
+        width: 460, background: 'var(--bg-card)', borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.25)', padding: 24,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -502,52 +98,53 @@ function UploadModal({ onClose, onUpload }) {
             ☁ Google Drive
           </span>
         </div>
-        <div style={{
-          border: '2px dashed var(--border)', borderRadius: 12, padding: 32,
-          textAlign: 'center', marginBottom: 16, cursor: 'pointer',
-          background: file ? '#f0fdf4' : 'var(--bg-hover)',
-        }}
+
+        <div
+          style={{
+            border: `2px dashed ${file ? (t?.color || 'var(--border)') : 'var(--border)'}`,
+            borderRadius: 12, padding: 28, textAlign: 'center', marginBottom: 16,
+            cursor: 'pointer', background: file ? t.bg : 'var(--bg-hover)',
+            transition: 'all 0.15s',
+          }}
           onClick={() => document.getElementById('doc-file-input')?.click()}
           onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--navy)'; }}
-          onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-          onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); e.currentTarget.style.borderColor = 'var(--border)'; }}
+          onDragLeave={e => { e.currentTarget.style.borderColor = file ? (t?.color || 'var(--border)') : 'var(--border)'; }}
+          onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files[0]); }}
         >
           <input id="doc-file-input" type="file" style={{ display: 'none' }}
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg"
             onChange={e => setFile(e.target.files?.[0] || null)} />
           {file ? (
             <>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📎</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{file.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                {(file.size / 1024 / 1024).toFixed(2)} MB
+              <div style={{ fontSize: 42, marginBottom: 8 }}>{t.icon}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', wordBreak: 'break-word' }}>
+                {file.name}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, display: 'flex', justifyContent: 'center', gap: 8 }}>
+                <span style={{ color: t.color, fontWeight: 700 }}>{t.label}</span>
+                <span>·</span>
+                <span>{formatSize(file.size)}</span>
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
+              <div style={{ fontSize: 34, marginBottom: 8 }}>📂</div>
               <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
                 Dosya sürükleyin veya tıklayarak seçin
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                PDF, Word, Excel, PowerPoint, resim desteklenir
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>
+                PDF, Word, Excel, PowerPoint, resim
               </div>
             </>
           )}
         </div>
+
         {uploading && (
           <div style={{ marginBottom: 12 }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', fontSize: 12,
-              color: 'var(--text-muted)', marginBottom: 4,
-            }}>
-              <span>{progress < 100 ? 'Drive\'a yükleniyor…' : 'Metadata kaydediliyor…'}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+              <span>{progress < 100 ? "Drive'a yükleniyor…" : 'Metadata kaydediliyor…'}</span>
               <span>{progress}%</span>
             </div>
-            <div style={{
-              width: '100%', height: 6, background: 'var(--border)',
-              borderRadius: 4, overflow: 'hidden',
-            }}>
+            <div style={{ width: '100%', height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{
                 width: `${progress}%`, height: '100%',
                 background: 'linear-gradient(90deg, #1a73e8, #4285f4)',
@@ -556,6 +153,7 @@ function UploadModal({ onClose, onUpload }) {
             </div>
           </div>
         )}
+
         {error && (
           <div style={{
             marginBottom: 12, padding: 10, borderRadius: 8,
@@ -565,19 +163,20 @@ function UploadModal({ onClose, onUpload }) {
             ⚠ {error}
           </div>
         )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} disabled={uploading} style={{
-            padding: '8px 16px', borderRadius: 10, fontSize: 13, cursor: uploading ? 'default' : 'pointer',
+            padding: '8px 16px', borderRadius: 10, fontSize: 13,
+            cursor: uploading ? 'default' : 'pointer',
             border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
             color: 'var(--text-secondary)', opacity: uploading ? 0.6 : 1,
           }}>İptal</button>
-          <button onClick={handleUpload} disabled={!file || uploading}
-            style={{
-              padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              border: 'none', cursor: !file || uploading ? 'default' : 'pointer',
-              background: !file || uploading ? 'var(--border)' : 'var(--navy)',
-              color: '#fff',
-            }}>
+          <button onClick={handleUpload} disabled={!file || uploading} style={{
+            padding: '8px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+            border: 'none', cursor: !file || uploading ? 'default' : 'pointer',
+            background: !file || uploading ? 'var(--border)' : 'var(--navy)',
+            color: '#fff',
+          }}>
             {uploading ? 'Yükleniyor…' : 'Yükle'}
           </button>
         </div>
@@ -586,43 +185,45 @@ function UploadModal({ onClose, onUpload }) {
   );
 }
 
-// ── Doküman kartı ────────────────────────────────────────────────────────────
-function DocCard({ doc, onClick, onDelete }) {
-  const type = getDocType(doc.doc_type);
-  const isFile = !!doc.file_url;
-  const dateStr = new Date(doc.updated_at || doc.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
+// ══════════════════════════════════════════════════════════════════════════════
+// KARE KART (GRID) — 1:1 aspect ratio
+// ══════════════════════════════════════════════════════════════════════════════
+function DocCardGrid({ doc, onOpen, onDelete }) {
+  const t = typeOf(doc.file_name);
   const [hovered, setHovered] = useState(false);
 
-  const FILE_ICONS = { pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗', ppt: '📙', pptx: '📙', png: '🖼', jpg: '🖼', jpeg: '🖼', txt: '📃', csv: '📊' };
-  const ext = doc.file_name?.split('.').pop()?.toLowerCase();
-  const fileIcon = FILE_ICONS[ext] || '📎';
-
   return (
-    <div onClick={onClick}
+    <div
+      onClick={() => onOpen(doc)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        position: 'relative',
-        background: 'var(--bg-card)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: 16, cursor: 'pointer', transition: 'all 0.15s',
-        display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120,
+        position: 'relative', aspectRatio: '1 / 1',
+        background: 'var(--bg-card)',
+        border: `1.5px solid ${hovered ? t.color : 'var(--border)'}`,
+        borderTop: `4px solid ${t.color}`,
+        borderRadius: 14,
+        padding: 12, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column',
+        transition: 'all 0.18s',
+        boxShadow: hovered ? `0 8px 22px ${t.color}22` : 'none',
+        transform: hovered ? 'translateY(-2px)' : 'none',
+        overflow: 'hidden',
       }}
-      onMouseEnter={e => { setHovered(true); e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { setHovered(false); e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
     >
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(doc); }}
-          title="Dokümanı sil"
-          aria-label="Dokümanı sil"
+          title="Dokümanı sil" aria-label="Dokümanı sil"
           style={{
             position: 'absolute', top: 8, right: 8, zIndex: 2,
-            width: 28, height: 28, borderRadius: 8,
+            width: 26, height: 26, borderRadius: 7,
             border: '1px solid var(--border)',
-            background: hovered ? '#fff' : 'transparent',
-            opacity: hovered ? 1 : 0,
+            background: '#fff', opacity: hovered ? 1 : 0,
             transition: 'opacity 0.15s',
-            cursor: 'pointer', fontSize: 13, lineHeight: 1,
+            cursor: 'pointer', fontSize: 12, lineHeight: 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#dc2626',
+            color: '#dc2626', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#fecaca'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = 'var(--border)'; }}
@@ -630,61 +231,171 @@ function DocCard({ doc, onClick, onDelete }) {
           🗑
         </button>
       )}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <span style={{ fontSize: 28 }}>{isFile ? fileIcon : type.icon}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: onDelete ? 32 : 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-              {doc.title}
-            </div>
-            {isFile && (
-              <span title="Google Drive" style={{
-                fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
-                padding: '2px 6px', borderRadius: 5, flexShrink: 0,
-                background: 'rgba(66, 133, 244, 0.12)', color: '#1a73e8',
-                border: '1px solid rgba(66, 133, 244, 0.3)',
-              }}>☁ Drive</span>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isFile ? (doc.file_name || 'Dosya') : type.label}
-          </div>
+
+      {/* İkon alanı — pastel kare */}
+      <div style={{
+        flex: 1, minHeight: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: t.bg, borderRadius: 10, marginBottom: 10,
+      }}>
+        <span style={{ fontSize: 'clamp(36px, 10vw, 54px)', lineHeight: 1 }}>{t.icon}</span>
+      </div>
+
+      {/* Bilgi */}
+      <div style={{ flexShrink: 0 }}>
+        <div style={{
+          fontWeight: 600, fontSize: 13, color: 'var(--text)', lineHeight: 1.3,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {doc.title}
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, marginTop: 5,
+          fontSize: 10.5, color: 'var(--text-muted)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          <span style={{
+            color: t.color, fontWeight: 700, letterSpacing: 0.2,
+            textTransform: 'uppercase', fontSize: 9.5,
+          }}>{t.label}</span>
+          {doc.file_size ? <><span>·</span><span>{formatSize(doc.file_size)}</span></> : null}
         </div>
       </div>
-      <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)' }}>
-        <span>{doc.created_by_name || 'Bilinmiyor'}</span>
-        <span>{dateStr}</span>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LİSTE SATIRI
+// ══════════════════════════════════════════════════════════════════════════════
+function DocCardList({ doc, onOpen, onDelete }) {
+  const t = typeOf(doc.file_name);
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      onClick={() => onOpen(doc)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 14px',
+        background: hovered ? 'var(--bg-hover)' : 'var(--bg-card)',
+        borderLeft: `3px solid ${t.color}`,
+        border: '1px solid var(--border)',
+        borderLeftWidth: 3,
+        borderRadius: 10,
+        cursor: 'pointer', transition: 'all 0.12s',
+      }}
+    >
+      {/* İkon kutusu */}
+      <div style={{
+        width: 38, height: 38, flexShrink: 0,
+        background: t.bg, borderRadius: 9,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, border: `1px solid ${t.color}26`,
+      }}>
+        {t.icon}
       </div>
-      {doc.tags?.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {doc.tags.map(t => (
-            <span key={t} style={{ padding: '1px 8px', borderRadius: 8, fontSize: 10, background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>{t}</span>
-          ))}
+
+      {/* Başlık + dosya adı */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontWeight: 600, fontSize: 13.5, color: 'var(--text)', lineHeight: 1.3,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {doc.title}
         </div>
+        {doc.file_name && doc.file_name !== doc.title && (
+          <div style={{
+            fontSize: 11, color: 'var(--text-muted)', marginTop: 2,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {doc.file_name}
+          </div>
+        )}
+      </div>
+
+      {/* Tip etiketi */}
+      <div style={{
+        flexShrink: 0,
+        padding: '3px 9px', borderRadius: 999,
+        fontSize: 10.5, fontWeight: 700, letterSpacing: 0.3,
+        color: t.color, background: t.bg, border: `1px solid ${t.color}33`,
+        minWidth: 70, textAlign: 'center',
+      }}>
+        {t.label}
+      </div>
+
+      {/* Boyut */}
+      <div style={{
+        flexShrink: 0, width: 70, textAlign: 'right',
+        fontSize: 11.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums',
+      }}>
+        {formatSize(doc.file_size)}
+      </div>
+
+      {/* Sahip */}
+      <div style={{
+        flexShrink: 0, width: 130,
+        fontSize: 11.5, color: 'var(--text-muted)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {doc.created_by_name || '—'}
+      </div>
+
+      {/* Tarih */}
+      <div style={{
+        flexShrink: 0, width: 90, textAlign: 'right',
+        fontSize: 11.5, color: 'var(--text-muted)',
+      }}>
+        {formatDate(doc.updated_at || doc.created_at)}
+      </div>
+
+      {/* Sil */}
+      {onDelete ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(doc); }}
+          title="Dokümanı sil" aria-label="Dokümanı sil"
+          style={{
+            flexShrink: 0, width: 30, height: 30, borderRadius: 7,
+            border: '1px solid transparent',
+            background: 'transparent',
+            cursor: 'pointer', fontSize: 13,
+            color: '#dc2626',
+            opacity: hovered ? 1 : 0.35, transition: 'all 0.15s',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#fecaca'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+        >
+          🗑
+        </button>
+      ) : (
+        <div style={{ width: 30 }} />
       )}
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ANA DOCUMENTS BİLEŞENİ
+// ANA BİLEŞEN
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Documents({ user }) {
   const { profile } = useProfile() || {};
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeDoc, setActiveDoc] = useState(null);
-  const [showNewDoc, setShowNewDoc] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('');
+  const [filterId, setFilterId] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
-  // ── Dokümanları yükle ──────────────────────────────────────────────────────
   const loadDocs = useCallback(async () => {
     const { data, error } = await supabase
       .from('documents')
       .select('*')
+      .not('file_url', 'is', null)
       .order('updated_at', { ascending: false });
     if (!error) setDocs(data || []);
     setLoading(false);
@@ -692,80 +403,16 @@ export default function Documents({ user }) {
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
 
-  // ── Yeni doküman oluştur ───────────────────────────────────────────────────
-  const createDocument = async (title, docType) => {
-    const { data, error } = await supabase.from('documents').insert({
-      title,
-      doc_type: docType,
-      unit: profile?.unit || null,
-      created_by: user.id,
-      created_by_name: profile?.full_name || user.email,
-      updated_by: user.id,
-      updated_by_name: profile?.full_name || user.email,
-    }).select().single();
-    if (!error && data) {
-      loadDocs();
-      setActiveDoc(data);
-      logActivity({ action: 'oluşturdu', module: 'dokümanlar', entityType: 'doküman', entityName: title });
-    }
-  };
-
-  // ── Silme yetkisi ──────────────────────────────────────────────────────────
-  // Direktör / direktör yardımcısı / asistan: tümünü silebilir
-  // Koordinatör: sadece kendi biriminin dokümanlarını silebilir
-  // Diğerleri: silemez (buton gösterilmez)
-  const canDeleteDoc = useCallback((doc) => {
-    const role = profile?.role;
-    if (!role) return false;
-    if (role === 'direktor' || role === 'direktor_yardimcisi' || role === 'asistan') return true;
-    if (role === 'koordinator') return !!doc.unit && doc.unit === profile?.unit;
-    return false;
-  }, [profile?.role, profile?.unit]);
-
-  // ── Doküman sil (Drive + DB) ───────────────────────────────────────────────
-  const deleteDoc = useCallback(async (doc) => {
-    const msg = doc.file_url
-      ? `"${doc.title}" silinsin mi?\n\nDrive'daki dosya da kalıcı olarak silinecek.`
-      : `"${doc.title}" silinsin mi?\n\nBu işlem geri alınamaz.`;
-    if (!window.confirm(msg)) return;
-
-    // 1) Drive dosyasını sil (varsa). Hata olursa DB silmeye yine devam et — yetim satır yerine yetim Drive dosyası bırakmak tercih edilir.
-    let driveWarn = null;
+  // ── Dosya aç ──
+  const openDoc = useCallback((doc) => {
     if (doc.file_url) {
-      try {
-        await deleteDocumentFromDrive(doc.file_url);
-      } catch (err) {
-        driveWarn = err?.message || String(err);
-        console.warn('[drive-delete] failed, proceeding with DB delete:', driveWarn);
-      }
-    }
-
-    // 2) Supabase documents satırını sil
-    const { error } = await supabase.from('documents').delete().eq('id', doc.id);
-    if (error) {
-      alert('Doküman silinemedi: ' + error.message);
-      return;
-    }
-
-    setDocs(prev => prev.filter(d => d.id !== doc.id));
-    logActivity({
-      action: 'sildi',
-      module: 'dokümanlar',
-      entityType: doc.file_url ? 'dosya' : 'doküman',
-      entityName: doc.title,
-    });
-
-    if (driveWarn) {
-      alert('Doküman silindi ama Drive dosyası silinemedi. Drive\'dan manuel silmen gerekebilir.\n\nDetay: ' + driveWarn);
+      window.open(doc.file_url, '_blank', 'noopener,noreferrer');
     }
   }, []);
 
-  // ── Dosya yükle (Google Drive üzerinden) ───────────────────────────────────
+  // ── Drive yükleme + DB satırı ──
   const uploadFile = async (file, onProgress) => {
-    // Edge function -> Service Account JWT -> Drive Shared Drive (IRDP-App-Files)
     const result = await uploadDocumentToDrive(file, { onProgress });
-    // result: { fileId, name, mimeType, size, webViewLink, webContentLink }
-
     const { error: dbError } = await supabase.from('documents').insert({
       title: (result.name || file.name).replace(/\.[^.]+$/, ''),
       doc_type: 'document',
@@ -784,38 +431,58 @@ export default function Documents({ user }) {
     logActivity({ action: 'yükledi', module: 'dokümanlar', entityType: 'dosya', entityName: file.name });
   };
 
-  // ── Filtreleme ─────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => docs.filter(d => {
-    if (d.is_archived !== showArchived) return false;
-    if (filterType && d.doc_type !== filterType) return false;
-    if (search) {
-      const s = search.toLowerCase();
-      if (!(d.title || '').toLowerCase().includes(s) && !(d.created_by_name || '').toLowerCase().includes(s)) return false;
-    }
-    return true;
-  }), [docs, showArchived, filterType, search]);
+  // ── Silme yetkisi ──
+  const canDeleteDoc = useCallback((doc) => {
+    const role = profile?.role;
+    if (!role) return false;
+    if (role === 'direktor' || role === 'direktor_yardimcisi' || role === 'asistan') return true;
+    if (role === 'koordinator') return !!doc.unit && doc.unit === profile?.unit;
+    return false;
+  }, [profile?.role, profile?.unit]);
 
-  // ── Editör görünümü ────────────────────────────────────────────────────────
-  if (activeDoc) {
-    if (activeDoc.file_url) {
-      const url = activeDoc.file_url;
-      if (url.startsWith('https://') || url.startsWith('http://')) {
-        window.open(url, '_blank', 'noopener,noreferrer');
+  // ── Doküman sil ──
+  const deleteDoc = useCallback(async (doc) => {
+    const msg = `"${doc.title}" silinsin mi?\n\nDrive'daki dosya da kalıcı olarak silinecek.`;
+    if (!window.confirm(msg)) return;
+
+    let driveWarn = null;
+    try {
+      await deleteDocumentFromDrive(doc.file_url);
+    } catch (err) {
+      driveWarn = err?.message || String(err);
+      console.warn('[drive-delete] failed, proceeding with DB delete:', driveWarn);
+    }
+
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id);
+    if (error) { alert('Doküman silinemedi: ' + error.message); return; }
+
+    setDocs(prev => prev.filter(d => d.id !== doc.id));
+    logActivity({ action: 'sildi', module: 'dokümanlar', entityType: 'dosya', entityName: doc.title });
+
+    if (driveWarn) {
+      alert("Doküman silindi ama Drive dosyası silinemedi. Drive'dan manuel silmen gerekebilir.\n\nDetay: " + driveWarn);
+    }
+  }, []);
+
+  // ── Filtreleme ──
+  const filtered = useMemo(() => {
+    const group = FILTER_GROUPS.find(g => g.id === filterId);
+    return docs.filter(d => {
+      if (d.is_archived !== showArchived) return false;
+      if (group?.exts) {
+        if (!group.exts.includes(extOf(d.file_name))) return false;
       }
-      setActiveDoc(null);
-      return null;
-    }
-    return (
-      <DocumentEditor
-        doc={activeDoc}
-        user={user}
-        profile={profile}
-        onBack={() => { setActiveDoc(null); loadDocs(); }}
-      />
-    );
-  }
+      if (search) {
+        const s = search.toLowerCase();
+        if (!(d.title || '').toLowerCase().includes(s) &&
+            !(d.file_name || '').toLowerCase().includes(s) &&
+            !(d.created_by_name || '').toLowerCase().includes(s)) return false;
+      }
+      return true;
+    });
+  }, [docs, showArchived, filterId, search]);
 
-  // ── Liste görünümü ─────────────────────────────────────────────────────────
+  // ══ Render ══
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -825,96 +492,172 @@ export default function Documents({ user }) {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 20, flexWrap: 'wrap', gap: 12,
+      }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>📄 Dokümanlar</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>
+            📄 Dokümanlar
+          </h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Zengin metin editörü ile dokümanlarınızı oluşturun
+            Tüm dosyalar Google Drive Shared Drive'da saklanır
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowUpload(true)} style={{
-            padding: '10px 16px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontWeight: 500,
-            border: '1.5px solid var(--border)', background: 'var(--bg-hover)',
-            color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            📎 Dosya Yükle
-          </button>
-          <button onClick={() => setShowNewDoc(true)} style={{
+        <button
+          onClick={() => setShowUpload(true)}
+          style={{
             padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 600,
-            border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8,
             background: 'var(--navy)', color: '#fff',
-          }}>
-            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Yeni Doküman
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: 320 }}>
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.4 }}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Doküman ara…"
-            style={{
-              width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10,
-              border: '1.5px solid var(--border)', fontSize: 13,
-              outline: 'none', background: 'var(--bg-hover)', color: 'var(--text)',
-              boxSizing: 'border-box',
-            }} />
-        </div>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          style={{
-            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border)',
-            fontSize: 12.5, background: 'var(--bg-hover)', color: 'var(--text-secondary)',
-            cursor: 'pointer', outline: 'none',
-          }}>
-          <option value="">Tüm türler</option>
-          {DOC_TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
-        </select>
-        <button onClick={() => setShowArchived(!showArchived)}
-          style={{
-            padding: '6px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            border: '1.5px solid var(--border)',
-            background: showArchived ? 'var(--navy)' : 'var(--bg-hover)',
-            color: showArchived ? '#fff' : 'var(--text-secondary)',
-          }}>
-          🗄 {showArchived ? 'Aktif' : 'Arşiv'}
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          }}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>📎</span> Dosya Yükle
         </button>
       </div>
 
-      {/* Document grid */}
-      {filtered.length > 0 ? (
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 12,
-        }}>
-          {filtered.map(doc => (
-            <DocCard
-              key={doc.id}
-              doc={doc}
-              onClick={() => setActiveDoc(doc)}
-              onDelete={canDeleteDoc(doc) ? deleteDoc : null}
-            />
-          ))}
+      {/* Kontroller */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        marginBottom: 16, flexWrap: 'wrap',
+      }}>
+        {/* Arama */}
+        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 340 }}>
+          <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.45 }}>🔍</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Doküman ara…"
+            style={{
+              width: '100%', padding: '9px 12px 9px 34px', borderRadius: 10,
+              border: '1.5px solid var(--border)', fontSize: 13,
+              outline: 'none', background: 'var(--bg-hover)', color: 'var(--text)',
+              boxSizing: 'border-box',
+            }}
+          />
         </div>
+
+        {/* Tip filtresi (pill'ler) */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: '1 1 auto' }}>
+          {FILTER_GROUPS.map(g => {
+            const active = filterId === g.id;
+            return (
+              <button
+                key={g.id || 'all'}
+                onClick={() => setFilterId(g.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                  border: '1.5px solid', cursor: 'pointer',
+                  borderColor: active ? 'var(--navy)' : 'var(--border)',
+                  background: active ? 'var(--navy)' : 'var(--bg-hover)',
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.12s',
+                }}
+              >
+                {g.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Arşiv toggle */}
+        <button
+          onClick={() => setShowArchived(!showArchived)}
+          style={{
+            padding: '7px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
+            cursor: 'pointer', border: '1.5px solid var(--border)',
+            background: showArchived ? 'var(--navy)' : 'var(--bg-hover)',
+            color: showArchived ? '#fff' : 'var(--text-secondary)',
+          }}
+        >
+          🗄 {showArchived ? 'Aktif' : 'Arşiv'}
+        </button>
+
+        {/* Görünüm toggle */}
+        <div style={{
+          display: 'flex', borderRadius: 10, overflow: 'hidden',
+          border: '1.5px solid var(--border)',
+        }}>
+          <button
+            onClick={() => setViewMode('grid')}
+            title="Izgara görünümü" aria-label="Izgara görünümü"
+            style={{
+              padding: '7px 12px', fontSize: 14, cursor: 'pointer',
+              border: 'none',
+              background: viewMode === 'grid' ? 'var(--navy)' : 'var(--bg-hover)',
+              color: viewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
+            }}
+          >
+            ▦
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            title="Liste görünümü" aria-label="Liste görünümü"
+            style={{
+              padding: '7px 12px', fontSize: 14, cursor: 'pointer',
+              border: 'none', borderLeft: '1.5px solid var(--border)',
+              background: viewMode === 'list' ? 'var(--navy)' : 'var(--bg-hover)',
+              color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
+            }}
+          >
+            ☰
+          </button>
+        </div>
+      </div>
+
+      {/* İçerik */}
+      {filtered.length > 0 ? (
+        viewMode === 'grid' ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+            gap: 14,
+          }}>
+            {filtered.map(doc => (
+              <DocCardGrid
+                key={doc.id}
+                doc={doc}
+                onOpen={openDoc}
+                onDelete={canDeleteDoc(doc) ? deleteDoc : null}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filtered.map(doc => (
+              <DocCardList
+                key={doc.id}
+                doc={doc}
+                onOpen={openDoc}
+                onDelete={canDeleteDoc(doc) ? deleteDoc : null}
+              />
+            ))}
+          </div>
+        )
       ) : (
-        <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
+        <div style={{
+          textAlign: 'center', padding: '80px 20px', color: 'var(--text-muted)',
+        }}>
+          <div style={{ fontSize: 56, marginBottom: 12 }}>📂</div>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: 'var(--text-muted)' }}>
-            {search || filterType ? 'Filtrelerle eşleşen doküman yok' : 'Henüz doküman oluşturulmamış'}
+            {search || filterId
+              ? 'Filtrelerle eşleşen doküman yok'
+              : 'Henüz dosya yüklenmemiş'}
           </div>
           <div style={{ fontSize: 13 }}>
-            {!search && !filterType && 'İlk dokümanınızı oluşturmak için "Yeni Doküman" butonuna tıklayın.'}
+            {!search && !filterId && "İlk dosyayı yüklemek için üstteki \"Dosya Yükle\" butonunu kullanın."}
           </div>
         </div>
       )}
 
-      {/* Modals */}
-      {showNewDoc && <NewDocModal onClose={() => setShowNewDoc(false)} onCreate={createDocument} />}
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} onUpload={uploadFile} />}
+      {/* Modal */}
+      {showUpload && (
+        <UploadModal onClose={() => setShowUpload(false)} onUpload={uploadFile} />
+      )}
     </div>
   );
 }
