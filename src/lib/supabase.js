@@ -1940,3 +1940,33 @@ export const uploadDocumentToDrive = (file, { displayName = null, onProgress = n
     }
   });
 };
+
+// ── GOOGLE DRIVE DELETE (Documents modülü) ──
+// fileId veya file_url (Drive view link) kabul eder. Edge function parse eder.
+// Başarıda { ok: true, fileId, status } döner.
+export const deleteDocumentFromDrive = async (fileIdOrUrl) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('not_authenticated');
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error('missing_supabase_config');
+
+  const isUrl = typeof fileIdOrUrl === 'string' && /^https?:\/\//.test(fileIdOrUrl);
+  const body = isUrl ? { fileUrl: fileIdOrUrl } : { fileId: fileIdOrUrl };
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/drive-delete`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  if (!resp.ok) {
+    let detail = text;
+    try { detail = JSON.parse(text)?.error || detail; } catch {}
+    throw new Error(`drive_delete_http_${resp.status}: ${detail}`);
+  }
+  try { return JSON.parse(text); } catch { return { ok: true }; }
+};

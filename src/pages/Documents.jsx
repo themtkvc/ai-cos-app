@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase, logActivity, uploadDocumentToDrive } from '../lib/supabase';
+import { supabase, logActivity, uploadDocumentToDrive, deleteDocumentFromDrive } from '../lib/supabase';
 import { useProfile } from '../App';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -587,10 +587,11 @@ function UploadModal({ onClose, onUpload }) {
 }
 
 // ── Doküman kartı ────────────────────────────────────────────────────────────
-function DocCard({ doc, onClick }) {
+function DocCard({ doc, onClick, onDelete }) {
   const type = getDocType(doc.doc_type);
   const isFile = !!doc.file_url;
   const dateStr = new Date(doc.updated_at || doc.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const [hovered, setHovered] = useState(false);
 
   const FILE_ICONS = { pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗', ppt: '📙', pptx: '📙', png: '🖼', jpg: '🖼', jpeg: '🖼', txt: '📃', csv: '📊' };
   const ext = doc.file_name?.split('.').pop()?.toLowerCase();
@@ -599,17 +600,40 @@ function DocCard({ doc, onClick }) {
   return (
     <div onClick={onClick}
       style={{
+        position: 'relative',
         background: 'var(--bg-card)', border: '1px solid var(--border)',
         borderRadius: 12, padding: 16, cursor: 'pointer', transition: 'all 0.15s',
         display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120,
       }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
+      onMouseEnter={e => { setHovered(true); e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { setHovered(false); e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
     >
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(doc); }}
+          title="Dokümanı sil"
+          aria-label="Dokümanı sil"
+          style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 2,
+            width: 28, height: 28, borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: hovered ? '#fff' : 'transparent',
+            opacity: hovered ? 1 : 0,
+            transition: 'opacity 0.15s',
+            cursor: 'pointer', fontSize: 13, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#dc2626',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#fecaca'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+        >
+          🗑
+        </button>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <span style={{ fontSize: 28 }}>{isFile ? fileIcon : type.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingRight: onDelete ? 32 : 0 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {doc.title}
             </div>
@@ -685,6 +709,56 @@ export default function Documents({ user }) {
       logActivity({ action: 'oluşturdu', module: 'dokümanlar', entityType: 'doküman', entityName: title });
     }
   };
+
+  // ── Silme yetkisi ──────────────────────────────────────────────────────────
+  // Direktör / direktör yardımcısı / asistan: tümünü silebilir
+  // Koordinatör: sadece kendi biriminin dokümanlarını silebilir
+  // Diğerleri: silemez (buton gösterilmez)
+  const canDeleteDoc = useCallback((doc) => {
+    const role = profile?.role;
+    if (!role) return false;
+    if (role === 'direktor' || role === 'direktor_yardimcisi' || role === 'asistan') return true;
+    if (role === 'koordinator') return !!doc.unit && doc.unit === profile?.unit;
+    return false;
+  }, [profile?.role, profile?.unit]);
+
+  // ── Doküman sil (Drive + DB) ───────────────────────────────────────────────
+  const deleteDoc = useCallback(async (doc) => {
+    const msg = doc.file_url
+      ? `"${doc.title}" silinsin mi?\n\nDrive'daki dosya da kalıcı olarak silinecek.`
+      : `"${doc.title}" silinsin mi?\n\nBu işlem geri alınamaz.`;
+    if (!window.confirm(msg)) return;
+
+    // 1) Drive dosyasını sil (varsa). Hata olursa DB silmeye yine devam et — yetim satır yerine yetim Drive dosyası bırakmak tercih edilir.
+    let driveWarn = null;
+    if (doc.file_url) {
+      try {
+        await deleteDocumentFromDrive(doc.file_url);
+      } catch (err) {
+        driveWarn = err?.message || String(err);
+        console.warn('[drive-delete] failed, proceeding with DB delete:', driveWarn);
+      }
+    }
+
+    // 2) Supabase documents satırını sil
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id);
+    if (error) {
+      alert('Doküman silinemedi: ' + error.message);
+      return;
+    }
+
+    setDocs(prev => prev.filter(d => d.id !== doc.id));
+    logActivity({
+      action: 'sildi',
+      module: 'dokümanlar',
+      entityType: doc.file_url ? 'dosya' : 'doküman',
+      entityName: doc.title,
+    });
+
+    if (driveWarn) {
+      alert('Doküman silindi ama Drive dosyası silinemedi. Drive\'dan manuel silmen gerekebilir.\n\nDetay: ' + driveWarn);
+    }
+  }, []);
 
   // ── Dosya yükle (Google Drive üzerinden) ───────────────────────────────────
   const uploadFile = async (file, onProgress) => {
@@ -818,7 +892,12 @@ export default function Documents({ user }) {
           gap: 12,
         }}>
           {filtered.map(doc => (
-            <DocCard key={doc.id} doc={doc} onClick={() => setActiveDoc(doc)} />
+            <DocCard
+              key={doc.id}
+              doc={doc}
+              onClick={() => setActiveDoc(doc)}
+              onDelete={canDeleteDoc(doc) ? deleteDoc : null}
+            />
           ))}
         </div>
       ) : (
