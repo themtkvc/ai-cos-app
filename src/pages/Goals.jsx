@@ -480,96 +480,257 @@ function Tab0Overview({ kurumGoals, birimGoals, personalGoals, getLinkedBirimIds
         const linkedIds = getLinkedBirimIds(kg.id);
         const linkedBG = birimGoals.filter(b => linkedIds.includes(b.id));
 
+        // Status → banner gradient & label
+        const hasLinks = linkedBG.length > 0;
+        const isTam = hasLinks && p >= 100;
+        const isYolunda = hasLinks && p >= 70 && p < 100;
+        const isRisk = hasLinks && p >= 40 && p < 70;
+        const isGeride = hasLinks && p < 40;
+        const bannerGrad = !hasLinks ? 'linear-gradient(135deg,#475569,#64748b)'
+                         : isTam     ? 'linear-gradient(135deg,#2563eb,#60a5fa)'
+                         : isYolunda ? 'linear-gradient(135deg,#059669,#10b981)'
+                         : isRisk    ? 'linear-gradient(135deg,#ca8a04,#eab308)'
+                         :             'linear-gradient(135deg,#dc2626,#f97316)';
+        const statusLabel = !hasLinks ? 'Bağlantı yok'
+                         : isTam ? 'Tamamlandı'
+                         : isYolunda ? 'Yolunda'
+                         : isRisk ? 'Risk'
+                         : 'Geride';
+
+        // Toplam katkı hesaplaması — birim hedefi target'ının tüm bağlı birim hedefleri toplamındaki payı
+        const totalTargetAll = linkedBG.reduce((s, b) => s + Number(b.target || 0), 0);
+
         return (
-          <div key={kg.id} style={{ ...styles.card, borderLeft: '5px solid var(--navy)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ flex: 1 }}>
-                <div style={styles.treeLabel}>Departman Hedefi</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{kg.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>{kg.metric} · İlerleme: {fmtN(prog.current)}/{fmtN(prog.target)} · {kg.period}</span>
-                  {kg.owner_name && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ ...styles.avatar, background: 'var(--navy)', width: 20, height: 20, fontSize: 8 }}>{kg.owner_initials || '?'}</span>
-                      {kg.owner_name}
-                    </span>
-                  )}
-                  {deadlineBadge(kg.deadline, p >= 100)}
+          <div key={kg.id} style={styles.deptFrame}>
+            {/* Banner — Departman hedefi ana çerçevesi */}
+            <div style={{ ...styles.deptBanner, background: bannerGrad }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <span style={styles.deptChip}>DEPARTMAN HEDEFİ</span>
+                    <span style={styles.deptStatusChip}>{statusLabel}</span>
+                  </div>
+                  <div style={styles.deptTitle}>{kg.title}</div>
+                  <div style={styles.deptMeta}>
+                    <span>{kg.metric}</span>
+                    {hasLinks && (
+                      <>
+                        <span style={{ opacity: 0.6 }}>·</span>
+                        <span>Hedef: {fmtN(prog.current)}/{fmtN(prog.target)}</span>
+                      </>
+                    )}
+                    <span style={{ opacity: 0.6 }}>·</span>
+                    <span>{kg.period}</span>
+                    {kg.owner_name && (
+                      <>
+                        <span style={{ opacity: 0.6 }}>·</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ ...styles.avatar, background: 'rgba(255,255,255,0.28)', width: 22, height: 22, fontSize: 9 }}>
+                            {kg.owner_initials || '?'}
+                          </span>
+                          {kg.owner_name}
+                        </span>
+                      </>
+                    )}
+                    {kg.deadline && (
+                      <>
+                        <span style={{ opacity: 0.6 }}>·</span>
+                        <span>📅 {fmtDate(kg.deadline)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
+                  <div style={styles.deptPct}>{p}%</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button onClick={() => onEditKurum(kg)} style={styles.deptIconBtn} title="Düzenle">✏️</button>
+                    <button onClick={() => onDeleteKurum(kg.id)} style={styles.deptIconBtn} title="Sil">🗑️</button>
+                  </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <StatusBadge p={p} />
-                <button onClick={() => onEditKurum(kg)} style={styles.actionBtn} title="Düzenle">✏️</button>
-                <button onClick={() => onDeleteKurum(kg.id)} style={{ ...styles.actionBtn, ...styles.deleteBtn }} title="Sil">🗑️</button>
+              {/* Progress bar (beyaz) */}
+              <div style={styles.deptProgressWrap}>
+                <div style={{ ...styles.deptProgressBar, width: `${p}%` }} />
               </div>
+              {isTam && <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, opacity: 0.95 }}>🏆 +30 XP — Hedef tamamlandı!</div>}
             </div>
 
-            {/* Progress */}
-            <div style={styles.progressRow}>
-              <div style={styles.progressWrap}><div style={{ ...styles.progressBar, width: `${p}%`, background: pGrad(p) }} /></div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: pColor(p), minWidth: 42, textAlign: 'right' }}>{p}%</div>
-            </div>
+            {/* İçerik: Birim Hedefleri */}
+            <div style={styles.deptBody}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Birim Hedefleri</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{linkedBG.length} Hedef</div>
+              </div>
 
-            {p >= 100 && <div style={{ marginTop: 8, fontSize: 11, color: '#16a34a', fontWeight: 600 }}>🏆 +30 XP — Hedef tamamlandı!</div>}
+              {linkedBG.length === 0 ? (
+                <button onClick={() => onLinkBirim(kg)} style={{ ...styles.birimAddPlaceholder, minHeight: 140 }}>
+                  <span style={styles.plusCircle}>+</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#6366f1' }}>Birim Hedefi Bağla</span>
+                </button>
+              ) : (
+                <div style={styles.birimRow}>
+                  {linkedBG.map(bg => {
+                    const bp = pct(Number(bg.current_value), Number(bg.target));
+                    const unit = U(bg.unit);
+                    const pgs = personalGoals.filter(pg => pg.birim_goal_id === bg.id);
 
-            {/* Linked birim goals */}
-            <div style={{ marginTop: 16 }}>
-              {linkedBG.map(bg => {
-                const bp = pct(Number(bg.current_value), Number(bg.target));
-                const unit = U(bg.unit);
-                const pgs = personalGoals.filter(pg => pg.birim_goal_id === bg.id);
+                    // Katkı payı = bu birim hedefinin hedef değerinin toplam içindeki oranı
+                    const contribution = totalTargetAll > 0 ? Number(bg.target || 0) / totalTargetAll : 1 / linkedBG.length;
 
-                return (
-                  <div key={bg.id} style={{ borderLeft: `3px solid ${unit.color}`, paddingLeft: 16, marginLeft: 12, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={styles.treeLabel}>{unit.icon} {unit.name}</div>
-                      <span onClick={() => onSwitchTab(1)} style={styles.linkBadge}>🔗 Birim</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{bg.title}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          Koordinatör: {unit.coord} · Hedef: {fmtN(Number(bg.target))} · Mevcut: {fmtN(Number(bg.current_value))}
-                          {deadlineBadge(bg.deadline, bp >= 100)}
-                        </div>
-                      </div>
-                      <span style={{ ...styles.badge, background: `${unit.color}18`, color: unit.color, fontWeight: 700 }}>{bp}%</span>
-                    </div>
-                    <div style={{ ...styles.progressRow, marginTop: 6 }}>
-                      <div style={{ ...styles.progressWrap, height: 6 }}><div style={{ ...styles.progressBar, width: `${bp}%`, background: unit.color }} /></div>
-                    </div>
-
-                    {/* Personal goals */}
-                    {pgs.map(pg => {
-                      const pp = pct(Number(pg.current_value), Number(pg.target));
-                      return (
-                        <div key={pg.id} style={{ borderLeft: `3px solid ${unit.color}44`, paddingLeft: 16, marginLeft: 16, marginTop: 10 }}>
+                    return (
+                      <div key={bg.id} style={{
+                        flexGrow: Math.max(contribution * 100, 1),
+                        flexShrink: 1,
+                        flexBasis: `${Math.max(contribution * 100, 22)}%`,
+                        minWidth: 220,
+                        background: `${unit.color}12`,
+                        border: `1px solid ${unit.color}33`,
+                        borderRadius: 16,
+                        padding: 16,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                      }}>
+                        {/* Üst: ikon + BİRİM etiketi + aksiyonlar */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ ...styles.avatar, background: pg.person_color || '#7c3aed' }}>{pg.person_initials || '?'}</span>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{pg.person_name} — {pg.title}</div>
-                              <div style={{ ...styles.progressRow, marginTop: 4 }}>
-                                <div style={{ ...styles.progressWrap, height: 5 }}><div style={{ ...styles.progressBar, width: `${pp}%`, background: pg.person_color || '#7c3aed' }} /></div>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: pg.person_color || '#7c3aed' }}>{Number(pg.current_value)}/{Number(pg.target)}</span>
-                              </div>
-                            </div>
-                            <button onClick={() => onEditPersonal(bg.id, pg)} style={{ ...styles.actionBtn, width: 24, height: 24 }}>✏️</button>
-                            <button onClick={() => onDeletePersonal(pg.id)} style={{ ...styles.actionBtn, ...styles.deleteBtn, width: 24, height: 24 }}>🗑️</button>
+                            <span style={{ fontSize: 18 }}>{unit.icon}</span>
+                            <span style={{
+                              background: '#fff', padding: '2px 10px', borderRadius: 10,
+                              fontSize: 9.5, fontWeight: 800, color: unit.color, letterSpacing: 0.6,
+                            }}>BİRİM</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <span onClick={() => onSwitchTab(1)} style={{ ...styles.linkBadge, fontSize: 9 }} title="Birim sekmesine git">🔗</span>
                           </div>
                         </div>
-                      );
-                    })}
-                    <button onClick={() => onAddPersonal(bg.id)} style={styles.addSubBtn}>+ Kişisel Hedef Ekle</button>
-                  </div>
-                );
-              })}
-              <button onClick={() => onLinkBirim(kg)} style={styles.addSubBtn}>+ Birim Hedefi Bağla</button>
+
+                        {/* Başlık */}
+                        <div style={{ fontSize: 14, fontWeight: 700, color: unit.color, marginBottom: 10, minHeight: 36 }}>
+                          {bg.title}
+                        </div>
+
+                        {/* Donut */}
+                        <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 14px' }}>
+                          <Donut percent={bp} color={unit.color} size={98} stroke={9} />
+                        </div>
+
+                        {/* Stats */}
+                        <div style={{ fontSize: 12, color: unit.color, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.8 }}>Hedef:</span>
+                            <strong>{fmtN(Number(bg.target))}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.8 }}>Mevcut:</span>
+                            <strong>{fmtN(Number(bg.current_value))}</strong>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.8 }}>Koordinatör:</span>
+                            <strong>{unit.coord}</strong>
+                          </div>
+                          {totalTargetAll > 0 && Number(bg.target) > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.85 }}>
+                              <span style={{ opacity: 0.8 }}>Katkı payı:</span>
+                              <strong>{Math.round(contribution * 100)}%</strong>
+                            </div>
+                          )}
+                          {bg.deadline && (
+                            <div style={{ marginTop: 2 }}>{deadlineBadge(bg.deadline, bp >= 100)}</div>
+                          )}
+                        </div>
+
+                        {/* Alt: birim adı + mini aksiyonlar */}
+                        <div style={{
+                          marginTop: 14, paddingTop: 10, borderTop: `1px dashed ${unit.color}55`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                        }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: unit.color, letterSpacing: 0.8 }}>
+                            {unit.name.toUpperCase()}
+                          </span>
+                          {pgs.length > 0 && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, color: unit.color,
+                              background: '#fff', padding: '2px 8px', borderRadius: 8, border: `1px solid ${unit.color}33`,
+                            }} title="Bağlı kişisel hedefler">👥 {pgs.length}</span>
+                          )}
+                        </div>
+
+                        {/* Kişisel hedefler (kompakt) */}
+                        {pgs.length > 0 && (
+                          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {pgs.map(pg => {
+                              const pp = pct(Number(pg.current_value), Number(pg.target));
+                              return (
+                                <div key={pg.id} style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  background: '#fff', border: `1px solid ${unit.color}22`,
+                                  padding: '6px 8px', borderRadius: 10,
+                                }}>
+                                  <span style={{ ...styles.avatar, background: pg.person_color || '#7c3aed', width: 20, height: 20, fontSize: 9 }}>
+                                    {pg.person_initials || '?'}
+                                  </span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {pg.person_name}
+                                    </div>
+                                    <div style={{ ...styles.progressWrap, height: 4, marginTop: 3 }}>
+                                      <div style={{ ...styles.progressBar, width: `${pp}%`, background: pg.person_color || '#7c3aed' }} />
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: pg.person_color || '#7c3aed' }}>{pp}%</span>
+                                  <button onClick={() => onEditPersonal(bg.id, pg)} style={{ ...styles.actionBtn, width: 20, height: 20, fontSize: 10 }}>✏️</button>
+                                  <button onClick={() => onDeletePersonal(pg.id)} style={{ ...styles.actionBtn, ...styles.deleteBtn, width: 20, height: 20, fontSize: 10 }}>🗑️</button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <button onClick={() => onAddPersonal(bg.id)} style={{ ...styles.addSubBtn, marginTop: 8, fontSize: 11 }}>
+                          + Kişisel Hedef
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Birim ekle placeholder'ı — orantılı grid'e girsin diye küçük flex payı */}
+                  <button onClick={() => onLinkBirim(kg)} style={styles.birimAddPlaceholder}>
+                    <span style={styles.plusCircle}>+</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#6366f1' }}>Birim Hedefi Ekle</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
       })}
     </>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// DONUT — küçük SVG ring
+// ═══════════════════════════════════════════════════
+function Donut({ percent, color, size = 96, stroke = 9 }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, percent || 0));
+  const offset = c - (clamped / 100) * c;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={offset}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+      />
+      <text
+        x="50%" y="50%" textAnchor="middle" dominantBaseline="central"
+        fontSize={size * 0.26} fontWeight="800" fill={color} fontFamily="inherit"
+      >{clamped}%</text>
+    </svg>
   );
 }
 
@@ -1002,6 +1163,66 @@ const styles = {
   card: {
     background: 'var(--bg-card)', border: '1px solid var(--border)',
     borderRadius: 14, padding: 20, marginBottom: 16, transition: 'box-shadow 0.2s',
+  },
+  // ── Yeni departman çerçevesi ──
+  deptFrame: {
+    borderRadius: 22, overflow: 'hidden', marginBottom: 24,
+    boxShadow: '0 4px 20px rgba(15,23,42,0.06)',
+    border: '1px solid var(--border)',
+    background: 'var(--bg-card)',
+  },
+  deptBanner: {
+    color: '#fff', padding: '22px 26px', position: 'relative',
+  },
+  deptChip: {
+    background: 'rgba(255,255,255,0.22)', padding: '4px 10px', borderRadius: 999,
+    fontSize: 9.5, fontWeight: 800, letterSpacing: 1, color: '#fff',
+  },
+  deptStatusChip: {
+    background: 'rgba(255,255,255,0.32)', padding: '4px 10px', borderRadius: 999,
+    fontSize: 10.5, fontWeight: 700, color: '#fff',
+  },
+  deptTitle: {
+    fontSize: 24, fontWeight: 800, margin: 0, marginBottom: 6, lineHeight: 1.2,
+    overflowWrap: 'anywhere',
+  },
+  deptMeta: {
+    fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+    opacity: 0.95,
+  },
+  deptPct: {
+    fontSize: 46, fontWeight: 900, lineHeight: 1, letterSpacing: -1,
+  },
+  deptIconBtn: {
+    width: 28, height: 28, borderRadius: 8, border: 'none',
+    background: 'rgba(255,255,255,0.22)', color: '#fff', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 12, transition: 'background 0.15s',
+  },
+  deptProgressWrap: {
+    marginTop: 16, height: 8, background: 'rgba(255,255,255,0.28)',
+    borderRadius: 999, overflow: 'hidden',
+  },
+  deptProgressBar: {
+    height: '100%', background: '#fff', borderRadius: 999,
+    transition: 'width 0.6s ease',
+  },
+  deptBody: { padding: 22, background: 'var(--bg-card)' },
+  birimRow: {
+    display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'stretch',
+  },
+  birimAddPlaceholder: {
+    flexGrow: 0.5, flexShrink: 1, flexBasis: '18%',
+    minWidth: 200, minHeight: 240,
+    border: '2px dashed var(--border)', borderRadius: 16,
+    background: 'transparent', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 8, fontFamily: 'inherit', transition: 'all 0.15s',
+  },
+  plusCircle: {
+    width: 40, height: 40, borderRadius: '50%', background: '#e0e7ff',
+    color: '#6366f1', fontSize: 22, fontWeight: 700,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   kpiStrip: { display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
   descBox: {
