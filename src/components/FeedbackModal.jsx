@@ -107,8 +107,21 @@ export default function FeedbackModal({ user, profile, onClose, onSubmitted }) {
 
   const handleSubmit = async () => {
     if (submitting) return;
-    if (!title.trim()) { setError('Başlık gerekli'); return; }
-    if (!description.trim()) { setError('Açıklama gerekli'); return; }
+    if (!title.trim()) {
+      setError('Başlık alanı zorunlu — lütfen doldurun.');
+      window.setTimeout(() => {
+        const el = document.querySelector('[data-feedback-skip] input[type="text"]');
+        if (el) { el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      }, 50);
+      return;
+    }
+    if (!description.trim()) {
+      setError('Açıklama alanı zorunlu — lütfen doldurun.');
+      window.setTimeout(() => {
+        if (descRef.current) { descRef.current.focus(); descRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      }, 50);
+      return;
+    }
     if (!user?.id) { setError('Oturum bulunamadı'); return; }
     setSubmitting(true); setError('');
     try {
@@ -241,7 +254,9 @@ export default function FeedbackModal({ user, profile, onClose, onSubmitted }) {
           </div>
 
           {/* Başlık */}
-          <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Başlık</div>
+          <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Başlık <span style={{ color: '#dc2626' }}>*</span>
+          </div>
           <input
             type="text"
             value={title}
@@ -250,14 +265,17 @@ export default function FeedbackModal({ user, profile, onClose, onSubmitted }) {
             maxLength={180}
             style={{
               width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-              borderRadius: 8, border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+              borderRadius: 8,
+              border: `1.5px solid ${!title.trim() && error ? '#dc2626' : 'var(--border, rgba(0,0,0,0.15))'}`,
               background: 'var(--bg, #fff)', color: 'inherit',
               fontSize: 14, fontFamily: 'inherit', marginBottom: 14, outline: 'none',
             }}
           />
 
           {/* Açıklama */}
-          <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Açıklama</div>
+          <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Açıklama <span style={{ color: '#dc2626' }}>*</span>
+          </div>
           <textarea
             ref={descRef}
             value={description}
@@ -269,7 +287,8 @@ export default function FeedbackModal({ user, profile, onClose, onSubmitted }) {
             rows={6}
             style={{
               width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-              borderRadius: 8, border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+              borderRadius: 8,
+              border: `1.5px solid ${!description.trim() && error ? '#dc2626' : 'var(--border, rgba(0,0,0,0.15))'}`,
               background: 'var(--bg, #fff)', color: 'inherit',
               fontSize: 14, fontFamily: 'inherit', marginBottom: 14,
               outline: 'none', resize: 'vertical', minHeight: 120,
