@@ -1984,32 +1984,6 @@ export default function Agendas({ user, profile, linkedAgendaId, onClearLinkedAg
         )}
       </div>
 
-      {/* Tür pill filtreleri */}
-      {agendaTypes.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-          <button onClick={() => setFilterType('all')}
-            style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
-              border: `2px solid ${filterType === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-              background: filterType === 'all' ? 'var(--accent)' : 'var(--bg-card)',
-              color: filterType === 'all' ? '#fff' : 'var(--text)', fontWeight: filterType === 'all' ? 700 : 400 }}>
-            Tümü ({filteredAgendas.length})
-          </button>
-          {agendaTypes.map(t => {
-            const cnt = filteredAgendas.filter(a => a.type_id === t.id).length;
-            const isActive = filterType === t.id;
-            return (
-              <button key={t.id} onClick={() => setFilterType(isActive ? 'all' : t.id)}
-                style={{ padding: '5px 13px', borderRadius: 20, fontSize: 12, cursor: 'pointer', flexShrink: 0,
-                  border: `2px solid ${isActive ? t.color : 'var(--border)'}`,
-                  background: isActive ? t.color : 'var(--bg-card)',
-                  color: isActive ? '#fff' : 'var(--text)', fontWeight: isActive ? 700 : 400 }}>
-                {t.icon} {t.name} ({cnt})
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* İçerik */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
