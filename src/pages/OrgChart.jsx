@@ -953,16 +953,31 @@ export default function OrgChart({ user, profile, onNavigate, defaultTab }) {
         </div>
       </div>
 
-      {/* Direktör kartı + Yönetici Asistanı */}
+      {/* Direktör Ofisi — Direktör + Yönetici Asistanı(ları) */}
       {headProfile && !q && (
-        <DirectorCard
-          profile={headProfile}
-          label={ROLE_LABELS[headProfile.role] || 'Direktör'}
-          assistants={profiles.filter(p => p.role === 'asistan' && p.user_id !== headProfile.user_id)}
-          isDirektor={isDirektor}
-          allProfiles={profiles}
-          onReload={loadData}
-        />
+        <div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            margin: '0 0 10px 2px',
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              color: 'var(--navy)', letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}>
+              🏛 Direktör Ofisi
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+          <DirectorCard
+            profile={headProfile}
+            label={ROLE_LABELS[headProfile.role] || 'Direktör'}
+            assistants={profiles.filter(p => p.role === 'asistan' && p.user_id !== headProfile.user_id)}
+            isDirektor={isDirektor}
+            allProfiles={profiles}
+            onReload={loadData}
+          />
+        </div>
       )}
 
       {/* Birim kartları */}
