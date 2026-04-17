@@ -378,12 +378,17 @@ export default function FeedbackModal({ user, profile, onClose, onSubmitted }) {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !title.trim() || !description.trim()}
+            disabled={submitting}
             style={{
               padding: '9px 18px', borderRadius: 8, border: 'none',
-              background: submitting ? 'rgba(0,0,0,0.25)' : 'var(--navy, #1a3a5c)',
+              background: submitting
+                ? 'rgba(0,0,0,0.25)'
+                : (!title.trim() || !description.trim())
+                  ? 'rgba(26,58,92,0.45)'
+                  : 'var(--navy, #1a3a5c)',
               color: '#fff', fontSize: 13, fontWeight: 700,
               cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: (!title.trim() || !description.trim()) && !submitting ? 0.75 : 1,
             }}
           >
             {submitting ? '⏳ Gönderiliyor…' : '📤 Gönder'}
