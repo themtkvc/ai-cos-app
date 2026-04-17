@@ -330,11 +330,12 @@ export default function Goals({ user, profile }) {
   };
 
   const openKRForm = (objectiveId, editKR = null, unitKey = null, period = null) => {
-    const available = birimGoals.filter(b => b.unit === unitKey && (b.period === period || b.period === '2026'));
     openModal(editKR ? 'Anahtar Sonuç Düzenle' : 'Anahtar Sonuç Ekle',
       <KeyResultForm
         initial={editKR}
-        availableBirim={available}
+        availableBirim={birimGoals}
+        objectiveUnit={unitKey}
+        objectivePeriod={period}
         birimGoals={birimGoals}
         onSave={(data) => handleSaveKR(data, objectiveId, editKR?.id)}
         onCancel={closeModal}
@@ -1078,7 +1079,7 @@ function OKRForm({ initial, activePeriod, onSave, onCancel }) {
   );
 }
 
-function KeyResultForm({ initial, availableBirim, birimGoals, onSave, onCancel }) {
+function KeyResultForm({ initial, availableBirim, objectiveUnit, objectivePeriod, birimGoals, onSave, onCancel }) {
   const [title, setTitle] = useState(initial?.title || '');
   const [linkedBirimId, setLinkedBirimId] = useState(initial?.linked_birim_id || '');
   const [target, setTarget] = useState(initial?.target || '');
@@ -1087,15 +1088,50 @@ function KeyResultForm({ initial, availableBirim, birimGoals, onSave, onCancel }
 
   const hasLink = !!linkedBirimId;
 
+  // Bağlanabilir birim hedeflerini gruplandır: aynı birim (önerilen) üstte, diğer birimler altta optgroup olarak.
+  const sameUnitGoals = availableBirim.filter(b => b.unit === objectiveUnit);
+  const otherUnitGoals = availableBirim.filter(b => b.unit !== objectiveUnit);
+  const otherUnitsGrouped = UNITS
+    .filter(u => u.key !== objectiveUnit)
+    .map(u => ({ unit: u, goals: otherUnitGoals.filter(b => b.unit === u.key) }))
+    .filter(g => g.goals.length > 0);
+  const objUnitInfo = objectiveUnit ? U(objectiveUnit) : null;
+  const showNoBirim = availableBirim.length === 0;
+
+  const renderOption = (b) => {
+    const label = `🔗 ${b.title} (${fmtN(Number(b.current_value))}/${fmtN(Number(b.target))})${b.period ? ` · ${b.period}` : ''}`;
+    return <option key={b.id} value={b.id}>{label}</option>;
+  };
+
   return (
     <>
       <div style={styles.formGroup}><label style={styles.formLabel}>Başlık</label>
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ölçülebilir sonuç" style={styles.formInput} /></div>
-      <div style={styles.formGroup}><label style={styles.formLabel}>Birim Hedefine Bağla (opsiyonel)</label>
+      <div style={styles.formGroup}>
+        <label style={styles.formLabel}>Birim Hedefine Bağla (opsiyonel)</label>
         <select value={linkedBirimId} onChange={e => setLinkedBirimId(e.target.value)} style={styles.formInput}>
           <option value="">— Bağlantısız (manuel değer) —</option>
-          {availableBirim.map(b => <option key={b.id} value={b.id}>🔗 {b.title} ({fmtN(Number(b.current_value))}/{fmtN(Number(b.target))})</option>)}
-        </select></div>
+          {sameUnitGoals.length > 0 && (
+            <optgroup label={`${objUnitInfo ? objUnitInfo.icon + ' ' + objUnitInfo.name.toUpperCase() : 'Aynı birim'} (önerilen)`}>
+              {sameUnitGoals.map(renderOption)}
+            </optgroup>
+          )}
+          {otherUnitsGrouped.map(({ unit, goals }) => (
+            <optgroup key={unit.key} label={`${unit.icon} ${unit.name.toUpperCase()}`}>
+              {goals.map(renderOption)}
+            </optgroup>
+          ))}
+        </select>
+        {showNoBirim ? (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            Henüz birim hedefi yok. Önce <strong>Birim Hedefleri</strong> sekmesinden ekleyebilirsin — ya da aşağıdan manuel hedef/mevcut girerek devam et.
+          </div>
+        ) : sameUnitGoals.length === 0 && objUnitInfo ? (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            {objUnitInfo.icon} {objUnitInfo.name} biriminde hedef yok. Farklı birimdeki hedeflere de bağlanabilirsin.
+          </div>
+        ) : null}
+      </div>
       {!hasLink && (
         <>
           <div style={styles.formRow}>
