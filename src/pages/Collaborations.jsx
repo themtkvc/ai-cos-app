@@ -40,7 +40,7 @@ export default function Collaborations({ user, profile }) {
   const [typeFilter, setTypeFilter]   = useState('all');
   const [unitFilter, setUnitFilter]   = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
-  const [statusFilter, setStatusFilter]   = useState('active');
+  const [statusFilter, setStatusFilter]   = useState('all');
   const [search, setSearch] = useState('');
 
   const [editing, setEditing] = useState(null); // {} or {unit: 'X'} for new, row for edit
