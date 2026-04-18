@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { updateUserProfile, updateAuthEmail, updateAuthPassword, uploadAvatar, awardXP, supabase } from '../lib/supabase';
+import { updateUserProfile, updateAuthEmail, updateAuthPassword, uploadAvatar, awardXP, supabase, validateUploadFile, MAX_AVATAR_BYTES } from '../lib/supabase';
 import { ROLE_LABELS } from '../lib/constants';
 
 // ── AVATAR BILEŞENI (yeniden kullanılabilir) ──────────────────────────────────
@@ -113,8 +113,10 @@ export default function ProfileSettings({ user, profile, onProfileUpdate }) {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setErrors({ avatar: 'Dosya boyutu 5 MB\'dan küçük olmalı.' });
+    const v = validateUploadFile(file, { maxBytes: MAX_AVATAR_BYTES, kind: 'avatar' });
+    if (!v.ok) {
+      setErrors({ avatar: v.error });
+      e.target.value = '';
       return;
     }
     setAvatarFile(file);

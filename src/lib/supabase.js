@@ -1898,6 +1898,52 @@ export const getAllUserProfiles = async () => {
   return { data: data || [], error };
 };
 
+// ── DOSYA GÜVENLİK DOĞRULAMASI (istemci tarafı) ──
+// Edge function / RLS'e ek olarak kullanıcıyı erken uyarmak için kullanılır.
+// Güvenliği tek başına garanti etmez — sunucu her zaman kendi kontrolünü yapar.
+export const BLOCKED_FILE_EXTENSIONS = [
+  'exe','bat','cmd','com','msi','ps1','vbs','vbe','js','jse','wsf','wsh','scr',
+  'sh','bash','zsh','jar','apk','ipa','dmg','app','lnk','reg','pif','hta','cpl',
+  'deb','rpm','msp',
+];
+
+export const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024; // 100 MB
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const IMAGE_MIME_TYPES = [
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'
+];
+
+/**
+ * Validate a file before upload. Returns { ok: true } or { ok: false, error }.
+ * Accepts options { maxBytes, kind: 'document'|'image'|'avatar' }.
+ */
+export function validateUploadFile(file, { maxBytes = MAX_DOCUMENT_BYTES, kind = 'document' } = {}) {
+  if (!file || typeof file !== 'object') {
+    return { ok: false, error: 'Geçersiz dosya.' };
+  }
+  if (typeof file.size !== 'number' || file.size <= 0) {
+    return { ok: false, error: 'Dosya boş veya okunamadı.' };
+  }
+  if (file.size > maxBytes) {
+    const mb = Math.round(maxBytes / (1024 * 1024));
+    return { ok: false, error: `Dosya çok büyük. En fazla ${mb} MB olabilir.` };
+  }
+  const name = (file.name || '').toLowerCase();
+  const ext = name.includes('.') ? name.split('.').pop() : '';
+  if (ext && BLOCKED_FILE_EXTENSIONS.includes(ext)) {
+    return { ok: false, error: `Güvenlik nedeniyle .${ext} uzantılı dosyalar yüklenemez.` };
+  }
+  if (kind === 'image' || kind === 'avatar') {
+    const mime = (file.type || '').toLowerCase();
+    if (!mime.startsWith('image/') || (mime && !IMAGE_MIME_TYPES.includes(mime))) {
+      return { ok: false, error: 'Sadece JPG, PNG, WebP, GIF veya HEIC görseller yüklenebilir.' };
+    }
+  }
+  return { ok: true };
+}
+
 // ── GOOGLE DRIVE UPLOAD (Documents modülü) ──
 // Dosyayı drive-upload edge function'ına XHR ile POST eder ve progress callback'i tetikler.
 // Başarılıda { fileId, name, mimeType, size, webViewLink, webContentLink } döner.

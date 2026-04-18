@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase, logActivity, uploadDocumentToDrive, deleteDocumentFromDrive } from '../lib/supabase';
+import { supabase, logActivity, uploadDocumentToDrive, deleteDocumentFromDrive, validateUploadFile, MAX_DOCUMENT_BYTES } from '../lib/supabase';
 import { useProfile } from '../App';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -276,10 +276,23 @@ function UploadModal({ onClose, onUpload }) {
           onClick={() => document.getElementById('doc-file-input')?.click()}
           onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--navy)'; }}
           onDragLeave={e => { e.currentTarget.style.borderColor = file ? (t?.color || 'var(--border)') : 'var(--border)'; }}
-          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setFile(f); setTitle(stripExt(f.name)); } }}
+          onDrop={e => {
+            e.preventDefault();
+            const f = e.dataTransfer.files[0];
+            if (!f) return;
+            const v = validateUploadFile(f, { maxBytes: MAX_DOCUMENT_BYTES, kind: 'document' });
+            if (!v.ok) { alert(v.error); return; }
+            setFile(f); setTitle(stripExt(f.name));
+          }}
         >
           <input id="doc-file-input" type="file" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0] || null; setFile(f); if (f) setTitle(stripExt(f.name)); }} />
+            onChange={e => {
+              const f = e.target.files?.[0] || null;
+              if (!f) { setFile(null); return; }
+              const v = validateUploadFile(f, { maxBytes: MAX_DOCUMENT_BYTES, kind: 'document' });
+              if (!v.ok) { alert(v.error); e.target.value = ''; setFile(null); return; }
+              setFile(f); setTitle(stripExt(f.name));
+            }} />
           {file ? (
             <>
               <div style={{ fontSize: 34, marginBottom: 6 }}>{t.icon}</div>
