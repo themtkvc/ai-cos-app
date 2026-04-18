@@ -2091,6 +2091,9 @@ export const COLLAB_TYPES = [
   { id: 'egitim',       label: 'Eğitim',       icon: '🎓', color: '#0891b2' },
   { id: 'savunuculuk',  label: 'Savunuculuk',  icon: '📣', color: '#dc2626' },
   { id: 'yayin',        label: 'Yayın',        icon: '📄', color: '#475569' },
+  { id: 'uyelik',       label: 'Üyelik',       icon: '🪪', color: '#db2777' },
+  { id: 'akreditasyon', label: 'Akreditasyon', icon: '🏅', color: '#ca8a04' },
+  { id: 'koordinasyon', label: 'Koordinasyon', icon: '🧭', color: '#0d9488' },
   { id: 'diger',        label: 'Diğer',        icon: '🔗', color: '#6b7280' },
 ];
 
