@@ -505,10 +505,29 @@ function ByPartnerView({ rows, onOpen }) {
 }
 
 // ── Kart ─────────────────────────────────────────────────────────────────────
+function formatBudget(row) {
+  if (row.budget_amount == null || row.budget_amount === '') return null;
+  const cur = row.budget_currency || 'TRY';
+  const sym = { TRY: '₺', USD: '$', EUR: '€', GBP: '£' }[cur] || cur;
+  const n = Number(row.budget_amount);
+  if (!Number.isFinite(n)) return null;
+  return `${sym}${n.toLocaleString('tr-TR')}`;
+}
+
+function formatDateRange(row) {
+  if (!row.start_date && !row.end_date) return null;
+  if (row.start_date && row.end_date && row.start_date !== row.end_date) {
+    return `${fmtDisplayDate(row.start_date)} → ${fmtDisplayDate(row.end_date)}`;
+  }
+  return fmtDisplayDate(row.start_date || row.end_date);
+}
+
 function CollabCard({ row, onOpen, compact = false }) {
   const t = typeObj(row.type);
   const s = statusObj(row.status);
   const u = unitObj(row.unit);
+  const budget = formatBudget(row);
+  const dateStr = formatDateRange(row);
   return (
     <div
       onClick={onOpen}
@@ -563,10 +582,42 @@ function CollabCard({ row, onOpen, compact = false }) {
             {u.icon} <span style={{ color: u.color, fontWeight: 600 }}>{u.name}</span>
           </div>
         )}
-        <div style={{ fontSize: 11, opacity: 0.6, display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 'auto' }}>
-          {row.start_date && <span>📅 {fmtDisplayDate(row.start_date)}</span>}
-          {!compact && row.owner_name && <span>👤 {row.owner_name}</span>}
-        </div>
+
+        {/* Meta bilgileri: bütçe, tarih, konum */}
+        {(budget || dateStr || row.location) && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2,
+          }}>
+            {budget && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 7px', borderRadius: 8,
+                background: 'rgba(22,163,74,0.12)', color: '#15803d',
+              }}>💰 {budget}</span>
+            )}
+            {dateStr && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: '3px 7px', borderRadius: 8,
+                background: 'rgba(37,99,235,0.1)', color: '#1d4ed8',
+              }}>📅 {dateStr}</span>
+            )}
+            {row.location && (
+              <span
+                title={row.location}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: '3px 7px', borderRadius: 8,
+                  background: 'rgba(147,51,234,0.1)', color: '#7e22ce',
+                  maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >📍 {row.location}</span>
+            )}
+          </div>
+        )}
+
+        {!compact && row.owner_name && (
+          <div style={{ fontSize: 11, opacity: 0.55, marginTop: 'auto' }}>
+            👤 {row.owner_name}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -627,6 +678,7 @@ function CollabDetailModal({ row, profile, onClose, onEdit, onDeleted }) {
         <Section title="Zaman & Durum">
           {row.start_date && <Field label="Başlangıç" value={fmtDisplayDate(row.start_date)} />}
           {row.end_date   && <Field label="Bitiş"     value={fmtDisplayDate(row.end_date)} />}
+          {row.location   && <Field label="Konum"     value={`📍 ${row.location}`} />}
           {row.budget_amount != null && (
             <Field label="Bütçe" value={`${Number(row.budget_amount).toLocaleString('tr-TR')} ${row.budget_currency || 'TRY'}`} />
           )}
@@ -689,6 +741,7 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
     status:                  row?.status || 'planlaniyor',
     budget_amount:           row?.budget_amount ?? '',
     budget_currency:         row?.budget_currency || 'TRY',
+    location:                row?.location || '',
     tags:                    (row?.tags || []).join(', '),
     image_url:               row?.image_url || '',
   });
@@ -755,6 +808,7 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
       status:                 form.status,
       budget_amount:          form.budget_amount === '' ? null : Number(form.budget_amount),
       budget_currency:        form.budget_currency || 'TRY',
+      location:               form.location.trim() || null,
       tags:                   form.tags.split(',').map(x => x.trim()).filter(Boolean),
       image_url:              form.image_url || null,
     };
@@ -866,6 +920,8 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
             <option value="GBP">GBP (£)</option>
           </LabeledSelect>
         </div>
+
+        <LabeledInput label="Konum" value={form.location} onChange={v => set('location', v)} placeholder="Örn: İstanbul / Çevrimiçi / Gaziantep, Türkiye" />
 
         <LabeledInput label="Etiketler (virgülle ayırın)" value={form.tags} onChange={v => set('tags', v)} placeholder="çocuk, sağlık, gaziantep" />
 
