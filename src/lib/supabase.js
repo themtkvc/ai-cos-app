@@ -2077,3 +2077,57 @@ export const uploadFeedbackScreenshot = async (dataUrlOrBlob, userId) => {
   const { data: pub } = supabase.storage.from('feedback-screenshots').getPublicUrl(path);
   return pub?.publicUrl || null;
 };
+
+// ── COLLABORATIONS MODÜLÜ (İşbirlikleri) ─────────────────────────────
+// Tüm birimlerin etkinlik/fon/proje/araştırma vb. işbirliklerini
+// ortak bir yerde takip eder. Herkes görür; sahip + koordinatör +
+// direktör düzenler.
+
+export const COLLAB_TYPES = [
+  { id: 'etkinlik',     label: 'Etkinlik',     icon: '📅', color: '#2563eb' },
+  { id: 'fon',          label: 'Fon / Hibe',   icon: '💰', color: '#eab308' },
+  { id: 'proje',        label: 'Proje',        icon: '🚀', color: '#16a34a' },
+  { id: 'arastirma',    label: 'Araştırma',    icon: '🔬', color: '#9333ea' },
+  { id: 'egitim',       label: 'Eğitim',       icon: '🎓', color: '#0891b2' },
+  { id: 'savunuculuk',  label: 'Savunuculuk',  icon: '📣', color: '#dc2626' },
+  { id: 'yayin',        label: 'Yayın',        icon: '📄', color: '#475569' },
+  { id: 'diger',        label: 'Diğer',        icon: '🔗', color: '#6b7280' },
+];
+
+export const COLLAB_STATUSES = [
+  { id: 'planlaniyor', label: 'Planlanıyor', color: '#6366f1' },
+  { id: 'aktif',       label: 'Aktif',       color: '#16a34a' },
+  { id: 'beklemede',   label: 'Beklemede',   color: '#eab308' },
+  { id: 'tamamlandi',  label: 'Tamamlandı',  color: '#475569' },
+  { id: 'iptal',       label: 'İptal',       color: '#dc2626' },
+];
+
+export const getCollaborations = async (filters = {}) => {
+  let q = supabase.from('collaborations').select('*').order('created_at', { ascending: false });
+  if (filters.type)   q = q.eq('type', filters.type);
+  if (filters.unit)   q = q.eq('unit', filters.unit);
+  if (filters.status) q = q.eq('status', filters.status);
+  if (filters.ownerId) q = q.eq('owner_id', filters.ownerId);
+  if (filters.q) {
+    const s = `%${filters.q}%`;
+    q = q.or(`title.ilike.${s},description.ilike.${s},partner_name.ilike.${s}`);
+  }
+  const { data, error } = await q;
+  return { data: data || [], error };
+};
+
+export const getCollaboration = async (id) => {
+  return await supabase.from('collaborations').select('*').eq('id', id).single();
+};
+
+export const createCollaboration = async (payload) => {
+  return await supabase.from('collaborations').insert([payload]).select().single();
+};
+
+export const updateCollaboration = async (id, updates) => {
+  return await supabase.from('collaborations').update(updates).eq('id', id).select().single();
+};
+
+export const deleteCollaboration = async (id) => {
+  return await supabase.from('collaborations').delete().eq('id', id);
+};

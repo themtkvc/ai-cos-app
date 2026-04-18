@@ -28,6 +28,7 @@ const ALL_NAV = [
   { id: 'capacity',         icon: '📚', label: 'Kapasite Geliştirme' },
   { id: 'activities',       icon: '📊', label: 'Aktiviteler' },
   { id: 'goals',            icon: '🎯', label: 'Hedefler' },
+  { id: 'collaborations',   icon: '🤝', label: 'İşbirlikleri' },
   { id: 'policy',           icon: '⚖️', label: 'Politikalar ve Yönetişim' },
   { id: 'emails',           icon: '📧', label: 'Mailler' },
   { id: 'feedback',         icon: '💬', label: 'Geri Bildirim' },

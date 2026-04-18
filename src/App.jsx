@@ -31,6 +31,7 @@ import Goals from './pages/Goals';
 import PolicyGovernance from './pages/PolicyGovernance';
 import PublicFormFill from './pages/PublicFormFill';
 import Feedback from './pages/Feedback';
+import Collaborations from './pages/Collaborations';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import AIChatPanel from './components/AIChatPanel';
@@ -47,11 +48,11 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','policy','emails','feedback','admin','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','policy','profile'],
-  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
-  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','collaborations','policy','emails','feedback','admin','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','policy','profile'],
+  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
 };
 
 // Politika birimi üyeleri (rolden bağımsız) "policy" sayfasına erişebilir.
@@ -330,6 +331,7 @@ export default function App() {
     policy:           PolicyGovernance,
     emails:           SystemEmails,
     feedback:         Feedback,
+    collaborations:   Collaborations,
     admin:     Admin,
   };
 
@@ -360,6 +362,7 @@ export default function App() {
     direktor_agendas: '🗂 Direktör Gündemleri',
     goals:      '🎯 Hedefler',
     policy:     '⚖️ Politikalar ve Yönetişim',
+    collaborations: '🤝 İşbirlikleri',
     feedback:   '💬 Geri Bildirim',
     profile:    '⚙️ Profil',
     admin:      '⚙️ Admin',
