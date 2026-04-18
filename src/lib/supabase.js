@@ -2131,3 +2131,85 @@ export const updateCollaboration = async (id, updates) => {
 export const deleteCollaboration = async (id) => {
   return await supabase.from('collaborations').delete().eq('id', id);
 };
+
+// ── İŞBİRLİĞİ GÖRSEL YÜKLEME (< 3MB otomatik küçültme) ─────────────────────
+// Tarayıcıda canvas ile ölçeklendirir; 3MB altına inene kadar boyut/kalite düşürür.
+export const MAX_COLLAB_IMAGE_BYTES = 3 * 1024 * 1024; // 3 MB
+const COLLAB_IMAGE_BUCKET = 'collaboration-images';
+
+/**
+ * Görseli 3MB altına sıkıştırır. JPEG'e çevirir (transparanlık kaybolur).
+ * GIF/animasyonlar için sıkıştırma yapılmaz; > 3MB ise reddeder.
+ */
+async function resizeImageUnder3MB(file) {
+  // Animasyonlu/özel formatlar: canvas'a çizemeyiz, olduğu gibi geri döner.
+  if (file.type === 'image/gif') {
+    if (file.size <= MAX_COLLAB_IMAGE_BYTES) return file;
+    throw new Error('GIF dosyası 3MB\'tan büyük; lütfen daha küçük bir dosya seçin.');
+  }
+
+  // Küçük dosya: dokunma
+  if (file.size <= MAX_COLLAB_IMAGE_BYTES) return file;
+
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  let quality  = 0.88;
+  let maxSide  = Math.max(width, height);
+
+  // En fazla 8 iterasyon
+  for (let i = 0; i < 8; i++) {
+    // Max tarafı 2400'e indirilerek başlar, sonraki turlarda %85
+    const scale = Math.min(1, maxSide / Math.max(width, height));
+    const w = Math.round(width  * scale);
+    const h = Math.round(height * scale);
+    const canvas = (typeof OffscreenCanvas !== 'undefined')
+      ? new OffscreenCanvas(w, h)
+      : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    if ('width' in canvas) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bitmap, 0, 0, w, h);
+
+    const blob = canvas.convertToBlob
+      ? await canvas.convertToBlob({ type: 'image/jpeg', quality })
+      : await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+
+    if (blob && blob.size <= MAX_COLLAB_IMAGE_BYTES) {
+      return new File([blob], (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+    // Küçültmeye devam
+    if (maxSide > 1200)      maxSide = Math.round(maxSide * 0.85);
+    else if (quality > 0.5)  quality = Math.max(0.5, quality - 0.1);
+    else                     maxSide = Math.round(maxSide * 0.8);
+  }
+  throw new Error('Görsel yeterince küçültülemedi. Lütfen farklı bir dosya deneyin.');
+}
+
+/** Sıkıştırır ve Supabase Storage'a yükler; public URL döndürür. */
+export const uploadCollabImage = async (file, userId) => {
+  if (!file)   throw new Error('Dosya yok');
+  if (!file.type?.startsWith('image/')) throw new Error('Sadece görsel dosyalar kabul edilir.');
+
+  const compressed = await resizeImageUnder3MB(file);
+  const ext  = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${userId || 'anon'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(COLLAB_IMAGE_BUCKET)
+    .upload(path, compressed, { cacheControl: '3600', upsert: false, contentType: compressed.type });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(COLLAB_IMAGE_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, path, size: compressed.size };
+};
+
+/** Storage'dan görseli siler. URL veya path alabilir. */
+export const deleteCollabImage = async (urlOrPath) => {
+  if (!urlOrPath) return { error: null };
+  let path = urlOrPath;
+  const marker = `/${COLLAB_IMAGE_BUCKET}/`;
+  const idx = urlOrPath.indexOf(marker);
+  if (idx >= 0) path = urlOrPath.slice(idx + marker.length);
+  return await supabase.storage.from(COLLAB_IMAGE_BUCKET).remove([path]);
+};
