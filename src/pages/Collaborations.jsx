@@ -45,6 +45,7 @@ export default function Collaborations({ user, profile }) {
 
   const [editing, setEditing] = useState(null); // {} or {unit: 'X'} for new, row for edit
   const [viewId, setViewId]   = useState(null);
+  const [toast, setToast]     = useState('');
 
   const load = async () => {
     setLoading(true); setError('');
@@ -98,13 +99,28 @@ export default function Collaborations({ user, profile }) {
 
   const viewing = rows.find(r => r.id === viewId);
 
-  const handleSaved = (next) => {
+  const handleSaved = (next, { isNew } = {}) => {
     setRows(xs => {
       const idx = xs.findIndex(x => x.id === next.id);
       if (idx >= 0) { const n = xs.slice(); n[idx] = next; return n; }
       return [next, ...xs];
     });
     setEditing(null);
+
+    // Kayıt, mevcut filtrede görünmüyorsa filtreyi aç ki kullanıcı göstersin:
+    // - Durum 'tamamlandi'/'iptal' ise 'active' filtresi gizler → 'all' yap
+    // - Farklı birim / farklı tür / farklı partner ise → o filtreyi 'all' yap
+    const willBeHidden =
+      (statusFilter === 'active' && ['tamamlandi', 'iptal'].includes(next.status)) ||
+      (statusFilter !== 'active' && statusFilter !== 'all' && statusFilter !== next.status);
+    if (willBeHidden) setStatusFilter('all');
+    if (typeFilter !== 'all' && typeFilter !== next.type) setTypeFilter('all');
+    if (unitFilter !== 'all' && unitFilter !== resolveUnitName(next.unit)) setUnitFilter('all');
+    const partnerKey = next.partner_name || '(Partnersiz)';
+    if (partnerFilter !== 'all' && partnerFilter !== partnerKey) setPartnerFilter('all');
+
+    setToast(isNew ? '✅ İşbirliği oluşturuldu' : '✅ Değişiklik kaydedildi');
+    setTimeout(() => setToast(''), 2800);
   };
 
   return (
@@ -206,6 +222,15 @@ export default function Collaborations({ user, profile }) {
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
         />
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 11000, padding: '10px 18px', borderRadius: 10,
+          background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 700,
+          boxShadow: '0 10px 30px rgba(22,163,74,0.35)',
+        }}>{toast}</div>
       )}
 
       {viewing && (
@@ -740,11 +765,11 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
         payload.owner_name = profile?.full_name || user?.email || '—';
         const { data, error } = await createCollaboration(payload);
         if (error) throw error;
-        onSaved(data);
+        onSaved(data, { isNew: true });
       } else {
         const { data, error } = await updateCollaboration(row.id, payload);
         if (error) throw error;
-        onSaved(data);
+        onSaved(data, { isNew: false });
       }
     } catch (e) {
       console.error(e);
