@@ -2,9 +2,31 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   getCollaborations, createCollaboration, updateCollaboration, deleteCollaboration,
   uploadCollabImage, deleteCollabImage,
+  uploadDocumentToDrive, deleteDocumentFromDrive,
+  validateUploadFile, MAX_DOCUMENT_BYTES,
   COLLAB_TYPES, COLLAB_STATUSES,
 } from '../lib/supabase';
 import { UNITS, resolveUnitName, fmtDisplayDate } from '../lib/constants';
+
+// ── Drive dosya yardımcıları ────────────────────────────────────────────────
+const ATTACH_FILE_ICONS = {
+  pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗',
+  ppt: '📙', pptx: '📙', png: '🖼', jpg: '🖼', jpeg: '🖼',
+  gif: '🖼', webp: '🖼', svg: '🖼', txt: '📃', csv: '📊',
+  zip: '🗜', rar: '🗜',
+};
+const attachIcon = (name = '') => {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  return ATTACH_FILE_ICONS[ext] || '📎';
+};
+const formatFileSize = (bytes) => {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+};
 
 // ── Yardımcılar ──────────────────────────────────────────────────────────────
 const typeObj   = (id) => COLLAB_TYPES.find(t => t.id === id);
@@ -528,6 +550,7 @@ function CollabCard({ row, onOpen, compact = false }) {
   const u = unitObj(row.unit);
   const budget = formatBudget(row);
   const dateStr = formatDateRange(row);
+  const attachCount = Array.isArray(row.attachments) ? row.attachments.length : 0;
   return (
     <div
       onClick={onOpen}
@@ -584,7 +607,7 @@ function CollabCard({ row, onOpen, compact = false }) {
         )}
 
         {/* Meta bilgileri: bütçe, tarih, konum */}
-        {(budget || dateStr || row.location) && (
+        {(budget || dateStr || row.location || attachCount > 0) && (
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 2,
           }}>
@@ -609,6 +632,15 @@ function CollabCard({ row, onOpen, compact = false }) {
                   maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
               >📍 {row.location}</span>
+            )}
+            {attachCount > 0 && (
+              <span
+                title={`${attachCount} ek dosya`}
+                style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 7px', borderRadius: 8,
+                  background: 'rgba(55,65,81,0.12)', color: '#374151',
+                }}
+              >📎 {attachCount}</span>
             )}
           </div>
         )}
@@ -699,6 +731,49 @@ function CollabDetailModal({ row, profile, onClose, onEdit, onDeleted }) {
         </Section>
       )}
 
+      {Array.isArray(row.attachments) && row.attachments.length > 0 && (
+        <Section title={`Ek Dosyalar (${row.attachments.length})`}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {row.attachments.map((a) => (
+              <a
+                key={a.drive_file_id}
+                href={a.web_view_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 8,
+                  border: '1px solid var(--border, rgba(0,0,0,0.1))',
+                  background: 'var(--bg, #fff)', color: 'inherit',
+                  textDecoration: 'none',
+                }}
+              >
+                <div style={{ fontSize: 22 }}>{attachIcon(a.name)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    title={a.name}
+                    style={{
+                      fontSize: 13, fontWeight: 600,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >{a.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>
+                    {formatFileSize(a.size)}
+                    {a.uploaded_by_name ? ` · ${a.uploaded_by_name}` : ''}
+                    {a.uploaded_at ? ` · ${fmtDisplayDate(a.uploaded_at)}` : ''}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6,
+                  color: 'var(--navy, #1a3a5c)',
+                  border: '1px solid var(--border, rgba(0,0,0,0.15))',
+                }}>Drive'da Aç ↗</span>
+              </a>
+            ))}
+          </div>
+        </Section>
+      )}
+
       <div style={{ marginTop: 18, display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         {editable && (
           <>
@@ -745,11 +820,20 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
     tags:                    (row?.tags || []).join(', '),
     image_url:               row?.image_url || '',
   });
+  const [attachments, setAttachments] = useState(
+    Array.isArray(row?.attachments) ? row.attachments : []
+  );
+  // Bu oturumda yüklenen dosyalar (iptal edilirse Drive'dan temizlenir)
+  const [sessionUploadedIds, setSessionUploadedIds] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadInfo, setUploadInfo] = useState('');
+  const [attachUploading, setAttachUploading] = useState(false);
+  const [attachProgress, setAttachProgress] = useState(0);
+  const [attachErr, setAttachErr] = useState('');
   const [err, setErr] = useState('');
   const fileRef = useRef(null);
+  const attachFileRef = useRef(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -787,6 +871,82 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
     setUploadInfo('');
   };
 
+  // ── Drive eki: dosya seçimi ────────────────────────────────────────────────
+  const handlePickAttachment = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setAttachErr('');
+    for (const file of files) {
+      const v = validateUploadFile(file, { maxBytes: MAX_DOCUMENT_BYTES, kind: 'document' });
+      if (!v.ok) {
+        setAttachErr(`"${file.name}" yüklenemedi: ${v.error}`);
+        continue;
+      }
+      setAttachUploading(true);
+      setAttachProgress(0);
+      try {
+        const result = await uploadDocumentToDrive(file, {
+          onProgress: (p) => setAttachProgress(Math.round(p * 100)),
+        });
+        const meta = {
+          drive_file_id:    result.fileId,
+          name:             result.name || file.name,
+          mime_type:        result.mimeType || file.type || 'application/octet-stream',
+          size:             result.size || file.size,
+          web_view_link:    result.webViewLink,
+          web_content_link: result.webContentLink || null,
+          uploaded_at:      new Date().toISOString(),
+          uploaded_by:      user?.id || null,
+          uploaded_by_name: profile?.full_name || user?.email || '—',
+        };
+        setAttachments(prev => [...prev, meta]);
+        setSessionUploadedIds(prev => {
+          const n = new Set(prev); n.add(result.fileId); return n;
+        });
+      } catch (ex) {
+        console.error('[collab-attach] upload failed:', ex);
+        setAttachErr(`"${file.name}" yüklenemedi: ${ex.message || ex}`);
+      } finally {
+        setAttachUploading(false);
+        setAttachProgress(0);
+      }
+    }
+    e.target.value = '';
+  };
+
+  // ── Drive eki: kaldır ──────────────────────────────────────────────────────
+  const handleRemoveAttachment = async (att) => {
+    if (!window.confirm(`"${att.name}" kalıcı olarak silinecek (Drive dahil). Emin misiniz?`)) return;
+    let driveWarn = null;
+    try {
+      if (att.web_view_link) await deleteDocumentFromDrive(att.web_view_link);
+    } catch (ex) {
+      driveWarn = ex?.message || String(ex);
+      console.warn('[drive-delete] failed, proceeding with local removal:', driveWarn);
+    }
+    setAttachments(prev => prev.filter(a => a.drive_file_id !== att.drive_file_id));
+    setSessionUploadedIds(prev => {
+      const n = new Set(prev); n.delete(att.drive_file_id); return n;
+    });
+    if (driveWarn) {
+      setAttachErr("Drive'dan silinemedi ama listeden kaldırıldı. Drive'dan manuel silmeniz gerekebilir.");
+    }
+  };
+
+  // ── İptal: bu oturumda yüklenen ekleri Drive'dan temizle ───────────────────
+  const handleCancel = async () => {
+    const toClean = attachments.filter(a => sessionUploadedIds.has(a.drive_file_id));
+    if (toClean.length > 0) {
+      const msg = `Bu oturumda ${toClean.length} dosya yüklediniz. İptal ederseniz Drive'dan da silinecek. Devam edilsin mi?`;
+      if (!window.confirm(msg)) return;
+      for (const a of toClean) {
+        try { if (a.web_view_link) await deleteDocumentFromDrive(a.web_view_link); } catch {}
+      }
+    }
+    onClose();
+  };
+
   const handleSave = async () => {
     if (!form.title.trim()) return setErr('Başlık zorunlu.');
     if (!form.type) return setErr('Tür seçin.');
@@ -811,6 +971,7 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
       location:               form.location.trim() || null,
       tags:                   form.tags.split(',').map(x => x.trim()).filter(Boolean),
       image_url:              form.image_url || null,
+      attachments:            attachments || [],
     };
 
     try {
@@ -834,7 +995,7 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
   };
 
   return (
-    <ModalShell onClose={onClose} title={isNew ? '＋ Yeni İşbirliği' : '✎ İşbirliğini Düzenle'}>
+    <ModalShell onClose={handleCancel} title={isNew ? '＋ Yeni İşbirliği' : '✎ İşbirliğini Düzenle'}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* Görsel alanı */}
@@ -925,6 +1086,106 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
 
         <LabeledInput label="Etiketler (virgülle ayırın)" value={form.tags} onChange={v => set('tags', v)} placeholder="çocuk, sağlık, gaziantep" />
 
+        {/* ── Drive ek dosyalar ─────────────────────────────────────────── */}
+        <div style={{ marginTop: 6 }}>
+          <div style={{
+            fontSize: 11.5, fontWeight: 700, opacity: 0.7, marginBottom: 6,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            EK DOSYALAR
+            <span style={{ opacity: 0.55, fontWeight: 500 }}>
+              · Google Drive'a yüklenir · Maks 100 MB
+            </span>
+            {attachments.length > 0 && (
+              <span style={{
+                fontSize: 10.5, padding: '2px 7px', borderRadius: 10,
+                background: 'var(--bg-soft, rgba(0,0,0,0.05))',
+              }}>{attachments.length}</span>
+            )}
+          </div>
+
+          {attachments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+              {attachments.map((a) => (
+                <div
+                  key={a.drive_file_id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 8,
+                    border: '1px solid var(--border, rgba(0,0,0,0.1))',
+                    background: 'var(--bg, #fff)',
+                  }}
+                >
+                  <div style={{ fontSize: 20 }}>{attachIcon(a.name)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      title={a.name}
+                      style={{
+                        fontSize: 13, fontWeight: 600,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}
+                    >{a.name}</div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>
+                      {formatFileSize(a.size)}{a.uploaded_by_name ? ` · ${a.uploaded_by_name}` : ''}
+                    </div>
+                  </div>
+                  {a.web_view_link && (
+                    <a
+                      href={a.web_view_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: 11.5, fontWeight: 600, padding: '5px 10px', borderRadius: 6,
+                        textDecoration: 'none', color: 'var(--navy, #1a3a5c)',
+                        border: '1px solid var(--border, rgba(0,0,0,0.12))',
+                      }}
+                    >Aç</a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(a)}
+                    title="Kaldır"
+                    style={{
+                      padding: '5px 9px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                      border: '1px solid rgba(239,68,68,0.3)', color: '#dc2626',
+                      background: 'transparent',
+                    }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => attachFileRef.current?.click()}
+            disabled={attachUploading}
+            style={{
+              width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+              border: '1.5px dashed var(--border, rgba(0,0,0,0.2))',
+              background: 'var(--bg-soft, rgba(0,0,0,0.02))', color: 'inherit',
+              fontSize: 12.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 18 }}>📎</span>
+            <span style={{ fontWeight: 700 }}>
+              {attachUploading
+                ? `Yükleniyor… %${attachProgress}`
+                : 'Dosya Ekle (Google Drive)'}
+            </span>
+          </button>
+          <input
+            ref={attachFileRef}
+            type="file"
+            multiple
+            onChange={handlePickAttachment}
+            style={{ display: 'none' }}
+          />
+          {attachErr && (
+            <div style={{ fontSize: 11.5, color: '#dc2626', marginTop: 6 }}>⚠️ {attachErr}</div>
+          )}
+        </div>
+
         {err && (
           <div style={{
             padding: 10, borderRadius: 8,
@@ -934,15 +1195,15 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
         )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-          <button onClick={onClose} style={{
+          <button onClick={handleCancel} style={{
             padding: '9px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
             border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
             background: 'var(--bg, #fff)', color: 'inherit',
           }}>İptal</button>
-          <button onClick={handleSave} disabled={saving || uploading} style={{
+          <button onClick={handleSave} disabled={saving || uploading || attachUploading} style={{
             padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
             border: 'none', background: 'var(--navy, #1a3a5c)', color: '#fff',
-            opacity: (saving || uploading) ? 0.6 : 1,
+            opacity: (saving || uploading || attachUploading) ? 0.6 : 1,
           }}>{saving ? 'Kaydediliyor…' : (isNew ? 'Oluştur' : 'Kaydet')}</button>
         </div>
       </div>
