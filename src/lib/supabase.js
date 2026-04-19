@@ -2468,3 +2468,215 @@ export const deleteCollabImage = async (urlOrPath) => {
   if (idx >= 0) path = urlOrPath.slice(idx + marker.length);
   return await supabase.storage.from(COLLAB_IMAGE_BUCKET).remove([path]);
 };
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MEETINGS — Google Meet + Calendar entegreli toplantı modülü
+// ═════════════════════════════════════════════════════════════════════════════
+
+export const MEETING_STATUSES = [
+  { id: 'planlandi',    label: 'Planlandı',    color: '#0ea5e9' },
+  { id: 'devam_ediyor', label: 'Devam ediyor', color: '#22c55e' },
+  { id: 'tamamlandi',   label: 'Tamamlandı',   color: '#64748b' },
+  { id: 'iptal',        label: 'İptal',        color: '#ef4444' },
+  { id: 'ertelendi',    label: 'Ertelendi',    color: '#f59e0b' },
+];
+
+export const MEETING_DURATION_PRESETS = [15, 30, 45, 60, 90, 120];
+
+/**
+ * Liste getir — filtreli ve ilgili attendees ile.
+ * Opsiyonlar: { upcoming: bool, past: bool, unit, collaborationId, userId, from, to, limit=100 }
+ */
+export const getMeetings = async (opts = {}) => {
+  const {
+    upcoming = false, past = false,
+    unit = null, collaborationId = null,
+    from = null, to = null,
+    limit = 100,
+  } = opts;
+
+  let q = supabase
+    .from('meetings')
+    .select('*, attendees:meeting_attendees(*), collab:collaborations(id,title)')
+    .order('starts_at', { ascending: upcoming });
+
+  const nowIso = new Date().toISOString();
+  if (upcoming) q = q.gte('starts_at', nowIso);
+  if (past)     q = q.lt('starts_at', nowIso);
+  if (unit)     q = q.eq('unit', unit);
+  if (collaborationId) q = q.eq('related_collaboration_id', collaborationId);
+  if (from)     q = q.gte('starts_at', from);
+  if (to)       q = q.lte('starts_at', to);
+  if (limit)    q = q.limit(limit);
+
+  const { data, error } = await q;
+  return { data: data || [], error };
+};
+
+export const getMeeting = async (id) => {
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('*, attendees:meeting_attendees(*), collab:collaborations(id,title,unit)')
+    .eq('id', id).single();
+  return { data, error };
+};
+
+/**
+ * Yeni toplantı oluştur + katılımcıları ekle + Calendar event'i tetikle.
+ * attendees: [{ user_id?, name?, email, is_optional? }]
+ */
+export const createMeeting = async (payload, attendees = []) => {
+  const { data: sessionRes } = await supabase.auth.getSession();
+  const uid = sessionRes?.session?.user?.id || null;
+  const userEmail = sessionRes?.session?.user?.email || null;
+
+  // 1) Satırı kaydet
+  const row = {
+    ...payload,
+    created_by: uid,
+    organizer_id: payload.organizer_id || uid,
+    calendar_organizer_email: payload.calendar_organizer_email || userEmail,
+  };
+  const { data: m, error } = await supabase
+    .from('meetings').insert(row).select().single();
+  if (error) return { data: null, error };
+
+  // 2) Katılımcıları kaydet
+  if (attendees.length > 0) {
+    const rows = attendees.map(a => ({
+      meeting_id: m.id,
+      user_id: a.user_id || null,
+      name: a.name || null,
+      email: a.email || null,
+      is_optional: !!a.is_optional,
+      is_organizer: !!a.is_organizer,
+      rsvp_status: a.rsvp_status || 'pending',
+    }));
+    await supabase.from('meeting_attendees').insert(rows);
+  }
+
+  // 3) Calendar + Meet event — edge function
+  const attendeeEmails = attendees.filter(a => a.email).map(a => a.email);
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/create-meet-event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionRes?.session?.access_token || ''}`,
+      },
+      body: JSON.stringify({
+        meeting_id: m.id,
+        organizer_email: row.calendar_organizer_email,
+        title: m.title,
+        description: m.description || '',
+        starts_at: m.starts_at,
+        duration_minutes: m.duration_minutes,
+        timezone: m.timezone || 'Europe/Istanbul',
+        location: m.location || '',
+        attendee_emails: attendeeEmails,
+      }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.ok && out.meet_url) {
+      // Upsert — fonksiyon zaten yazmış olabilir, UI için güncel halini çek
+      const { data: refreshed } = await supabase
+        .from('meetings')
+        .select('*, attendees:meeting_attendees(*)')
+        .eq('id', m.id).single();
+      return { data: refreshed || m, error: null, meet_url: out.meet_url };
+    }
+    // Meet yaratılamadıysa satırı silip hata dön
+    return {
+      data: m,
+      error: { message: out.error || 'Meet linki oluşturulamadı — toplantı satır kayıtlı ama takvim/Meet oluşmadı.' },
+    };
+  } catch (e) {
+    return {
+      data: m,
+      error: { message: 'Meet edge function erişilemedi: ' + (e.message || e) },
+    };
+  }
+};
+
+/** Toplantı güncelle + (opsiyonel) Calendar event'i güncelle. */
+export const updateMeeting = async (id, patch, opts = { updateCalendar: true }) => {
+  const { data, error } = await supabase
+    .from('meetings').update(patch).eq('id', id).select().single();
+  if (error) return { data: null, error };
+
+  if (opts.updateCalendar && data.calendar_event_id) {
+    try {
+      const { data: sessionRes } = await supabase.auth.getSession();
+      await fetch(`${supabaseUrl}/functions/v1/update-meet-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionRes?.session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          meeting_id: id,
+          organizer_email: data.calendar_organizer_email,
+          event_id: data.calendar_event_id,
+          title: data.title,
+          description: data.description || '',
+          starts_at: data.starts_at,
+          duration_minutes: data.duration_minutes,
+          timezone: data.timezone || 'Europe/Istanbul',
+          location: data.location || '',
+          status: data.status,
+        }),
+      });
+    } catch (_) { /* sessiz fail — DB güncel */ }
+  }
+  return { data, error: null };
+};
+
+/** Toplantı sil + Calendar event'i sil. */
+export const deleteMeeting = async (id) => {
+  const { data: m } = await supabase
+    .from('meetings').select('calendar_event_id, calendar_organizer_email').eq('id', id).single();
+
+  if (m?.calendar_event_id) {
+    try {
+      const { data: sessionRes } = await supabase.auth.getSession();
+      await fetch(`${supabaseUrl}/functions/v1/delete-meet-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionRes?.session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          organizer_email: m.calendar_organizer_email,
+          event_id: m.calendar_event_id,
+        }),
+      });
+    } catch (_) { /* ignore */ }
+  }
+
+  const { error } = await supabase.from('meetings').delete().eq('id', id);
+  return { error };
+};
+
+/** Katılımcı RSVP güncelle (UI üzerinden manuel override). */
+export const updateMeetingAttendeeRsvp = async (attendeeId, rsvpStatus) => {
+  const { error } = await supabase
+    .from('meeting_attendees').update({ rsvp_status: rsvpStatus }).eq('id', attendeeId);
+  return { error };
+};
+
+/** Katılımcı ekle/sil (mevcut toplantıya). */
+export const addMeetingAttendee = async (meetingId, attendee) => {
+  const { error } = await supabase.from('meeting_attendees').insert({
+    meeting_id: meetingId,
+    user_id: attendee.user_id || null,
+    name:    attendee.name || null,
+    email:   attendee.email || null,
+    is_optional: !!attendee.is_optional,
+  });
+  return { error };
+};
+
+export const removeMeetingAttendee = async (attendeeId) => {
+  const { error } = await supabase.from('meeting_attendees').delete().eq('id', attendeeId);
+  return { error };
+};
