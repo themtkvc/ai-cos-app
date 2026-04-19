@@ -146,76 +146,110 @@ const selStyle = {
   color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none',
 };
 
-// ── TEK GÜNDEM SATIRI ─────────────────────────────────────────────────────────
-function AgendaRow({ item, onToggle, onClick }) {
+// ── TEK GÜNDEM KARTI ─────────────────────────────────────────────────────────
+function AgendaCard({ item, onToggle, onClick, accentColor }) {
   const done = item.status === 'tamamlandi';
   const overdue = !done && isOverdue(item.due_date);
   const prio = PRIORITY[item.priority] || PRIORITY.normal;
+  const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS.aktif;
 
   return (
     <div
+      onClick={() => onClick(item)}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '9px 14px', borderRadius: 8,
-        background: done ? 'transparent' : 'var(--bg-card)',
-        border: `1px solid ${done ? 'transparent' : 'var(--border)'}`,
-        marginBottom: 5, cursor: 'pointer', transition: 'all 0.12s',
-        opacity: done ? 0.52 : 1,
+        position: 'relative',
+        display: 'flex', flexDirection: 'column',
+        padding: '14px 14px 12px',
+        borderRadius: 12,
+        background: 'var(--bg-card)',
+        border: `1px solid ${done ? 'var(--border)' : 'var(--border)'}`,
+        borderLeft: `4px solid ${done ? '#a7f3d0' : (overdue ? '#dc2626' : (prio.color || accentColor))}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+        opacity: done ? 0.6 : 1,
+        minHeight: 118,
       }}
-      onMouseEnter={e => { if (!done) e.currentTarget.style.borderColor = '#9ca3af'; }}
-      onMouseLeave={e => { if (!done) e.currentTarget.style.borderColor = 'var(--border)'; }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
     >
-      {/* Checkbox */}
-      <button
-        onClick={e => { e.stopPropagation(); onToggle(item); }}
-        style={{
-          width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1,
-          border: `2px solid ${done ? '#16a34a' : '#d1d5db'}`,
-          background: done ? '#16a34a' : 'white',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: 11, fontWeight: 800, padding: 0, lineHeight: 1,
-        }}
-      >{done ? '✓' : ''}</button>
-
-      {/* İçerik */}
-      <div style={{ flex: 1, minWidth: 0 }} onClick={() => onClick(item)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{
-            fontSize: 13.5, fontWeight: 600, color: 'var(--text)',
-            textDecoration: done ? 'line-through' : 'none',
-            flex: 1,
-          }}>
-            {item.title}
-          </span>
-          {item.priority === 'yuksek' && !done && (
-            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', whiteSpace: 'nowrap' }}>
-              ● Yüksek
-            </span>
-          )}
-          {item.status === 'bekliyor' && !done && (
-            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: '#fefce8', color: '#a16207', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
-              ⏸ Bekliyor
-            </span>
-          )}
+      {/* Üst satır: checkbox + başlık */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+        <button
+          onClick={e => { e.stopPropagation(); onToggle(item); }}
+          title={done ? 'Aktifleştir' : 'Tamamlandı olarak işaretle'}
+          style={{
+            width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 2,
+            border: `2px solid ${done ? '#16a34a' : '#d1d5db'}`,
+            background: done ? '#16a34a' : 'white',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: 12, fontWeight: 800, padding: 0, lineHeight: 1,
+          }}
+        >{done ? '✓' : ''}</button>
+        <div style={{
+          flex: 1, minWidth: 0,
+          fontSize: 14, fontWeight: 700, lineHeight: 1.35,
+          color: 'var(--text)',
+          textDecoration: done ? 'line-through' : 'none',
+          wordBreak: 'break-word',
+        }}>
+          {item.title}
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 2 }}>
-          {item.notes && (
-            <span style={{ fontSize: 11.5, color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
-              {item.notes}
-            </span>
-          )}
+      </div>
+
+      {/* Notlar önizleme */}
+      {item.notes && (
+        <div style={{
+          fontSize: 12, color: 'var(--text-light)', lineHeight: 1.45,
+          marginBottom: 10, paddingLeft: 30,
+          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {item.notes}
+        </div>
+      )}
+
+      {/* Badge'ler */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 30, marginBottom: 8 }}>
+        {item.priority === 'yuksek' && !done && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>
+            🔴 Yüksek
+          </span>
+        )}
+        {item.priority === 'dusuk' && !done && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
+            🟢 Düşük
+          </span>
+        )}
+        {!done && item.status === 'bekliyor' && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}` }}>
+            ⏸ Bekliyor
+          </span>
+        )}
+        {done && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>
+            ✓ Tamamlandı
+          </span>
+        )}
+      </div>
+
+      {/* Alt satır: tarih + yaratıcı */}
+      {(item.due_date || item.created_by_name) && (
+        <div style={{
+          display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+          paddingLeft: 30, marginTop: 'auto',
+          fontSize: 11, color: 'var(--text-light)',
+        }}>
           {item.due_date && (
-            <span style={{ fontSize: 11, fontWeight: 600, color: overdue ? '#dc2626' : 'var(--text-light)', whiteSpace: 'nowrap' }}>
-              {overdue ? '⚠️ ' : '📅 '}{fmtDate(item.due_date)}
+            <span style={{ fontWeight: 600, color: overdue && !done ? '#dc2626' : 'var(--text-light)', whiteSpace: 'nowrap' }}>
+              {overdue && !done ? '⚠️ ' : '📅 '}{fmtDate(item.due_date)}
             </span>
           )}
           {item.created_by_name && (
-            <span style={{ fontSize: 11, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
-              {item.created_by_name}
-            </span>
+            <span style={{ whiteSpace: 'nowrap' }}>👤 {item.created_by_name}</span>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -276,34 +310,54 @@ function SectionPanel({ section, items, onAdd, onToggle, onEdit, onDelete, showD
       </div>
 
       {!collapsed && (
-        <div style={{ padding: '0 14px 14px' }}>
-          {/* Aktif items */}
+        <div style={{ padding: '4px 16px 16px' }}>
+          {/* Aktif kartlar */}
           {active.length === 0 && (
-            <div style={{ fontSize: 13, color: 'var(--text-light)', padding: '6px 0 10px', fontStyle: 'italic' }}>
-              Henüz gündem yok
+            <div style={{
+              fontSize: 13, color: 'var(--text-light)',
+              padding: '16px', fontStyle: 'italic',
+              background: 'var(--bg-hover)', borderRadius: 10,
+              textAlign: 'center', border: '1.5px dashed var(--border)',
+              marginBottom: 10,
+            }}>
+              Henüz gündem yok — aşağıdan ekle
             </div>
           )}
-          {active.map(item => (
-            <AgendaRow key={item.id} item={item}
-              onToggle={onToggle}
-              onClick={onEdit}
-            />
-          ))}
-
-          {/* Tamamlananlar (daraltılmış) */}
-          {showDone && done.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                Tamamlananlar ({done.length})
-              </div>
-              {done.map(item => (
-                <AgendaRow key={item.id} item={item} onToggle={onToggle} onClick={onEdit} />
+          {active.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 12,
+              marginBottom: 10,
+            }}>
+              {active.map(item => (
+                <AgendaCard key={item.id} item={item} accentColor={section.color}
+                  onToggle={onToggle} onClick={onEdit} />
               ))}
             </div>
           )}
 
+          {/* Tamamlananlar (grid) */}
+          {showDone && done.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Tamamlananlar ({done.length})
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 12,
+              }}>
+                {done.map(item => (
+                  <AgendaCard key={item.id} item={item} accentColor={section.color}
+                    onToggle={onToggle} onClick={onEdit} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Hızlı ekle */}
-          <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+          <div style={{ display: 'flex', gap: 7, marginTop: 14 }}>
             <input
               ref={inputRef}
               type="text"
@@ -312,7 +366,7 @@ function SectionPanel({ section, items, onAdd, onToggle, onEdit, onDelete, showD
               onChange={e => setInputVal(e.target.value)}
               onKeyDown={handleQuickAdd}
               style={{
-                flex: 1, padding: '7px 11px', borderRadius: 7,
+                flex: 1, padding: '8px 12px', borderRadius: 8,
                 border: '1.5px dashed var(--border)', fontSize: 13,
                 fontFamily: 'inherit', outline: 'none',
                 background: 'transparent', color: 'var(--text)',
@@ -325,7 +379,7 @@ function SectionPanel({ section, items, onAdd, onToggle, onEdit, onDelete, showD
               onClick={handleQuickAdd}
               disabled={!inputVal.trim()}
               style={{
-                padding: '7px 14px', borderRadius: 7, border: 'none',
+                padding: '8px 16px', borderRadius: 8, border: 'none',
                 background: inputVal.trim() ? section.color : '#e5e7eb',
                 color: inputVal.trim() ? 'white' : '#9ca3af',
                 fontWeight: 700, fontSize: 13, cursor: inputVal.trim() ? 'pointer' : 'default',
@@ -336,7 +390,7 @@ function SectionPanel({ section, items, onAdd, onToggle, onEdit, onDelete, showD
               onClick={() => onEdit(null, section.id)}
               title="Detaylı ekle"
               style={{
-                padding: '7px 11px', borderRadius: 7,
+                padding: '8px 12px', borderRadius: 8,
                 border: '1.5px solid var(--border)',
                 background: 'var(--bg-card)', color: 'var(--text-muted)',
                 fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',

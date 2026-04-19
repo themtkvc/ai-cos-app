@@ -468,6 +468,67 @@ export const ASSISTANT_TOOLS = [
     },
   },
 
+  // ── DİREKTÖR GÜNDEMLERİ (director_agendas) ─────────────────────────────────
+  {
+    name: 'list_director_agendas',
+    description: 'Direktör gündemlerini listeler. Bölüm (section) veya durum filtrelenebilir. Bölüm id\'leri: direktor_takip, asistan_takip, genel_sekreter, yonetim_kurulu, mutevelli.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', description: 'Bölüm id: direktor_takip | asistan_takip | genel_sekreter | yonetim_kurulu | mutevelli (boş = hepsi)' },
+        status: { type: 'string', description: 'Durum: aktif | bekliyor | tamamlandi' },
+        priority: { type: 'string', description: 'Öncelik: yuksek | normal | dusuk' },
+        only_open: { type: 'boolean', description: 'True ise sadece tamamlanmamış gündemleri getirir' },
+        limit: { type: 'number', description: 'Max sonuç (varsayılan 30)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_director_agenda',
+    description: 'Direktör gündemleri modülüne yeni gündem maddesi ekler. Bölüm seçimi zorunludur. Örn: "yönetim kuruluna X konusunu ekle" → section=yonetim_kurulu.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', description: 'Bölüm: direktor_takip | asistan_takip | genel_sekreter | yonetim_kurulu | mutevelli', enum: ['direktor_takip','asistan_takip','genel_sekreter','yonetim_kurulu','mutevelli'] },
+        title: { type: 'string', description: 'Gündem başlığı' },
+        notes: { type: 'string', description: 'Ek notlar (opsiyonel)' },
+        status: { type: 'string', description: 'Durum: aktif (varsayılan) | bekliyor | tamamlandi' },
+        priority: { type: 'string', description: 'Öncelik: yuksek | normal (varsayılan) | dusuk' },
+        due_date: { type: 'string', description: 'Bitiş tarihi (YYYY-MM-DD, opsiyonel)' },
+      },
+      required: ['section', 'title'],
+    },
+  },
+  {
+    name: 'update_director_agenda',
+    description: 'Direktör gündemleri modülündeki bir gündemi günceller (durum, öncelik, başlık, not, tarih).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agenda_title: { type: 'string', description: 'Hedef gündemin başlığı (kısmi eşleşme)' },
+        new_title: { type: 'string', description: 'Yeni başlık' },
+        notes: { type: 'string', description: 'Yeni notlar' },
+        status: { type: 'string', description: 'Yeni durum: aktif | bekliyor | tamamlandi' },
+        priority: { type: 'string', description: 'Yeni öncelik: yuksek | normal | dusuk' },
+        due_date: { type: 'string', description: 'Yeni bitiş tarihi (YYYY-MM-DD)' },
+        section: { type: 'string', description: 'Farklı bölüme taşı' },
+      },
+      required: ['agenda_title'],
+    },
+  },
+  {
+    name: 'delete_director_agenda',
+    description: 'Direktör gündemleri modülünden bir gündemi siler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agenda_title: { type: 'string', description: 'Silinecek gündemin başlığı (kısmi eşleşme)' },
+      },
+      required: ['agenda_title'],
+    },
+  },
+
   // ── NOTLAR ───────────────────────────────────────────────────────────────────
   {
     name: 'search_notes',
@@ -1021,6 +1082,87 @@ export async function executeTool(toolName, toolInput, context) {
       return { success: true, message: `Görsel "${entityUrl.name || entityUrl.title}" için başarıyla yüklendi.`, url: publicUrl };
     }
 
+    // ── DİREKTÖR GÜNDEMLERİ ────────────────────────────────────────────────
+    case 'list_director_agendas': {
+      const DA_SECTIONS = { direktor_takip: 'Direktörün Takibi', asistan_takip: 'Asistan Takibi', genel_sekreter: 'Genel Sekreter', yonetim_kurulu: 'Yönetim Kurulu', mutevelli: 'Mütevelli' };
+      let query = supabase
+        .from('director_agendas')
+        .select('id, title, notes, section, status, priority, due_date, created_by_name, created_at')
+        .order('section')
+        .order('created_at', { ascending: false });
+      if (toolInput.section) query = query.eq('section', toolInput.section);
+      if (toolInput.status) query = query.eq('status', toolInput.status);
+      if (toolInput.priority) query = query.eq('priority', toolInput.priority);
+      if (toolInput.only_open) query = query.neq('status', 'tamamlandi');
+      query = query.limit(Math.min(Math.max(parseInt(toolInput.limit || 30, 10) || 30, 1), 100));
+      const { data, error } = await query;
+      if (error) return { error: error.message };
+      const byCount = data.reduce((acc, r) => { acc[r.section] = (acc[r.section] || 0) + 1; return acc; }, {});
+      return {
+        count: data.length,
+        by_section: Object.fromEntries(Object.entries(byCount).map(([k, v]) => [DA_SECTIONS[k] || k, v])),
+        agendas: data.map((r) => ({
+          id: r.id, title: r.title, notes: r.notes,
+          section: DA_SECTIONS[r.section] || r.section, section_id: r.section,
+          status: r.status, priority: r.priority,
+          due_date: r.due_date || null,
+          created_by: r.created_by_name || null,
+        })),
+      };
+    }
+
+    case 'create_director_agenda': {
+      const VALID_SECTIONS = ['direktor_takip','asistan_takip','genel_sekreter','yonetim_kurulu','mutevelli'];
+      if (!toolInput.section || !VALID_SECTIONS.includes(toolInput.section)) {
+        return { error: `Geçersiz bölüm. Geçerli değerler: ${VALID_SECTIONS.join(', ')}` };
+      }
+      if (!toolInput.title?.trim()) return { error: 'Başlık zorunludur.' };
+      const { data: profile } = await supabase.from('user_profiles').select('full_name').eq('user_id', userId).single();
+      const { data, error } = await supabase.from('director_agendas').insert({
+        section: toolInput.section,
+        title: toolInput.title.trim(),
+        notes: toolInput.notes || null,
+        status: toolInput.status || 'aktif',
+        priority: toolInput.priority || 'normal',
+        due_date: nullIfEmpty(toolInput.due_date),
+        created_by: userId,
+        created_by_name: profile?.full_name || userName || null,
+      }).select().single();
+      if (error) return { error: error.message };
+      return { success: true, agenda: { id: data.id, title: data.title, section: data.section, status: data.status, priority: data.priority } };
+    }
+
+    case 'update_director_agenda': {
+      if (!toolInput.agenda_title?.trim()) return { error: 'Hedef gündemin başlığı zorunludur.' };
+      const { data: matches } = await supabase
+        .from('director_agendas').select('id, title, section')
+        .ilike('title', `%${toolInput.agenda_title}%`).limit(1);
+      if (!matches?.length) return { error: `"${toolInput.agenda_title}" başlıklı direktör gündemi bulunamadı.` };
+      const updates = {};
+      if (toolInput.new_title !== undefined) updates.title = toolInput.new_title;
+      if (toolInput.notes !== undefined) updates.notes = toolInput.notes;
+      if (toolInput.status !== undefined) updates.status = toolInput.status;
+      if (toolInput.priority !== undefined) updates.priority = toolInput.priority;
+      if (toolInput.due_date !== undefined) updates.due_date = nullIfEmpty(toolInput.due_date);
+      if (toolInput.section !== undefined) updates.section = toolInput.section;
+      if (Object.keys(updates).length === 0) return { error: 'Güncellenecek alan verilmedi.' };
+      updates.updated_at = new Date().toISOString();
+      const { error } = await supabase.from('director_agendas').update(updates).eq('id', matches[0].id);
+      if (error) return { error: error.message };
+      return { success: true, updated: matches[0].title, changes: updates };
+    }
+
+    case 'delete_director_agenda': {
+      if (!toolInput.agenda_title?.trim()) return { error: 'Silinecek gündemin başlığı zorunludur.' };
+      const { data: matches } = await supabase
+        .from('director_agendas').select('id, title')
+        .ilike('title', `%${toolInput.agenda_title}%`).limit(1);
+      if (!matches?.length) return { error: `"${toolInput.agenda_title}" başlıklı direktör gündemi bulunamadı.` };
+      const { error } = await supabase.from('director_agendas').delete().eq('id', matches[0].id);
+      if (error) return { error: error.message };
+      return { success: true, deleted: matches[0].title };
+    }
+
     default:
       return { error: `Bilinmeyen araç: ${toolName}` };
   }
@@ -1040,6 +1182,14 @@ Sistemdeki TÜM modüllere erişimin var ve her türlü görevi yapabilirsin. Ku
 - Gündem arama, oluşturma, güncelleme
 - Görev ekleme, atama, durum güncelleme, listeleme
 - Birim veya kişi bazında filtreleme
+
+### 🗂 Direktör Gündemleri (Özel Modül)
+- 5 bölüm: Direktörün Takibi, Asistan Takibi, Genel Sekreter, Yönetim Kurulu, Mütevelli
+- list_director_agendas, create_director_agenda, update_director_agenda, delete_director_agenda
+- "Yönetim kuruluna X gündemi ekle" → section=yonetim_kurulu
+- "Mütevelliye sunulacaklara ekle" → section=mutevelli
+- "Asistanın takibine al" → section=asistan_takip
+- Durumu "bekliyor" veya "tamamlandı" yapma istenirse update_director_agenda kullan
 
 ### 🗓 İş Kayıtları
 - Günlük iş kaydı oluşturma ve sorgulama
