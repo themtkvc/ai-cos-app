@@ -2580,6 +2580,12 @@ export const createMeeting = async (payload, attendees = []) => {
 
   // 3) Calendar + Meet event — edge function
   const attendeeEmails = attendees.filter(a => a.email).map(a => a.email);
+  const cleanupOnFail = async (reasonMsg) => {
+    // Başarısız olursa orphan satır kalmasın — sessizce sil
+    await supabase.from('meeting_attendees').delete().eq('meeting_id', m.id);
+    await supabase.from('meetings').delete().eq('id', m.id);
+    return { data: null, error: { message: reasonMsg } };
+  };
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/create-meet-event`, {
       method: 'POST',
@@ -2608,16 +2614,19 @@ export const createMeeting = async (payload, attendees = []) => {
         .eq('id', m.id).single();
       return { data: refreshed || m, error: null, meet_url: out.meet_url };
     }
-    // Meet yaratılamadıysa satırı silip hata dön
-    return {
-      data: m,
-      error: { message: out.error || 'Meet linki oluşturulamadı — toplantı satır kayıtlı ama takvim/Meet oluşmadı.' },
-    };
+
+    // Edge function hata döndürdü — detayı kullanıcıya göster, satırı sil
+    const errCode = out.error || `HTTP ${res.status}`;
+    const detail = out.detail ? ` — ${typeof out.detail === 'string' ? out.detail.slice(0, 300) : JSON.stringify(out.detail).slice(0, 300)}` : '';
+    let friendly = `Meet linki oluşturulamadı (${errCode})${detail}`;
+    if (errCode === 'google_auth_failed' || /unauthorized_client/i.test(detail)) {
+      friendly = `Google Calendar izni başarısız. "${row.calendar_organizer_email}" adresi Google Workspace kullanıcısı olmalı — kişisel Gmail hesaplarıyla çalışmaz.`;
+    }
+    console.error('[createMeeting] edge function failed:', { status: res.status, out });
+    return cleanupOnFail(friendly);
   } catch (e) {
-    return {
-      data: m,
-      error: { message: 'Meet edge function erişilemedi: ' + (e.message || e) },
-    };
+    console.error('[createMeeting] network/fetch error:', e);
+    return cleanupOnFail('Meet edge function erişilemedi: ' + (e.message || e));
   }
 };
 
