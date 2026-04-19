@@ -13,8 +13,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const CLIENT_ID     = process.env.GOOGLE_TASKS_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_TASKS_CLIENT_SECRET;
-const SUPABASE_URL      = process.env.SUPABASE_URL      || process.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL      = process.env.SUPABASE_URL      || process.env.VITE_SUPABASE_URL      || process.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 function makeClient(userJwt) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
