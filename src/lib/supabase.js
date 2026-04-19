@@ -2105,19 +2105,130 @@ export const COLLAB_STATUSES = [
   { id: 'iptal',       label: 'İptal',       color: '#dc2626' },
 ];
 
+// Partner rolü (typolojisi) — donor reporting ve audit için standart
+export const COLLAB_PARTNER_ROLES = [
+  { id: 'lead',            label: 'Lider Partner',       color: '#2563eb' },
+  { id: 'co_applicant',    label: 'Ortak Başvuran',      color: '#7c3aed' },
+  { id: 'implementing',    label: 'Uygulayıcı',          color: '#16a34a' },
+  { id: 'sub_grantee',     label: 'Alt-Hibe Alan',       color: '#0891b2' },
+  { id: 'donor',           label: 'Donör',               color: '#eab308' },
+  { id: 'fiscal_sponsor',  label: 'Mali Sponsor',        color: '#db2777' },
+  { id: 'advisory',        label: 'Danışma',             color: '#475569' },
+  { id: 'observer',        label: 'Gözlemci',            color: '#94a3b8' },
+];
+
+// MoU / sözleşme durumları
+export const COLLAB_MOU_STATUSES = [
+  { id: 'not_required', label: 'Gerekli Değil', color: '#94a3b8' },
+  { id: 'draft',        label: 'Taslak',        color: '#eab308' },
+  { id: 'signed',       label: 'İmzalandı',     color: '#16a34a' },
+  { id: 'renewed',      label: 'Yenilendi',     color: '#0891b2' },
+  { id: 'expired',      label: 'Süresi Doldu',  color: '#dc2626' },
+  { id: 'terminated',   label: 'Feshedildi',    color: '#475569' },
+];
+
+// Rapor türleri
+export const COLLAB_REPORT_TYPES = [
+  { id: 'narrative',  label: 'Narrative' },
+  { id: 'financial',  label: 'Finansal'  },
+  { id: 'interim',    label: 'Ara Rapor' },
+  { id: 'final',      label: 'Final Rapor' },
+  { id: 'monitoring', label: 'M&E'       },
+  { id: 'ad_hoc',     label: 'Ad Hoc'    },
+];
+
+export const COLLAB_REPORT_STATUSES = [
+  { id: 'pending',     label: 'Bekliyor',      color: '#94a3b8' },
+  { id: 'in_progress', label: 'Hazırlanıyor',  color: '#eab308' },
+  { id: 'submitted',   label: 'Gönderildi',    color: '#0891b2' },
+  { id: 'approved',    label: 'Onaylandı',     color: '#16a34a' },
+  { id: 'overdue',     label: 'Geçikti',       color: '#dc2626' },
+];
+
+export const DEFAULT_COLLAB_PAGE_LIMIT = 100;
+
+/**
+ * İşbirliklerini getirir. Gelişmiş filtreler: tarih aralığı, partner rolü,
+ * MoU durumu, FTS araması, pagination.
+ */
 export const getCollaborations = async (filters = {}) => {
-  let q = supabase.from('collaborations').select('*').order('created_at', { ascending: false });
-  if (filters.type)   q = q.eq('type', filters.type);
-  if (filters.unit)   q = q.eq('unit', filters.unit);
-  if (filters.status) q = q.eq('status', filters.status);
-  if (filters.ownerId) q = q.eq('owner_id', filters.ownerId);
+  const { limit = DEFAULT_COLLAB_PAGE_LIMIT, offset = 0 } = filters;
+  let q = supabase.from('collaborations').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+  if (filters.type)         q = q.eq('type', filters.type);
+  if (filters.unit)         q = q.eq('unit', filters.unit);
+  if (filters.status)       q = q.eq('status', filters.status);
+  if (filters.ownerId)      q = q.eq('owner_id', filters.ownerId);
+  if (filters.partnerOrgId) q = q.eq('partner_org_id', filters.partnerOrgId);
+  if (filters.partnerRole)  q = q.eq('partner_role', filters.partnerRole);
+  if (filters.mouStatus)    q = q.eq('mou_status', filters.mouStatus);
+  if (filters.relatedFundId)  q = q.eq('related_fund_id', filters.relatedFundId);
+  if (filters.relatedEventId) q = q.eq('related_event_id', filters.relatedEventId);
+  // Tarih aralığı (overlap mantığı): işbirliğinin [start..end] aralığı filtre penceresiyle kesişsin
+  if (filters.dateFrom) q = q.or(`end_date.gte.${filters.dateFrom},end_date.is.null`);
+  if (filters.dateTo)   q = q.or(`start_date.lte.${filters.dateTo},start_date.is.null`);
+  if (filters.mouExpiringBefore) q = q.lte('mou_expires_at', filters.mouExpiringBefore);
   if (filters.q) {
     const s = `%${filters.q}%`;
-    q = q.or(`title.ilike.${s},description.ilike.${s},partner_name.ilike.${s}`);
+    q = q.or(`title.ilike.${s},description.ilike.${s},partner_name.ilike.${s},location.ilike.${s}`);
   }
-  const { data, error } = await q;
+  if (typeof limit === 'number' && limit > 0) q = q.range(offset, offset + limit - 1);
+  const { data, error, count } = await q;
+  return { data: data || [], error, count: count ?? null };
+};
+
+/** Postgres FTS araması (tsvector/GIN) — büyük veri setinde hızlı. */
+export const searchCollaborationsFTS = async (text, { limit = 50 } = {}) => {
+  if (!text || text.trim().length < 2) return { data: [], error: null };
+  const tsQuery = text.trim().split(/\s+/).map(t => t.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean).join(' & ');
+  if (!tsQuery) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('collaborations')
+    .select('*')
+    .textSearch('search_tsv', tsQuery, { config: 'simple' })
+    .limit(limit);
   return { data: data || [], error };
 };
+
+/** Dashboard widget ve reporting için özet istatistikler. */
+export const getCollabStats = async () => {
+  const { data, error } = await supabase
+    .from('collaborations')
+    .select('id, status, type, unit, budget_amount, budget_currency, end_date, mou_expires_at, partner_role, created_at');
+  if (error) return { stats: null, recent: [], upcoming: [], error };
+
+  const now = new Date();
+  const in30 = new Date(Date.now() + 30 * 86400000);
+  const in90 = new Date(Date.now() + 90 * 86400000);
+  const stats = {
+    total:      data.length,
+    active:     data.filter(c => c.status === 'aktif').length,
+    planning:   data.filter(c => c.status === 'planlaniyor').length,
+    completed:  data.filter(c => c.status === 'tamamlandi').length,
+    thisMonth:  data.filter(c => new Date(c.created_at) >= new Date(now.getFullYear(), now.getMonth(), 1)).length,
+    budgetByCcy: {},
+    byUnit: {},
+    byType: {},
+    mouExpiringSoon: data.filter(c => c.mou_expires_at && new Date(c.mou_expires_at) >= now && new Date(c.mou_expires_at) <= in90).length,
+    dueSoon:   data.filter(c => c.end_date && new Date(c.end_date) >= now && new Date(c.end_date) <= in30 && c.status === 'aktif').length,
+  };
+  for (const c of data) {
+    if (c.budget_amount) {
+      const ccy = c.budget_currency || 'TRY';
+      stats.budgetByCcy[ccy] = (stats.budgetByCcy[ccy] || 0) + Number(c.budget_amount);
+    }
+    if (c.unit) stats.byUnit[c.unit] = (stats.byUnit[c.unit] || 0) + 1;
+    if (c.type) stats.byType[c.type] = (stats.byType[c.type] || 0) + 1;
+  }
+
+  const recent   = [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+  const upcoming = data.filter(c => c.end_date && new Date(c.end_date) >= now && c.status === 'aktif')
+    .sort((a, b) => new Date(a.end_date) - new Date(b.end_date)).slice(0, 5);
+
+  return { stats, recent, upcoming, error: null };
+};
+
+/** Dashboard için işbirliği KPI + son 5 kayıt. */
+export const getCollabDashboardData = getCollabStats;
 
 export const getCollaboration = async (id) => {
   return await supabase.from('collaborations').select('*').eq('id', id).single();
@@ -2133,6 +2244,122 @@ export const updateCollaboration = async (id, updates) => {
 
 export const deleteCollaboration = async (id) => {
   return await supabase.from('collaborations').delete().eq('id', id);
+};
+
+/** Çoklu güncelleme: bir liste kaydın ortak alanlarını güncelle (bulk action). */
+export const bulkUpdateCollaborations = async (ids, patch) => {
+  if (!Array.isArray(ids) || ids.length === 0) return { data: [], error: null };
+  return await supabase.from('collaborations').update(patch).in('id', ids).select();
+};
+
+/** Çoklu silme. */
+export const bulkDeleteCollaborations = async (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return { error: null };
+  return await supabase.from('collaborations').delete().in('id', ids);
+};
+
+// ── YORUMLAR ───────────────────────────────────────────────────────────
+export const getCollaborationComments = async (collabId) => {
+  const { data, error } = await supabase
+    .from('collaboration_comments')
+    .select('*')
+    .eq('collaboration_id', collabId)
+    .order('created_at', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const addCollaborationComment = async ({ collabId, body, mentions = [] }) => {
+  const { data: authData } = await supabase.auth.getUser();
+  const uid = authData?.user?.id;
+  let authorName = null;
+  if (uid) {
+    const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('user_id', uid).maybeSingle();
+    authorName = prof?.full_name || authData?.user?.email || null;
+  }
+  const { data, error } = await supabase
+    .from('collaboration_comments')
+    .insert([{ collaboration_id: collabId, body, mentions, author_id: uid, author_name: authorName }])
+    .select()
+    .single();
+  // @mention'lara bildirim gönder
+  if (!error && data && Array.isArray(mentions) && mentions.length > 0) {
+    try {
+      const rows = mentions.filter(Boolean).filter(id => id !== uid).map(userId => ({
+        user_id: userId,
+        type: 'collaboration_mention',
+        title: `${authorName || 'Biri'} sizden bahsetti`,
+        body: (body || '').slice(0, 200),
+        link_type: 'collaboration',
+        link_id: collabId,
+        created_by: uid,
+        created_by_name: authorName,
+      }));
+      if (rows.length > 0) await supabase.from('notifications').insert(rows);
+    } catch (_e) { /* notifications tablosu opsiyonel */ }
+  }
+  return { data, error };
+};
+
+export const updateCollaborationComment = async (id, body) => {
+  return await supabase.from('collaboration_comments').update({ body, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+};
+
+export const deleteCollaborationComment = async (id) => {
+  return await supabase.from('collaboration_comments').delete().eq('id', id);
+};
+
+// ── DEĞİŞİKLİK GEÇMİŞİ (audit log) ─────────────────────────────────────
+export const getCollaborationHistory = async (collabId, limit = 50) => {
+  const { data, error } = await supabase
+    .from('collaboration_history')
+    .select('*')
+    .eq('collaboration_id', collabId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return { data: data || [], error };
+};
+
+// ── RAPORLAMA YÜKÜMLÜLÜKLERİ ───────────────────────────────────────────
+export const getCollaborationReports = async (collabId = null, { limit = 200 } = {}) => {
+  let q = supabase.from('collaboration_reports').select('*').order('due_date', { ascending: true });
+  if (collabId) q = q.eq('collaboration_id', collabId);
+  if (limit) q = q.limit(limit);
+  const { data, error } = await q;
+  return { data: data || [], error };
+};
+
+export const getMyCollaborationReports = async (userId) => {
+  if (!userId) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('collaboration_reports')
+    .select('*')
+    .or(`responsible_user_id.eq.${userId}`)
+    .in('status', ['pending', 'in_progress'])
+    .order('due_date', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const getUpcomingReports = async (days = 30) => {
+  const cutoff = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('collaboration_reports')
+    .select('*, collaborations(id, title, partner_name, unit)')
+    .lte('due_date', cutoff)
+    .in('status', ['pending', 'in_progress'])
+    .order('due_date', { ascending: true });
+  return { data: data || [], error };
+};
+
+export const createCollaborationReport = async (payload) => {
+  return await supabase.from('collaboration_reports').insert([payload]).select().single();
+};
+
+export const updateCollaborationReport = async (id, updates) => {
+  return await supabase.from('collaboration_reports').update(updates).eq('id', id).select().single();
+};
+
+export const deleteCollaborationReport = async (id) => {
+  return await supabase.from('collaboration_reports').delete().eq('id', id);
 };
 
 // ── İşbirliği için lookup listeleri (modal picker'ları doldurmak için) ────

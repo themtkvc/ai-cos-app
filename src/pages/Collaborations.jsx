@@ -5,7 +5,9 @@ import {
   uploadDocumentToDrive, deleteDocumentFromDrive,
   validateUploadFile, MAX_DOCUMENT_BYTES,
   getCollabLookups,
-  COLLAB_TYPES, COLLAB_STATUSES,
+  bulkUpdateCollaborations, bulkDeleteCollaborations,
+  COLLAB_TYPES, COLLAB_STATUSES, COLLAB_PARTNER_ROLES, COLLAB_MOU_STATUSES,
+  DEFAULT_COLLAB_PAGE_LIMIT,
 } from '../lib/supabase';
 import { UNITS, resolveUnitName, fmtDisplayDate } from '../lib/constants';
 
@@ -54,16 +56,18 @@ function canEdit(row, profile) {
 }
 
 // ── Ana Sayfa ────────────────────────────────────────────────────────────────
-export default function Collaborations({ user, profile }) {
+export default function Collaborations({ user, profile, onNavigate, editCollabId, onClearEditCollab }) {
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
-  const [viewMode, setViewMode]       = useState('cards'); // cards | list | by-unit | by-partner
+  const [viewMode, setViewMode]       = useState('cards'); // cards | list | by-unit | by-partner | by-type
   const [typeFilter, setTypeFilter]   = useState('all');
   const [unitFilter, setUnitFilter]   = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [statusFilter, setStatusFilter]   = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
 
   const [editing, setEditing] = useState(null); // {} or {unit: 'X'} for new, row for edit
@@ -71,12 +75,26 @@ export default function Collaborations({ user, profile }) {
   const [toast, setToast]     = useState('');
   const [lookups, setLookups] = useState({ organizations: [], users: [], fundOpportunities: [], events: [] });
 
-  const load = async () => {
+  // Bulk action mode
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  // Pagination
+  const [limit, setLimit] = useState(DEFAULT_COLLAB_PAGE_LIMIT || 100);
+  const [totalCount, setTotalCount] = useState(null);
+
+  const load = async (overrideLimit) => {
     setLoading(true); setError('');
     try {
-      const { data, error } = await getCollaborations({});
+      const { data, error, count } = await getCollaborations({
+        limit: overrideLimit || limit,
+        offset: 0,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
       if (error) throw error;
       setRows(data || []);
+      setTotalCount(typeof count === 'number' ? count : null);
     } catch (e) {
       console.error(e);
       setError(e.message || 'Yüklenemedi');
@@ -84,6 +102,13 @@ export default function Collaborations({ user, profile }) {
       setLoading(false);
     }
   };
+
+  const loadMore = async () => {
+    const newLimit = (limit || DEFAULT_COLLAB_PAGE_LIMIT || 100) + (DEFAULT_COLLAB_PAGE_LIMIT || 100);
+    setLimit(newLimit);
+    await load(newLimit);
+  };
+
   useEffect(() => {
     load();
     getCollabLookups().then(res => {
@@ -95,6 +120,22 @@ export default function Collaborations({ user, profile }) {
       });
     });
   }, []);
+
+  // Date range değişince yeniden yükle
+  useEffect(() => {
+    const t = setTimeout(() => { load(); }, 250);
+    return () => clearTimeout(t);
+  }, [dateFrom, dateTo]);
+
+  // Auto-open edit modal when editCollabId arrives via prop
+  useEffect(() => {
+    if (!editCollabId) return;
+    const found = rows.find(r => r.id === editCollabId);
+    if (found) {
+      setEditing(found);
+      if (typeof onClearEditCollab === 'function') onClearEditCollab();
+    }
+  }, [editCollabId, rows, onClearEditCollab]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -183,6 +224,26 @@ export default function Collaborations({ user, profile }) {
         <ViewChip active={viewMode === 'list'}       onClick={() => setViewMode('list')}       label="📋 Liste" />
         <ViewChip active={viewMode === 'by-unit'}    onClick={() => setViewMode('by-unit')}    label="🏛 Birim Bazlı" />
         <ViewChip active={viewMode === 'by-partner'} onClick={() => setViewMode('by-partner')} label="🤝 Kurum Bazlı" />
+        <ViewChip active={viewMode === 'by-type'}    onClick={() => setViewMode('by-type')}    label="🗂 Tür Bazlı" />
+        <span style={{ flex: 1 }} />
+        <button
+          onClick={() => { setBulkMode(v => !v); setSelectedIds(new Set()); }}
+          style={{
+            padding: '6px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: `1.5px solid ${bulkMode ? '#dc2626' : 'var(--border, rgba(0,0,0,0.15))'}`,
+            background: bulkMode ? '#dc2626' : 'var(--bg, #fff)',
+            color: bulkMode ? '#fff' : 'inherit',
+          }}
+        >{bulkMode ? '✕ Seçimi Kapat' : '☑ Toplu Seçim'}</button>
+        <button
+          onClick={() => exportCollabsToCSV(filtered)}
+          title="Filtrelenmiş kayıtları CSV olarak indir"
+          style={{
+            padding: '6px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+            background: 'var(--bg, #fff)', color: 'inherit',
+          }}
+        >📥 CSV</button>
       </div>
 
       {/* Status tabs */}
@@ -225,8 +286,77 @@ export default function Collaborations({ user, profile }) {
             background: 'var(--bg, #fff)', color: 'inherit', outline: 'none',
           }}
         />
-        <button onClick={load} style={selStyle}>🔄 Yenile</button>
+        <button onClick={() => load()} style={selStyle}>🔄 Yenile</button>
       </div>
+
+      {/* Tarih aralığı filtresi */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.6 }}>TARİH ARALIĞI:</span>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={e => setDateFrom(e.target.value)}
+          style={{ ...selStyle, padding: '6px 10px' }}
+          title="Başlangıç tarihi ≥"
+        />
+        <span style={{ fontSize: 12, opacity: 0.5 }}>→</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={e => setDateTo(e.target.value)}
+          style={{ ...selStyle, padding: '6px 10px' }}
+          title="Bitiş tarihi ≤"
+        />
+        {(dateFrom || dateTo) && (
+          <button
+            onClick={() => { setDateFrom(''); setDateTo(''); }}
+            style={{
+              padding: '6px 10px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer',
+              border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+              background: 'transparent', color: 'inherit',
+            }}
+          >✕ Temizle</button>
+        )}
+        {totalCount != null && (
+          <span style={{ marginLeft: 'auto', fontSize: 11.5, opacity: 0.6 }}>
+            {rows.length} / {totalCount} kayıt yüklü
+          </span>
+        )}
+      </div>
+
+      {/* Toplu seçim araç çubuğu */}
+      {bulkMode && (
+        <BulkBar
+          selectedIds={selectedIds}
+          allFiltered={filtered}
+          onSelectAll={() => setSelectedIds(new Set(filtered.map(r => r.id)))}
+          onClear={() => setSelectedIds(new Set())}
+          onBulkStatus={async (newStatus) => {
+            if (!selectedIds.size) return;
+            if (!window.confirm(`${selectedIds.size} kayda "${newStatus}" durumu uygulanacak. Onaylıyor musunuz?`)) return;
+            const { error } = await bulkUpdateCollaborations([...selectedIds], { status: newStatus });
+            if (error) return alert('Güncellenemedi: ' + error.message);
+            setToast(`✅ ${selectedIds.size} kayıt güncellendi`);
+            setTimeout(() => setToast(''), 2800);
+            setSelectedIds(new Set());
+            load();
+          }}
+          onBulkDelete={async () => {
+            if (!selectedIds.size) return;
+            if (!window.confirm(`${selectedIds.size} kayıt KALICI silinecek. Emin misiniz?`)) return;
+            const { error } = await bulkDeleteCollaborations([...selectedIds]);
+            if (error) return alert('Silinemedi: ' + error.message);
+            setToast(`🗑 ${selectedIds.size} kayıt silindi`);
+            setTimeout(() => setToast(''), 2800);
+            setSelectedIds(new Set());
+            load();
+          }}
+          onBulkExport={() => {
+            const rowsToExport = filtered.filter(r => selectedIds.has(r.id));
+            exportCollabsToCSV(rowsToExport);
+          }}
+        />
+      )}
 
       {error && (
         <div style={{
@@ -240,11 +370,27 @@ export default function Collaborations({ user, profile }) {
         <div style={{ padding: 40, textAlign: 'center', opacity: 0.6 }}>Yükleniyor…</div>
       ) : (
         <>
-          {viewMode === 'cards'      && <CardsView      rows={filtered} onOpen={(id) => setViewId(id)} />}
-          {viewMode === 'list'       && <ListView       rows={filtered} onOpen={(id) => setViewId(id)} />}
+          {viewMode === 'cards'      && <CardsView      rows={filtered} onOpen={(id) => setViewId(id)} bulkMode={bulkMode} selectedIds={selectedIds} onToggleSelect={(id) => toggleSelect(selectedIds, setSelectedIds, id)} />}
+          {viewMode === 'list'       && <ListView       rows={filtered} onOpen={(id) => setViewId(id)} bulkMode={bulkMode} selectedIds={selectedIds} onToggleSelect={(id) => toggleSelect(selectedIds, setSelectedIds, id)} />}
           {viewMode === 'by-unit'    && <ByUnitView     rows={filtered} onOpen={(id) => setViewId(id)}
                                                          onAddForUnit={(unitName) => setEditing({ _unitPrefill: unitName })} />}
           {viewMode === 'by-partner' && <ByPartnerView  rows={filtered} onOpen={(id) => setViewId(id)} />}
+          {viewMode === 'by-type'    && <ByTypeView     rows={filtered} onOpen={(id) => setViewId(id)} />}
+
+          {/* Pagination */}
+          {totalCount != null && rows.length < totalCount && (
+            <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
+              <button
+                onClick={loadMore}
+                disabled={loading}
+                style={{
+                  padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  border: '1.5px solid var(--navy, #1a3a5c)', color: 'var(--navy, #1a3a5c)',
+                  background: 'transparent',
+                }}
+              >↓ Daha Fazla Yükle ({totalCount - rows.length} kayıt daha)</button>
+            </div>
+          )}
         </>
       )}
 
@@ -275,6 +421,11 @@ export default function Collaborations({ user, profile }) {
           lookups={lookups}
           onClose={() => setViewId(null)}
           onEdit={() => { setViewId(null); setEditing(viewing); }}
+          onOpenFullPage={onNavigate ? () => {
+            const id = viewing.id;
+            setViewId(null);
+            onNavigate('collaborations', { collabId: id });
+          } : null}
           onDeleted={() => {
             setRows(xs => xs.filter(x => x.id !== viewing.id));
             setViewId(null);
@@ -283,6 +434,100 @@ export default function Collaborations({ user, profile }) {
       )}
     </div>
   );
+}
+
+// ── Bulk toggle helper + CSV export ──────────────────────────────────────────
+function toggleSelect(selectedIds, setSelectedIds, id) {
+  setSelectedIds(prev => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+}
+
+function exportCollabsToCSV(rows) {
+  if (!rows || !rows.length) {
+    alert('Dışa aktarılacak kayıt yok');
+    return;
+  }
+  const headers = [
+    'ID', 'Başlık', 'Tür', 'Birim', 'Durum',
+    'Partner', 'Partner Rolü', 'Sorumlu',
+    'Başlangıç', 'Bitiş', 'Bütçe', 'Para Birimi',
+    'MoU Durum', 'MoU Bitiş',
+    'Hedef Beneficiary', 'Ulaşılan',
+    'Konum', 'Etiketler', 'Oluşturulma',
+  ];
+  const esc = (v) => {
+    if (v == null) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[,"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [headers.join(',')];
+  rows.forEach(r => {
+    const t = COLLAB_TYPES.find(x => x.id === r.type);
+    const s = COLLAB_STATUSES.find(x => x.id === r.status);
+    lines.push([
+      r.id, r.title, t?.label || r.type, r.unit, s?.label || r.status,
+      r.partner_name, r.partner_role,
+      r.owner_name,
+      r.start_date, r.end_date, r.budget_amount, r.budget_currency,
+      r.mou_status, r.mou_expires_at,
+      r.target_beneficiaries, r.reached_beneficiaries,
+      r.location, (r.tags || []).join('; '), r.created_at,
+    ].map(esc).join(','));
+  });
+  const csv = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `isbirlikleri-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function BulkBar({ selectedIds, allFiltered, onSelectAll, onClear, onBulkStatus, onBulkDelete, onBulkExport }) {
+  const count = selectedIds.size;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+      padding: '10px 14px', borderRadius: 10, marginBottom: 12,
+      background: 'linear-gradient(90deg, rgba(26,58,92,0.08), rgba(99,102,241,0.05))',
+      border: '1.5px solid rgba(26,58,92,0.25)',
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 700 }}>
+        {count === 0 ? 'Hiçbir kayıt seçilmedi' : `${count} kayıt seçildi`}
+      </span>
+      <button onClick={onSelectAll} style={bulkBtn()}>
+        Tümünü Seç ({allFiltered.length})
+      </button>
+      {count > 0 && <button onClick={onClear} style={bulkBtn()}>Seçimi Kaldır</button>}
+      <span style={{ flex: 1 }} />
+      {count > 0 && (
+        <>
+          <select
+            onChange={e => { if (e.target.value) { onBulkStatus(e.target.value); e.target.value = ''; } }}
+            style={{ ...bulkBtn(), padding: '6px 10px' }}
+          >
+            <option value="">Durum değiştir…</option>
+            {COLLAB_STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          <button onClick={onBulkExport} style={bulkBtn()}>📥 CSV</button>
+          <button onClick={onBulkDelete} style={{ ...bulkBtn(), borderColor: '#dc2626', color: '#dc2626' }}>🗑 Sil</button>
+        </>
+      )}
+    </div>
+  );
+}
+function bulkBtn() {
+  return {
+    padding: '6px 11px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    border: '1.5px solid var(--border, rgba(0,0,0,0.2))',
+    background: 'var(--bg, #fff)', color: 'inherit',
+  };
 }
 
 // ── Ortak stiller ────────────────────────────────────────────────────────────
@@ -334,18 +579,25 @@ function EmptyState({ message }) {
   );
 }
 
-function CardsView({ rows, onOpen }) {
+function CardsView({ rows, onOpen, bulkMode, selectedIds, onToggleSelect }) {
   if (rows.length === 0) return <EmptyState message="Bu filtreye uyan işbirliği yok" />;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
       {rows.map(r => (
-        <CollabCard key={r.id} row={r} onOpen={() => onOpen(r.id)} />
+        <CollabCard
+          key={r.id}
+          row={r}
+          onOpen={() => onOpen(r.id)}
+          bulkMode={bulkMode}
+          selected={selectedIds?.has(r.id)}
+          onToggleSelect={onToggleSelect}
+        />
       ))}
     </div>
   );
 }
 
-function ListView({ rows, onOpen }) {
+function ListView({ rows, onOpen, bulkMode, selectedIds, onToggleSelect }) {
   if (rows.length === 0) return <EmptyState message="Bu filtreye uyan işbirliği yok" />;
   return (
     <div style={{
@@ -365,19 +617,33 @@ function ListView({ rows, onOpen }) {
         const t = typeObj(r.type);
         const s = statusObj(r.status);
         const u = unitObj(r.unit);
+        const checked = selectedIds?.has(r.id);
         return (
           <div
             key={r.id}
-            onClick={() => onOpen(r.id)}
+            onClick={(ev) => {
+              if (bulkMode) { ev.stopPropagation(); onToggleSelect && onToggleSelect(r.id); return; }
+              onOpen(r.id);
+            }}
             style={{
               display: 'grid', gridTemplateColumns: '1.8fr 0.9fr 1.3fr 1.3fr 0.9fr 1fr',
               padding: '12px 14px', fontSize: 13, cursor: 'pointer', alignItems: 'center',
               borderBottom: '1px solid var(--border, rgba(0,0,0,0.06))',
+              background: checked ? 'rgba(26,58,92,0.08)' : 'transparent',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-soft, rgba(0,0,0,0.02))'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={e => { if (!checked) e.currentTarget.style.background = 'var(--bg-soft, rgba(0,0,0,0.02))'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = checked ? 'rgba(26,58,92,0.08)' : 'transparent'; }}
           >
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+              {bulkMode && (
+                <input
+                  type="checkbox"
+                  checked={!!checked}
+                  onChange={() => onToggleSelect && onToggleSelect(r.id)}
+                  onClick={e => e.stopPropagation()}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+              )}
               {r.image_url && (
                 <img src={r.image_url} alt="" style={{
                   width: 32, height: 32, objectFit: 'cover', borderRadius: 6, flexShrink: 0,
@@ -540,6 +806,61 @@ function ByPartnerView({ rows, onOpen }) {
   );
 }
 
+function ByTypeView({ rows, onOpen }) {
+  const groups = useMemo(() => {
+    const map = new Map();
+    COLLAB_TYPES.forEach(t => map.set(t.id, []));
+    rows.forEach(r => {
+      const k = r.type || 'diger';
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(r);
+    });
+    return Array.from(map.entries()).filter(([, list]) => list.length > 0);
+  }, [rows]);
+
+  if (groups.length === 0) return <EmptyState message="Bu filtreye uyan işbirliği yok" />;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {groups.map(([typeId, list]) => {
+        const t = typeObj(typeId);
+        const color = t?.color || '#6366f1';
+        const icon = t?.icon || '🏷';
+        const label = t?.label || typeId;
+        return (
+          <div
+            key={typeId}
+            style={{
+              borderRadius: 14,
+              background: `linear-gradient(180deg, ${color}0c 0%, transparent 80px)`,
+              border: `1.5px solid ${color}33`,
+              padding: 14,
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+              paddingBottom: 10, borderBottom: `1.5px dashed ${color}33`,
+            }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                background: `${color}20`, color,
+              }}>{icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 800, color }}>{label}</div>
+                <div style={{ fontSize: 12, opacity: 0.65 }}>{list.length} işbirliği</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+              {list.map(r => <CollabCard key={r.id} row={r} onOpen={() => onOpen(r.id)} compact />)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Kart ─────────────────────────────────────────────────────────────────────
 function formatBudget(row) {
   if (row.budget_amount == null || row.budget_amount === '') return null;
@@ -558,7 +879,7 @@ function formatDateRange(row) {
   return fmtDisplayDate(row.start_date || row.end_date);
 }
 
-function CollabCard({ row, onOpen, compact = false }) {
+function CollabCard({ row, onOpen, compact = false, bulkMode = false, selected = false, onToggleSelect }) {
   const t = typeObj(row.type);
   const s = statusObj(row.status);
   const u = unitObj(row.unit);
@@ -567,17 +888,36 @@ function CollabCard({ row, onOpen, compact = false }) {
   const attachCount = Array.isArray(row.attachments) ? row.attachments.length : 0;
   return (
     <div
-      onClick={onOpen}
+      onClick={(ev) => {
+        if (bulkMode) { ev.stopPropagation(); onToggleSelect && onToggleSelect(row.id); return; }
+        onOpen();
+      }}
       style={{
         padding: 0, borderRadius: 12, cursor: 'pointer', overflow: 'hidden',
         background: 'var(--bg, #fff)',
-        border: '1.5px solid var(--border, rgba(0,0,0,0.12))',
+        border: `1.5px solid ${selected ? 'var(--navy, #1a3a5c)' : 'var(--border, rgba(0,0,0,0.12))'}`,
+        boxShadow: selected ? '0 0 0 3px rgba(26,58,92,0.15)' : 'none',
         transition: 'transform .1s ease, box-shadow .1s ease',
-        display: 'flex', flexDirection: 'column',
+        display: 'flex', flexDirection: 'column', position: 'relative',
       }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+      onMouseEnter={e => { if (!bulkMode) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)'; } }}
+      onMouseLeave={e => { if (!bulkMode) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = selected ? '0 0 0 3px rgba(26,58,92,0.15)' : 'none'; } }}
     >
+      {bulkMode && (
+        <div style={{
+          position: 'absolute', top: 8, left: 8, zIndex: 2,
+          background: 'rgba(255,255,255,0.95)', borderRadius: 6, padding: '2px 4px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+        }}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect && onToggleSelect(row.id)}
+            onClick={e => e.stopPropagation()}
+            style={{ width: 16, height: 16, cursor: 'pointer', margin: 0 }}
+          />
+        </div>
+      )}
       {row.image_url ? (
         <div style={{
           width: '100%', height: compact ? 110 : 140, overflow: 'hidden',
@@ -670,7 +1010,7 @@ function CollabCard({ row, onOpen, compact = false }) {
 }
 
 // ── Detay Modal ──────────────────────────────────────────────────────────────
-function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDeleted }) {
+function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDeleted, onOpenFullPage }) {
   const t = typeObj(row.type);
   const s = statusObj(row.status);
   const u = unitObj(row.unit);
@@ -898,7 +1238,39 @@ function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDele
         </Section>
       )}
 
+      {/* MoU / Partner Rolü / Beneficiary özeti */}
+      {(row.partner_role || row.mou_status || row.target_beneficiaries != null || row.reached_beneficiaries != null) && (
+        <Section title="İşbirliği Detayları">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+            {row.partner_role && (() => {
+              const r = COLLAB_PARTNER_ROLES.find(x => x.id === row.partner_role);
+              return <Field label="Partner Rolü" value={r ? `${r.icon || ''} ${r.label}` : row.partner_role} />;
+            })()}
+            {row.mou_status && (() => {
+              const m = COLLAB_MOU_STATUSES.find(x => x.id === row.mou_status);
+              return <Field label="MoU Durumu" value={m ? m.label : row.mou_status} />;
+            })()}
+            {row.mou_signed_at && <Field label="MoU İmza" value={fmtDisplayDate(row.mou_signed_at)} />}
+            {row.mou_expires_at && <Field label="MoU Bitiş" value={fmtDisplayDate(row.mou_expires_at)} />}
+            {row.mou_url && <Field label="MoU Dosyası" value={<a href={row.mou_url} target="_blank" rel="noreferrer" style={{ color: 'var(--navy, #1a3a5c)' }}>📄 Görüntüle</a>} />}
+            {(row.target_beneficiaries != null || row.reached_beneficiaries != null) && (
+              <Field
+                label="Beneficiary"
+                value={`${Number(row.reached_beneficiaries || 0).toLocaleString('tr-TR')} / ${Number(row.target_beneficiaries || 0).toLocaleString('tr-TR')}`}
+              />
+            )}
+          </div>
+        </Section>
+      )}
+
       <div style={{ marginTop: 18, display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {onOpenFullPage && (
+          <button onClick={onOpenFullPage} title="Notion tarzı tam sayfaya aç" style={{
+            padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            border: '1.5px solid var(--navy, #1a3a5c)', color: 'var(--navy, #1a3a5c)',
+            background: 'transparent',
+          }}>↗ Tam Sayfaya Aç</button>
+        )}
         {editable && (
           <>
             <button onClick={handleDelete} disabled={deleting} style={{
@@ -933,6 +1305,7 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
     unit:                    resolveUnitName(initialUnit),
     partner_org_id:          row?.partner_org_id || '',
     partner_name:            row?.partner_name || '',
+    partner_role:            row?.partner_role || '',
     partner_contact_person:  row?.partner_contact_person || '',
     partner_email:           row?.partner_email || '',
     partner_website:         row?.partner_website || '',
@@ -948,6 +1321,14 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
     location:                row?.location || '',
     tags:                    (row?.tags || []).join(', '),
     image_url:               row?.image_url || '',
+    // MoU / Sözleşme
+    mou_status:              row?.mou_status || '',
+    mou_signed_at:           row?.mou_signed_at || '',
+    mou_expires_at:          row?.mou_expires_at || '',
+    mou_url:                 row?.mou_url || '',
+    // Beneficiary
+    target_beneficiaries:    row?.target_beneficiaries ?? '',
+    reached_beneficiaries:   row?.reached_beneficiaries ?? '',
   });
   const [attachments, setAttachments] = useState(
     Array.isArray(row?.attachments) ? row.attachments : []
@@ -1090,6 +1471,7 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
       unit:                   resolveUnitName(form.unit),
       partner_org_id:         form.partner_org_id || null,
       partner_name:           form.partner_name.trim() || null,
+      partner_role:           form.partner_role || null,
       partner_contact_person: form.partner_contact_person.trim() || null,
       partner_email:          form.partner_email.trim() || null,
       partner_website:        form.partner_website.trim() || null,
@@ -1098,14 +1480,22 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
       related_fund_id:        form.related_fund_id || null,
       related_event_id:       form.related_event_id || null,
       start_date:             form.start_date || null,
-      end_date:               form.end_date || null,
-      status:                 form.status,
-      budget_amount:          form.budget_amount === '' ? null : Number(form.budget_amount),
-      budget_currency:        form.budget_currency || 'TRY',
-      location:               form.location.trim() || null,
-      tags:                   form.tags.split(',').map(x => x.trim()).filter(Boolean),
-      image_url:              form.image_url || null,
-      attachments:            attachments || [],
+      end_date:                form.end_date || null,
+      status:                  form.status,
+      budget_amount:           form.budget_amount === '' ? null : Number(form.budget_amount),
+      budget_currency:         form.budget_currency || 'TRY',
+      location:                form.location.trim() || null,
+      tags:                    form.tags.split(',').map(x => x.trim()).filter(Boolean),
+      image_url:               form.image_url || null,
+      attachments:             attachments || [],
+      // MoU
+      mou_status:              form.mou_status || null,
+      mou_signed_at:           form.mou_signed_at || null,
+      mou_expires_at:          form.mou_expires_at || null,
+      mou_url:                 (form.mou_url || '').trim() || null,
+      // Beneficiary
+      target_beneficiaries:    form.target_beneficiaries === '' ? null : Number(form.target_beneficiaries),
+      reached_beneficiaries:   form.reached_beneficiaries === '' ? null : Number(form.reached_beneficiaries),
     };
 
     try {
@@ -1225,11 +1615,33 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
           Seçtiğinizde kurum adı, e-posta ve web adresi otomatik doldurulur. Sistemde yoksa önce Network Yönetimi'nden ekleyin.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <LabeledInput label="Partner Kurum Adı" value={form.partner_name} onChange={v => set('partner_name', v)} placeholder="Örn: UNICEF Türkiye" />
+          <LabeledInput
+            label="Partner Kurum Adı"
+            value={form.partner_name}
+            onChange={v => set('partner_name', v)}
+            placeholder="Örn: UNICEF Türkiye"
+            listId="collab-partner-names"
+          />
+          <LabeledSelect
+            label="Partner Rolü"
+            value={form.partner_role}
+            onChange={v => set('partner_role', v)}
+          >
+            <option value="">— Belirtilmedi —</option>
+            {COLLAB_PARTNER_ROLES.map(r => (
+              <option key={r.id} value={r.id}>{r.icon ? `${r.icon} ` : ''}{r.label}</option>
+            ))}
+          </LabeledSelect>
           <LabeledInput label="İlgili Kişi" value={form.partner_contact_person} onChange={v => set('partner_contact_person', v)} placeholder="Ad Soyad" />
           <LabeledInput label="E-posta" value={form.partner_email} onChange={v => set('partner_email', v)} placeholder="kisi@kurum.org" />
           <LabeledInput label="Web / Link" value={form.partner_website} onChange={v => set('partner_website', v)} placeholder="https://…" />
         </div>
+        {/* Partner name autocomplete datalist */}
+        <datalist id="collab-partner-names">
+          {(lookups.organizations || []).map(o => (
+            <option key={o.id} value={o.name}>{o.org_type || ''}</option>
+          ))}
+        </datalist>
 
         <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>SORUMLU KİŞİ</div>
         <LabeledSelect
@@ -1300,6 +1712,25 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
         <LabeledInput label="Konum" value={form.location} onChange={v => set('location', v)} placeholder="Örn: İstanbul / Çevrimiçi / Gaziantep, Türkiye" />
 
         <LabeledInput label="Etiketler (virgülle ayırın)" value={form.tags} onChange={v => set('tags', v)} placeholder="çocuk, sağlık, gaziantep" />
+
+        {/* ── MoU / Sözleşme ─────────────────────────────────────────────── */}
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>MoU / SÖZLEŞME</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <LabeledSelect label="MoU Durumu" value={form.mou_status} onChange={v => set('mou_status', v)}>
+            <option value="">— Belirtilmedi —</option>
+            {COLLAB_MOU_STATUSES.map(m => (<option key={m.id} value={m.id}>{m.label}</option>))}
+          </LabeledSelect>
+          <LabeledInput label="MoU / Sözleşme URL" value={form.mou_url} onChange={v => set('mou_url', v)} placeholder="https://…" />
+          <LabeledInput type="date" label="İmzalanma Tarihi" value={form.mou_signed_at} onChange={v => set('mou_signed_at', v)} />
+          <LabeledInput type="date" label="Bitiş / Geçerlilik" value={form.mou_expires_at} onChange={v => set('mou_expires_at', v)} />
+        </div>
+
+        {/* ── Beneficiary Metrikleri ─────────────────────────────────────── */}
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>BENEFİCİARY / ETKİ ÖLÇÜMÜ</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <LabeledInput type="number" label="Hedef Sayı" value={form.target_beneficiaries} onChange={v => set('target_beneficiaries', v)} placeholder="0" />
+          <LabeledInput type="number" label="Ulaşılan" value={form.reached_beneficiaries} onChange={v => set('reached_beneficiaries', v)} placeholder="0" />
+        </div>
 
         {/* ── Drive ek dosyalar ─────────────────────────────────────────── */}
         <div style={{ marginTop: 6 }}>
@@ -1491,15 +1922,16 @@ function Field({ label, value }) {
   );
 }
 
-function LabeledInput({ label, value, onChange, placeholder, type = 'text' }) {
+function LabeledInput({ label, value, onChange, placeholder, type = 'text', listId }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.7 }}>{label}</span>
       <input
         type={type}
-        value={value || ''}
+        value={value == null ? '' : value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        list={listId}
         style={{
           padding: '8px 11px', borderRadius: 7, fontSize: 13,
           border: '1.5px solid var(--border, rgba(0,0,0,0.15))',

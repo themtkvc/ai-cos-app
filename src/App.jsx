@@ -32,6 +32,7 @@ import PolicyGovernance from './pages/PolicyGovernance';
 import PublicFormFill from './pages/PublicFormFill';
 import Feedback from './pages/Feedback';
 import Collaborations from './pages/Collaborations';
+import CollaborationDetail from './pages/CollaborationDetail';
 import Login from './pages/Login';
 import Sidebar from './components/Sidebar';
 import AIChatPanel from './components/AIChatPanel';
@@ -149,12 +150,18 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   // URL hash'ten başlangıç sayfasını oku (yenileme sonrası koru)
-  const pageFromHash = () => {
+  // `collaborations/:id` → Notion tarzı tam sayfa detay
+  const parseHash = () => {
     const h = window.location.hash.replace('#', '').trim();
+    const mCollab = h.match(/^collaborations\/([a-f0-9-]{8,})$/i);
+    if (mCollab) return { page: 'collaboration_detail', collabId: mCollab[1] };
     const allPages = Object.values(ROLE_ACCESS).flat();
-    return allPages.includes(h) ? h : 'dashboard';
+    return { page: allPages.includes(h) ? h : 'dashboard', collabId: null };
   };
-  const [activePage, setActivePage] = useState(pageFromHash);
+  const pageFromHash = () => parseHash().page;
+  const [activePage, setActivePage] = useState(() => parseHash().page);
+  const [collabDetailId, setCollabDetailId] = useState(() => parseHash().collabId);
+  const [collabEditTarget, setCollabEditTarget] = useState(null);
   const [chatInitialMessage, setChatInitialMessage] = useState(null);
   const [dailyLogLinkedTask, setDailyLogLinkedTask] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
@@ -193,9 +200,17 @@ export default function App() {
   // Browser geri/ileri tuşu desteği
   useEffect(() => {
     const onHashChange = () => {
-      const page = pageFromHash();
+      const { page, collabId } = parseHash();
       const allowed = getAllowedPages(profile);
-      if (allowed.includes(page)) setActivePage(page);
+      if (page === 'collaboration_detail') {
+        if (allowed.includes('collaborations')) {
+          setActivePage('collaboration_detail');
+          setCollabDetailId(collabId);
+        }
+      } else if (allowed.includes(page)) {
+        setActivePage(page);
+        setCollabDetailId(null);
+      }
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -259,10 +274,32 @@ export default function App() {
   const [linkedAgendaId, setLinkedAgendaId] = useState(null);
 
   const navigate = (page, opts = {}) => {
+    // ── Collaboration tam sayfa: navigate('collaborations', { collabId }) ──
+    if (page === 'collaborations' && opts.collabId) {
+      const allowed = getAllowedPages(profile);
+      if (!allowed.includes('collaborations')) return;
+      setActivePage('collaboration_detail');
+      setCollabDetailId(opts.collabId);
+      setMobileNavOpen(false);
+      window.location.hash = `collaborations/${opts.collabId}`;
+      return;
+    }
+    // ── Collaboration modal düzenleme: navigate('collaborations', { editCollabId }) ──
+    if (page === 'collaborations' && opts.editCollabId) {
+      const allowed = getAllowedPages(profile);
+      if (!allowed.includes('collaborations')) return;
+      setActivePage('collaborations');
+      setCollabDetailId(null);
+      setCollabEditTarget(opts.editCollabId);
+      setMobileNavOpen(false);
+      window.location.hash = 'collaborations';
+      return;
+    }
     // Check role + unit access
     const allowed = getAllowedPages(profile);
     if (!allowed.includes(page)) return;
     setActivePage(page);
+    setCollabDetailId(null);
     setMobileNavOpen(false);
     window.location.hash = page; // URL'ye yaz → yenileme sonrası korunur
     if (opts && opts.initialMessage !== undefined) {
@@ -404,6 +441,13 @@ export default function App() {
               initialMessage={chatInitialMessage}
               onClearInitialMessage={() => setChatInitialMessage(null)}
             />
+          ) : activePage === 'collaboration_detail' ? (
+            <CollaborationDetail
+              id={collabDetailId}
+              user={user}
+              profile={profile}
+              onNavigate={navigate}
+            />
           ) : PageComponent ? (
             <PageComponent
               user={user}
@@ -414,6 +458,8 @@ export default function App() {
               linkedTask={activePage === 'dailylog' ? dailyLogLinkedTask : undefined}
               linkedAgendaId={activePage === 'agendas' ? linkedAgendaId : undefined}
               onClearLinkedAgenda={() => setLinkedAgendaId(null)}
+              editCollabId={activePage === 'collaborations' ? collabEditTarget : undefined}
+              onClearEditCollab={() => setCollabEditTarget(null)}
             />
           ) : (
             <Dashboard user={user} profile={profile} onNavigate={navigate} />
