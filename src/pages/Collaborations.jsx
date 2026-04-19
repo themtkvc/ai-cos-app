@@ -6,6 +6,7 @@ import {
   validateUploadFile, MAX_DOCUMENT_BYTES,
   getCollabLookups,
   bulkUpdateCollaborations, bulkDeleteCollaborations,
+  createNetworkOrg,
   COLLAB_TYPES, COLLAB_STATUSES, COLLAB_PARTNER_ROLES, COLLAB_MOU_STATUSES,
   DEFAULT_COLLAB_PAGE_LIMIT,
 } from '../lib/supabase';
@@ -402,6 +403,13 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
           lookups={lookups}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+          onOrgCreated={(org) => {
+            setLookups(prev => ({
+              ...prev,
+              organizations: [org, ...(prev.organizations || [])]
+                .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'tr')),
+            }));
+          }}
         />
       )}
 
@@ -1295,7 +1303,7 @@ function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDele
 }
 
 // ── Oluştur/Düzenle Modal ────────────────────────────────────────────────────
-function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
+function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved, onOrgCreated }) {
   const isNew = !row?.id;
   const initialUnit = row?.unit || row?._unitPrefill || resolveUnitName(profile?.unit) || UNITS[0].name;
   const [form, setForm] = useState({
@@ -1586,42 +1594,36 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
         </div>
 
         <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>PARTNER KURUM</div>
-        <LabeledSelect
-          label="Sistemdeki Kurumlardan Seç"
+        <OrgAutocomplete
+          orgs={lookups.organizations || []}
           value={form.partner_org_id}
-          onChange={(v) => {
-            const org = (lookups.organizations || []).find(o => o.id === v);
-            if (org) {
+          legacyName={!form.partner_org_id ? form.partner_name : ''}
+          unitHint={form.unit}
+          onSelect={(org) => {
+            if (!org) {
               setForm(f => ({
                 ...f,
-                partner_org_id:  org.id,
-                partner_name:    org.name || f.partner_name,
-                partner_email:   org.email || f.partner_email,
-                partner_website: org.website || f.partner_website,
+                partner_org_id: '',
+                partner_name:   '',
+                partner_email:   f.partner_email,
+                partner_website: f.partner_website,
               }));
-            } else {
-              set('partner_org_id', '');
+              return;
             }
+            setForm(f => ({
+              ...f,
+              partner_org_id:  org.id,
+              partner_name:    org.name || '',
+              partner_email:   org.email || f.partner_email,
+              partner_website: org.website || f.partner_website,
+            }));
           }}
-        >
-          <option value="">— Seçilmedi / Sistemde olmayan kurum —</option>
-          {(lookups.organizations || []).map(o => (
-            <option key={o.id} value={o.id}>
-              {o.name}{o.org_type ? ` · ${o.org_type}` : ''}
-            </option>
-          ))}
-        </LabeledSelect>
-        <div style={{ fontSize: 11, opacity: 0.55, marginTop: -4 }}>
-          Seçtiğinizde kurum adı, e-posta ve web adresi otomatik doldurulur. Sistemde yoksa önce Network Yönetimi'nden ekleyin.
-        </div>
+          onOrgCreated={(newOrg) => {
+            if (typeof onOrgCreated === 'function') onOrgCreated(newOrg);
+          }}
+          creatorName={profile?.full_name || user?.email || null}
+        />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <LabeledInput
-            label="Partner Kurum Adı"
-            value={form.partner_name}
-            onChange={v => set('partner_name', v)}
-            placeholder="Örn: UNICEF Türkiye"
-            listId="collab-partner-names"
-          />
           <LabeledSelect
             label="Partner Rolü"
             value={form.partner_role}
@@ -1636,12 +1638,6 @@ function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
           <LabeledInput label="E-posta" value={form.partner_email} onChange={v => set('partner_email', v)} placeholder="kisi@kurum.org" />
           <LabeledInput label="Web / Link" value={form.partner_website} onChange={v => set('partner_website', v)} placeholder="https://…" />
         </div>
-        {/* Partner name autocomplete datalist */}
-        <datalist id="collab-partner-names">
-          {(lookups.organizations || []).map(o => (
-            <option key={o.id} value={o.name}>{o.org_type || ''}</option>
-          ))}
-        </datalist>
 
         <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>SORUMLU KİŞİ</div>
         <LabeledSelect
@@ -1978,3 +1974,327 @@ function LabeledSelect({ label, value, onChange, children }) {
     </label>
   );
 }
+
+// ── Partner kurum autocomplete + inline create ────────────────────────────────
+const ORG_TYPE_OPTIONS = [
+  { id: 'ngo',       label: 'STK / NGO' },
+  { id: 'govt',      label: 'Kamu' },
+  { id: 'un',        label: 'BM / Ajans' },
+  { id: 'academic',  label: 'Akademik' },
+  { id: 'private',   label: 'Özel Sektör' },
+  { id: 'donor',     label: 'Donor / Fon Veren' },
+  { id: 'foundation',label: 'Vakıf' },
+  { id: 'other',     label: 'Diğer' },
+];
+
+function OrgAutocomplete({ orgs = [], value, onSelect, onOrgCreated, creatorName, unitHint, legacyName }) {
+  const selectedOrg = orgs.find(o => o.id === value) || null;
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newOrg, setNewOrg] = useState({ name: '', org_type: 'ngo', website: '', email: '' });
+  const wrapRef = useRef(null);
+  const inputRef = useRef(null);
+  const hasLegacy = !selectedOrg && !!legacyName && legacyName.trim().length > 0;
+
+  // Outside click closes dropdown
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target)) { setOpen(false); setCreating(false); }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const q = query.trim().toLocaleLowerCase('tr');
+  const filtered = !q
+    ? orgs.slice(0, 20)
+    : orgs.filter(o =>
+        (o.name || '').toLocaleLowerCase('tr').includes(q)
+        || (o.org_type || '').toLocaleLowerCase('tr').includes(q)
+      ).slice(0, 50);
+  const exactMatch = q && filtered.some(o => (o.name || '').toLocaleLowerCase('tr') === q);
+  const canCreate = !!q && !exactMatch;
+
+  function pick(org) {
+    onSelect(org);
+    setQuery('');
+    setOpen(false);
+    setCreating(false);
+  }
+
+  function clear() {
+    onSelect(null);
+    setQuery('');
+    setOpen(false);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function startCreate(prefillName = '') {
+    setNewOrg({ name: prefillName || query.trim(), org_type: 'ngo', website: '', email: '' });
+    setCreating(true);
+    setOpen(true);
+  }
+
+  async function handleCreate(e) {
+    e?.preventDefault?.();
+    const name = newOrg.name.trim();
+    if (!name) return;
+    setSaving(true);
+    const payload = {
+      name,
+      org_type: newOrg.org_type || 'other',
+      website: newOrg.website.trim() || null,
+      email:   newOrg.email.trim() || null,
+      unit:    unitHint || null,
+    };
+    const { data, error } = await createNetworkOrg(payload, creatorName);
+    setSaving(false);
+    if (error) {
+      alert('Kurum eklenemedi: ' + (error.message || 'Bilinmeyen hata'));
+      return;
+    }
+    if (typeof onOrgCreated === 'function') onOrgCreated(data);
+    // Seç yeni ekleneni
+    pick(data);
+  }
+
+  function onKeyDown(e) {
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(filtered.length - (canCreate ? 0 : 1), i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIdx < filtered.length) {
+        pick(filtered[activeIdx]);
+      } else if (canCreate) {
+        startCreate();
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.7 }}>
+          Partner Kurum
+        </span>
+
+        {selectedOrg ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 10px', borderRadius: 7,
+            border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+            background: 'var(--bg, #fff)',
+          }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 9px', borderRadius: 999,
+              background: 'rgba(99,102,241,0.12)', color: '#4338ca',
+              fontSize: 12.5, fontWeight: 700,
+            }}>
+              🏛 {selectedOrg.name}
+              {selectedOrg.org_type && (
+                <span style={{ opacity: 0.7, fontWeight: 600 }}> · {selectedOrg.org_type}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={clear}
+              style={{
+                marginLeft: 'auto', padding: '3px 9px', borderRadius: 6,
+                border: '1px solid var(--border, rgba(0,0,0,0.15))',
+                background: 'transparent', cursor: 'pointer', fontSize: 12,
+              }}
+              title="Kurumu temizle"
+            >× Temizle</button>
+          </div>
+        ) : (
+          <>
+          {hasLegacy && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 10px', marginBottom: 6, borderRadius: 7,
+              background: 'rgba(234,179,8,0.12)', color: '#854d0e',
+              fontSize: 12, border: '1px solid rgba(234,179,8,0.35)',
+            }}>
+              <span style={{ fontSize: 14 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                Bu işbirliğindeki kurum <b>"{legacyName}"</b> sisteme bağlı değil.
+              </div>
+              <button
+                type="button"
+                onClick={() => { setQuery(legacyName.trim()); setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+                style={{
+                  padding: '4px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                  cursor: 'pointer', background: 'var(--bg, #fff)',
+                  border: '1px solid rgba(234,179,8,0.5)', color: '#854d0e',
+                }}
+              >Bağla →</button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setOpen(true); setActiveIdx(0); setCreating(false); }}
+              onFocus={() => setOpen(true)}
+              onKeyDown={onKeyDown}
+              placeholder="Kurum ara... (ör. UNICEF, TİKA, LSE)"
+              style={{
+                flex: 1, padding: '8px 11px', borderRadius: 7, fontSize: 13,
+                border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+                background: 'var(--bg, #fff)', color: 'inherit', outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => startCreate(query.trim())}
+              title="Sistemde yoksa yeni kurum ekle"
+              style={{
+                padding: '0 12px', borderRadius: 7, fontSize: 16, fontWeight: 800,
+                border: '1.5px solid var(--navy, #1a3a5c)',
+                background: 'var(--navy, #1a3a5c)', color: '#fff',
+                cursor: 'pointer', minWidth: 42,
+              }}
+            >+</button>
+          </div>
+          </>
+        )}
+      </label>
+
+      {!selectedOrg && open && !creating && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+          background: 'var(--bg, #fff)', zIndex: 20,
+          border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+          borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          maxHeight: 280, overflowY: 'auto',
+        }}>
+          {filtered.length === 0 && !canCreate && (
+            <div style={{ padding: 14, fontSize: 13, opacity: 0.6, textAlign: 'center' }}>
+              Kayıtlı kurum bulunamadı.
+            </div>
+          )}
+          {filtered.map((o, idx) => (
+            <div
+              key={o.id}
+              onMouseDown={(e) => { e.preventDefault(); pick(o); }}
+              onMouseEnter={() => setActiveIdx(idx)}
+              style={{
+                padding: '9px 12px', cursor: 'pointer', fontSize: 13,
+                background: activeIdx === idx ? 'rgba(99,102,241,0.08)' : 'transparent',
+                borderBottom: '1px solid var(--border, rgba(0,0,0,0.05))',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>🏛</span>
+              <span style={{ fontWeight: 600 }}>{o.name}</span>
+              {o.org_type && (
+                <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 'auto' }}>{o.org_type}</span>
+              )}
+            </div>
+          ))}
+          {canCreate && (
+            <div
+              onMouseDown={(e) => { e.preventDefault(); startCreate(query.trim()); }}
+              style={{
+                padding: '10px 12px', cursor: 'pointer', fontSize: 13,
+                background: activeIdx === filtered.length ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.06)',
+                color: '#15803d', fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              ➕ "{query.trim()}" adıyla yeni kurum ekle
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedOrg && creating && (
+        <div style={{
+          marginTop: 8,
+          padding: 12, borderRadius: 8,
+          border: '1.5px solid #22c55e',
+          background: 'rgba(34,197,94,0.05)',
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>
+            ➕ YENİ PARTNER KURUM EKLE
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 8 }}>
+            <input
+              type="text"
+              value={newOrg.name}
+              onChange={e => setNewOrg(n => ({ ...n, name: e.target.value }))}
+              placeholder="Kurum adı *"
+              autoFocus
+              style={inputStyle}
+            />
+            <select
+              value={newOrg.org_type}
+              onChange={e => setNewOrg(n => ({ ...n, org_type: e.target.value }))}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              {ORG_TYPE_OPTIONS.map(t => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={newOrg.website}
+              onChange={e => setNewOrg(n => ({ ...n, website: e.target.value }))}
+              placeholder="Web (opsiyonel)"
+              style={inputStyle}
+            />
+            <input
+              type="email"
+              value={newOrg.email}
+              onChange={e => setNewOrg(n => ({ ...n, email: e.target.value }))}
+              placeholder="E-posta (ops.)"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setCreating(false)}
+              style={{
+                padding: '7px 12px', borderRadius: 6, fontSize: 12.5, cursor: 'pointer',
+                border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+                background: 'var(--bg, #fff)', color: 'inherit',
+              }}
+            >İptal</button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={saving || !newOrg.name.trim()}
+              style={{
+                padding: '7px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 700,
+                cursor: saving || !newOrg.name.trim() ? 'not-allowed' : 'pointer',
+                border: 'none', background: '#22c55e', color: '#fff',
+                opacity: saving || !newOrg.name.trim() ? 0.6 : 1,
+              }}
+            >{saving ? 'Ekleniyor…' : '✓ Ekle & Seç'}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const inputStyle = {
+  padding: '7px 10px', borderRadius: 6, fontSize: 13,
+  border: '1.5px solid var(--border, rgba(0,0,0,0.15))',
+  background: 'var(--bg, #fff)', color: 'inherit', outline: 'none',
+};
