@@ -1000,6 +1000,8 @@ function NotesSidebar({
     }}>
       {item(VIEWS.NOTES,     '💡', 'Notlar',        counts.notes)}
       {item(VIEWS.REMINDERS, '🔔', 'Hatırlatıcılar', counts.reminders)}
+      {item(VIEWS.ARCHIVE,   '🗄', 'Arşiv',          counts.archive)}
+      {item(VIEWS.TRASH,     '🗑', 'Çöp kutusu',     counts.trash)}
 
       <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', padding: '14px 14px 6px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Etiketler
@@ -1089,8 +1091,6 @@ function NotesSidebar({
       )}
 
       <div style={{ height: 12 }} />
-      {item(VIEWS.ARCHIVE, '🗄', 'Arşiv', counts.archive)}
-      {item(VIEWS.TRASH,   '🗑', 'Çöp kutusu', counts.trash)}
     </aside>
   );
 }
