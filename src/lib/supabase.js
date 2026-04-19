@@ -2135,6 +2135,31 @@ export const deleteCollaboration = async (id) => {
   return await supabase.from('collaborations').delete().eq('id', id);
 };
 
+// ── İşbirliği için lookup listeleri (modal picker'ları doldurmak için) ────
+export const getCollabLookups = async () => {
+  const [orgs, users, funds, events] = await Promise.all([
+    supabase.from('network_organizations')
+      .select('id, name, org_type, website, email, logo_url, unit')
+      .order('name', { ascending: true }),
+    supabase.from('user_profiles')
+      .select('user_id, full_name, role, unit, email, avatar_url')
+      .order('full_name', { ascending: true }),
+    supabase.from('fund_opportunities')
+      .select('id, title, donor_organization, deadline, status, currency, amount_min, amount_max')
+      .order('deadline', { ascending: true, nullsFirst: false }),
+    supabase.from('events')
+      .select('id, title, event_type, start_date, end_date, status, location_name')
+      .order('start_date', { ascending: false }),
+  ]);
+  return {
+    organizations:     orgs.data  || [],
+    users:             users.data || [],
+    fundOpportunities: funds.data || [],
+    events:            events.data || [],
+    error: orgs.error || users.error || funds.error || events.error || null,
+  };
+};
+
 // ── İŞBİRLİĞİ GÖRSEL YÜKLEME (< 3MB otomatik küçültme) ─────────────────────
 // Tarayıcıda canvas ile ölçeklendirir; 3MB altına inene kadar boyut/kalite düşürür.
 export const MAX_COLLAB_IMAGE_BYTES = 3 * 1024 * 1024; // 3 MB

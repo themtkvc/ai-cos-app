@@ -4,6 +4,7 @@ import {
   uploadCollabImage, deleteCollabImage,
   uploadDocumentToDrive, deleteDocumentFromDrive,
   validateUploadFile, MAX_DOCUMENT_BYTES,
+  getCollabLookups,
   COLLAB_TYPES, COLLAB_STATUSES,
 } from '../lib/supabase';
 import { UNITS, resolveUnitName, fmtDisplayDate } from '../lib/constants';
@@ -68,6 +69,7 @@ export default function Collaborations({ user, profile }) {
   const [editing, setEditing] = useState(null); // {} or {unit: 'X'} for new, row for edit
   const [viewId, setViewId]   = useState(null);
   const [toast, setToast]     = useState('');
+  const [lookups, setLookups] = useState({ organizations: [], users: [], fundOpportunities: [], events: [] });
 
   const load = async () => {
     setLoading(true); setError('');
@@ -82,7 +84,17 @@ export default function Collaborations({ user, profile }) {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    getCollabLookups().then(res => {
+      if (!res.error) setLookups({
+        organizations: res.organizations,
+        users: res.users,
+        fundOpportunities: res.fundOpportunities,
+        events: res.events,
+      });
+    });
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -241,6 +253,7 @@ export default function Collaborations({ user, profile }) {
           row={editing}
           profile={profile}
           user={user}
+          lookups={lookups}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
         />
@@ -259,6 +272,7 @@ export default function Collaborations({ user, profile }) {
         <CollabDetailModal
           row={viewing}
           profile={profile}
+          lookups={lookups}
           onClose={() => setViewId(null)}
           onEdit={() => { setViewId(null); setEditing(viewing); }}
           onDeleted={() => {
@@ -656,12 +670,22 @@ function CollabCard({ row, onOpen, compact = false }) {
 }
 
 // ── Detay Modal ──────────────────────────────────────────────────────────────
-function CollabDetailModal({ row, profile, onClose, onEdit, onDeleted }) {
+function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDeleted }) {
   const t = typeObj(row.type);
   const s = statusObj(row.status);
   const u = unitObj(row.unit);
   const editable = canEdit(row, profile);
   const [deleting, setDeleting] = useState(false);
+
+  // Bağlantılı kayıtları lookup listelerinden çöz
+  const linkedOrg   = row.partner_org_id
+    ? (lookups.organizations || []).find(o => o.id === row.partner_org_id) : null;
+  const linkedUser  = row.owner_id
+    ? (lookups.users || []).find(x => x.user_id === row.owner_id) : null;
+  const linkedFund  = row.related_fund_id
+    ? (lookups.fundOpportunities || []).find(f => f.id === row.related_fund_id) : null;
+  const linkedEvent = row.related_event_id
+    ? (lookups.events || []).find(e => e.id === row.related_event_id) : null;
 
   const handleDelete = async () => {
     if (!window.confirm('Bu işbirliği kalıcı olarak silinecek. Emin misiniz?')) return;
@@ -698,25 +722,125 @@ function CollabDetailModal({ row, profile, onClose, onEdit, onDeleted }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-        {(row.partner_name || row.partner_contact_person || row.partner_email || row.partner_website) && (
-          <Section title="Partner Bilgileri">
-            {row.partner_name           && <Field label="Kurum"   value={row.partner_name} />}
-            {row.partner_contact_person && <Field label="İlgili Kişi" value={row.partner_contact_person} />}
-            {row.partner_email          && <Field label="E-posta" value={<a href={`mailto:${row.partner_email}`} style={{ color: 'var(--navy, #1a3a5c)' }}>{row.partner_email}</a>} />}
-            {row.partner_website        && <Field label="Web"     value={<a href={row.partner_website} target="_blank" rel="noreferrer" style={{ color: 'var(--navy, #1a3a5c)' }}>{row.partner_website}</a>} />}
+        {(linkedOrg || row.partner_name || row.partner_contact_person || row.partner_email || row.partner_website) && (
+          <Section title="Partner Kurum">
+            {linkedOrg && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(99,102,241,0.08)',
+                border: '1px solid rgba(99,102,241,0.2)',
+              }}>
+                {linkedOrg.logo_url ? (
+                  <img src={linkedOrg.logo_url} alt="" style={{
+                    width: 34, height: 34, borderRadius: 6, objectFit: 'cover',
+                  }} />
+                ) : (
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 6,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(99,102,241,0.2)', color: '#4338ca', fontSize: 18,
+                  }}>🏢</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{linkedOrg.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    {linkedOrg.org_type || 'Kurum'} · Network'te kayıtlı
+                  </div>
+                </div>
+              </div>
+            )}
+            {row.partner_name && !linkedOrg  && <Field label="Kurum"   value={row.partner_name} />}
+            {row.partner_contact_person      && <Field label="İlgili Kişi" value={row.partner_contact_person} />}
+            {row.partner_email               && <Field label="E-posta" value={<a href={`mailto:${row.partner_email}`} style={{ color: 'var(--navy, #1a3a5c)' }}>{row.partner_email}</a>} />}
+            {row.partner_website             && <Field label="Web"     value={<a href={row.partner_website} target="_blank" rel="noreferrer" style={{ color: 'var(--navy, #1a3a5c)' }}>{row.partner_website}</a>} />}
           </Section>
         )}
 
-        <Section title="Zaman & Durum">
+        <Section title="Sorumlu Kişi">
+          {linkedUser ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 8,
+              background: 'rgba(14,165,233,0.08)',
+              border: '1px solid rgba(14,165,233,0.2)',
+            }}>
+              {linkedUser.avatar_url ? (
+                <img src={linkedUser.avatar_url} alt="" style={{
+                  width: 34, height: 34, borderRadius: '50%', objectFit: 'cover',
+                }} />
+              ) : (
+                <div style={{
+                  width: 34, height: 34, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(14,165,233,0.2)', color: '#0369a1',
+                  fontSize: 14, fontWeight: 700,
+                }}>{(linkedUser.full_name || '?').charAt(0).toUpperCase()}</div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{linkedUser.full_name}</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>
+                  {linkedUser.unit ? `${linkedUser.unit} · ` : ''}{linkedUser.role || ''}
+                </div>
+              </div>
+            </div>
+          ) : (
+            row.owner_name && <Field label="Atanan" value={row.owner_name} />
+          )}
+        </Section>
+
+        <Section title="Zaman & Bütçe">
           {row.start_date && <Field label="Başlangıç" value={fmtDisplayDate(row.start_date)} />}
           {row.end_date   && <Field label="Bitiş"     value={fmtDisplayDate(row.end_date)} />}
           {row.location   && <Field label="Konum"     value={`📍 ${row.location}`} />}
           {row.budget_amount != null && (
             <Field label="Bütçe" value={`${Number(row.budget_amount).toLocaleString('tr-TR')} ${row.budget_currency || 'TRY'}`} />
           )}
-          {row.owner_name && <Field label="Sahibi" value={row.owner_name} />}
         </Section>
       </div>
+
+      {(linkedFund || linkedEvent) && (
+        <Section title="Bağlantılı Kayıtlar">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {linkedFund && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(234,179,8,0.08)',
+                border: '1px solid rgba(234,179,8,0.25)',
+              }}>
+                <div style={{ fontSize: 20 }}>💰</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{linkedFund.title}</div>
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    {linkedFund.donor_organization || 'Fon Fırsatı'}
+                    {linkedFund.deadline ? ` · ⏰ ${fmtDisplayDate(linkedFund.deadline)}` : ''}
+                    {linkedFund.status ? ` · ${linkedFund.status}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
+            {linkedEvent && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(37,99,235,0.08)',
+                border: '1px solid rgba(37,99,235,0.25)',
+              }}>
+                <div style={{ fontSize: 20 }}>📅</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{linkedEvent.title}</div>
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    {linkedEvent.event_type || 'Etkinlik'}
+                    {linkedEvent.start_date ? ` · ${fmtDisplayDate(linkedEvent.start_date)}` : ''}
+                    {linkedEvent.location_name ? ` · 📍 ${linkedEvent.location_name}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       {row.tags && row.tags.length > 0 && (
         <Section title="Etiketler">
@@ -799,7 +923,7 @@ function CollabDetailModal({ row, profile, onClose, onEdit, onDeleted }) {
 }
 
 // ── Oluştur/Düzenle Modal ────────────────────────────────────────────────────
-function CollabModal({ row, profile, user, onClose, onSaved }) {
+function CollabModal({ row, profile, user, lookups = {}, onClose, onSaved }) {
   const isNew = !row?.id;
   const initialUnit = row?.unit || row?._unitPrefill || resolveUnitName(profile?.unit) || UNITS[0].name;
   const [form, setForm] = useState({
@@ -807,10 +931,15 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
     description:             row?.description || '',
     type:                    row?.type || 'proje',
     unit:                    resolveUnitName(initialUnit),
+    partner_org_id:          row?.partner_org_id || '',
     partner_name:            row?.partner_name || '',
     partner_contact_person:  row?.partner_contact_person || '',
     partner_email:           row?.partner_email || '',
     partner_website:         row?.partner_website || '',
+    owner_id:                row?.owner_id || user?.id || '',
+    owner_name:              row?.owner_name || profile?.full_name || user?.email || '',
+    related_fund_id:         row?.related_fund_id || '',
+    related_event_id:        row?.related_event_id || '',
     start_date:              row?.start_date || '',
     end_date:                row?.end_date || '',
     status:                  row?.status || 'planlaniyor',
@@ -959,10 +1088,15 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
       description:            form.description.trim() || null,
       type:                   form.type,
       unit:                   resolveUnitName(form.unit),
+      partner_org_id:         form.partner_org_id || null,
       partner_name:           form.partner_name.trim() || null,
       partner_contact_person: form.partner_contact_person.trim() || null,
       partner_email:          form.partner_email.trim() || null,
       partner_website:        form.partner_website.trim() || null,
+      owner_id:               form.owner_id || null,
+      owner_name:             (form.owner_name || '').trim() || null,
+      related_fund_id:        form.related_fund_id || null,
+      related_event_id:       form.related_event_id || null,
       start_date:             form.start_date || null,
       end_date:               form.end_date || null,
       status:                 form.status,
@@ -976,8 +1110,11 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
 
     try {
       if (isNew) {
-        payload.owner_id   = user?.id || profile?.user_id;
-        payload.owner_name = profile?.full_name || user?.email || '—';
+        // Yeni kayıtta sorumlu kişi seçilmediyse: oluşturan kişi default olsun
+        if (!payload.owner_id) {
+          payload.owner_id   = user?.id || profile?.user_id;
+          payload.owner_name = profile?.full_name || user?.email || '—';
+        }
         const { data, error } = await createCollaboration(payload);
         if (error) throw error;
         onSaved(data, { isNew: true });
@@ -1058,12 +1195,90 @@ function CollabModal({ row, profile, user, onClose, onSaved }) {
           </LabeledSelect>
         </div>
 
-        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>PARTNER</div>
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>PARTNER KURUM</div>
+        <LabeledSelect
+          label="Sistemdeki Kurumlardan Seç"
+          value={form.partner_org_id}
+          onChange={(v) => {
+            const org = (lookups.organizations || []).find(o => o.id === v);
+            if (org) {
+              setForm(f => ({
+                ...f,
+                partner_org_id:  org.id,
+                partner_name:    org.name || f.partner_name,
+                partner_email:   org.email || f.partner_email,
+                partner_website: org.website || f.partner_website,
+              }));
+            } else {
+              set('partner_org_id', '');
+            }
+          }}
+        >
+          <option value="">— Seçilmedi / Sistemde olmayan kurum —</option>
+          {(lookups.organizations || []).map(o => (
+            <option key={o.id} value={o.id}>
+              {o.name}{o.org_type ? ` · ${o.org_type}` : ''}
+            </option>
+          ))}
+        </LabeledSelect>
+        <div style={{ fontSize: 11, opacity: 0.55, marginTop: -4 }}>
+          Seçtiğinizde kurum adı, e-posta ve web adresi otomatik doldurulur. Sistemde yoksa önce Network Yönetimi'nden ekleyin.
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <LabeledInput label="Partner Kurum" value={form.partner_name} onChange={v => set('partner_name', v)} placeholder="Örn: UNICEF Türkiye" />
+          <LabeledInput label="Partner Kurum Adı" value={form.partner_name} onChange={v => set('partner_name', v)} placeholder="Örn: UNICEF Türkiye" />
           <LabeledInput label="İlgili Kişi" value={form.partner_contact_person} onChange={v => set('partner_contact_person', v)} placeholder="Ad Soyad" />
           <LabeledInput label="E-posta" value={form.partner_email} onChange={v => set('partner_email', v)} placeholder="kisi@kurum.org" />
           <LabeledInput label="Web / Link" value={form.partner_website} onChange={v => set('partner_website', v)} placeholder="https://…" />
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>SORUMLU KİŞİ</div>
+        <LabeledSelect
+          label="Sistemdeki Kullanıcılardan Ata"
+          value={form.owner_id}
+          onChange={(v) => {
+            const u = (lookups.users || []).find(x => x.user_id === v);
+            setForm(f => ({
+              ...f,
+              owner_id:   v,
+              owner_name: u?.full_name || f.owner_name,
+            }));
+          }}
+        >
+          <option value="">— Seçilmedi —</option>
+          {(lookups.users || []).map(u => (
+            <option key={u.user_id} value={u.user_id}>
+              {u.full_name}{u.unit ? ` · ${u.unit}` : ''}{u.role ? ` (${u.role})` : ''}
+            </option>
+          ))}
+        </LabeledSelect>
+
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>BAĞLANTILI KAYITLAR</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <LabeledSelect
+            label="Fon Fırsatı"
+            value={form.related_fund_id}
+            onChange={v => set('related_fund_id', v)}
+          >
+            <option value="">— Bağlı değil —</option>
+            {(lookups.fundOpportunities || []).map(f => (
+              <option key={f.id} value={f.id}>
+                {f.title}{f.donor_organization ? ` · ${f.donor_organization}` : ''}
+                {f.deadline ? ` · ⏰ ${fmtDisplayDate(f.deadline)}` : ''}
+              </option>
+            ))}
+          </LabeledSelect>
+          <LabeledSelect
+            label="Etkinlik"
+            value={form.related_event_id}
+            onChange={v => set('related_event_id', v)}
+          >
+            <option value="">— Bağlı değil —</option>
+            {(lookups.events || []).map(e => (
+              <option key={e.id} value={e.id}>
+                {e.title}{e.start_date ? ` · ${fmtDisplayDate(e.start_date)}` : ''}
+              </option>
+            ))}
+          </LabeledSelect>
         </div>
 
         <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.6, marginTop: 6 }}>ZAMAN & BÜTÇE</div>
