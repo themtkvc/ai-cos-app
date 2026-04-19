@@ -1,8 +1,24 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ASSISTANT_TOOLS, executeTool, ASSISTANT_SYSTEM_PROMPT } from '../lib/assistantTools';
 
-// ── Claude API çağrısı (Vercel proxy üzerinden) ────────────────────────────
-async function callClaude(messages, tools = null, systemPrompt = ASSISTANT_SYSTEM_PROMPT) {
+// ── Model seçimi (Chat.jsx ile paylaşılan localStorage key) ──
+const MODEL_STORAGE_KEY = 'irdp_ai_model';
+const MODEL_META = {
+  claude: { endpoint: '/api/claude', label: 'Claude Sonnet 4', short: 'Claude', icon: '🧠' },
+  gemini: { endpoint: '/api/gemini', label: 'Gemini 2.5 Flash', short: 'Gemini', icon: '✨' },
+};
+
+// Rol bazlı model seçimini localStorage'dan oku — direktör dışı kullanıcılar Gemini'ye kilitli
+function resolveModelForRole(role) {
+  if (role !== 'direktor') return 'gemini';
+  try {
+    const saved = localStorage.getItem(MODEL_STORAGE_KEY);
+    return saved && MODEL_META[saved] ? saved : 'claude';
+  } catch { return 'claude'; }
+}
+
+// ── Generic model API çağrısı (Vercel proxy üzerinden) ─────────────────────
+async function callModel(endpoint, messages, tools = null, systemPrompt = ASSISTANT_SYSTEM_PROMPT) {
   const body = {
     messages,
     system: systemPrompt,
@@ -10,7 +26,7 @@ async function callClaude(messages, tools = null, systemPrompt = ASSISTANT_SYSTE
   };
   if (tools) body.tools = tools;
 
-  const res = await fetch('/api/claude', {
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -120,7 +136,7 @@ const PAGE_LABELS = {
 
 export default function AIChatPanel({ user, profile, activePage, isOpen, onClose }) {
   const [messages, setMessages] = useState([]);        // { role, content } — UI mesajları
-  const [apiMessages, setApiMessages] = useState([]);   // Claude API mesaj geçmişi (tool sonuçları dahil)
+  const [apiMessages, setApiMessages] = useState([]);   // Model API mesaj geçmişi (tool sonuçları dahil)
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [toolStatus, setToolStatus] = useState(null);
@@ -128,6 +144,33 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Aktif model — direktör için Chat.jsx'teki seçim, diğerleri için Gemini'ye kilitli
+  const isDirector = profile?.role === 'direktor';
+  const [activeModel, setActiveModel] = useState(() => resolveModelForRole(profile?.role));
+
+  // localStorage değişimlerini dinle (Chat.jsx seçim değiştirirse senkronize kal) — sadece direktör
+  useEffect(() => {
+    if (!isDirector) {
+      setActiveModel('gemini');
+      return;
+    }
+    setActiveModel(resolveModelForRole(profile?.role));
+    const onStorage = (e) => {
+      if (e.key === MODEL_STORAGE_KEY) {
+        setActiveModel(resolveModelForRole(profile?.role));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [isDirector, profile?.role]);
+
+  // Panel her açıldığında localStorage'dan güncel seçimi tekrar oku (aynı sekme için)
+  useEffect(() => {
+    if (isOpen) setActiveModel(resolveModelForRole(profile?.role));
+  }, [isOpen, profile?.role]);
+
+  const modelMeta = MODEL_META[activeModel] || MODEL_META.claude;
 
   const context = {
     userId: user?.id,
@@ -137,7 +180,10 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
 
   const pageLabel = PAGE_LABELS[activePage] || activePage || 'Bilinmiyor';
   const dynamicSystemPrompt = ASSISTANT_SYSTEM_PROMPT +
-    `\n\n📍 Kullanıcının şu an açık olan modülü: "${pageLabel}". Bu bilgiyi dikkate al — örneğin kullanıcı "buraya ekle" veya "buradaki etkinliği..." dediğinde aktif modülü baz al.`;
+    `\n\n📍 Kullanıcının şu an açık olan modülü: "${pageLabel}". Bu bilgiyi dikkate al — örneğin kullanıcı "buraya ekle" veya "buradaki etkinliği..." dediğinde aktif modülü baz al.` +
+    `\n\nKullanıcı: ${profile?.full_name || 'Bilinmiyor'} (${profile?.role || 'personel'})` +
+    `\nBirim: ${profile?.unit || 'belirtilmemiş'}` +
+    `\nBugünün tarihi: ${new Date().toISOString().split('T')[0]}`;
 
   // Otomatik scroll
   useEffect(() => {
@@ -247,10 +293,10 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
       let finalText = '';
       let loopCount = 0;
 
-      // Tool calling loop: Claude tool_use isterse, çalıştırıp sonucu gönder
-      while (loopCount < 5) {
+      // Tool calling loop: model tool_use isterse, çalıştırıp sonucu gönder
+      while (loopCount < 8) {
         loopCount++;
-        const response = await callClaude(currentMessages, ASSISTANT_TOOLS, dynamicSystemPrompt);
+        const response = await callModel(modelMeta.endpoint, currentMessages, ASSISTANT_TOOLS, dynamicSystemPrompt);
 
         // stop_reason kontrolü
         if (response.stop_reason === 'tool_use') {
@@ -294,7 +340,7 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
       setLoading(false);
       setToolStatus(null);
     }
-  }, [input, loading, apiMessages, context, pendingImage]);
+  }, [input, loading, apiMessages, context, pendingImage, activeModel, activePage]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -329,8 +375,10 @@ export default function AIChatPanel({ user, profile, activePage, isOpen, onClose
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 22 }}>🤖</span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>COS Asistan</div>
-            <div style={{ fontSize: 10.5, opacity: 0.7 }}>Gündem, görev, network komutları</div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>AI Asistan</div>
+            <div style={{ fontSize: 10.5, opacity: 0.75 }}>
+              {modelMeta.icon} {modelMeta.short} · 📍 {pageLabel}
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>

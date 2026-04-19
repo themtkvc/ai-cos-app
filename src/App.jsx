@@ -473,30 +473,26 @@ export default function App() {
         {/* Global feedback ikonu — tüm kullanıcılar için */}
         <FeedbackButton user={user} profile={profile} />
 
-        {/* AI Asistan Chat — sadece direktör */}
-        {profile?.role === 'direktor' && (
-          <>
-            <AIChatPanel user={user} profile={profile} activePage={activePage} isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
-            {!aiChatOpen && (
-              <button
-                onClick={() => setAiChatOpen(true)}
-                title="COS Asistan"
-                style={{
-                  position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-                  width: 56, height: 56, borderRadius: '50%', border: 'none',
-                  background: 'var(--navy, #1a3a5c)', color: '#fff',
-                  fontSize: 26, cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)'; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.25)'; }}
-              >
-                🤖
-              </button>
-            )}
-          </>
+        {/* AI Asistan Chat — tüm roller (direktör Claude/Gemini seçer, diğerleri Gemini'ye kilitli) */}
+        <AIChatPanel user={user} profile={profile} activePage={activePage} isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
+        {!aiChatOpen && (
+          <button
+            onClick={() => setAiChatOpen(true)}
+            title="AI Asistan"
+            style={{
+              position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+              width: 56, height: 56, borderRadius: '50%', border: 'none',
+              background: 'var(--navy, #1a3a5c)', color: '#fff',
+              fontSize: 26, cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.25)'; }}
+          >
+            🤖
+          </button>
         )}
       </div>
     </ProfileContext.Provider>

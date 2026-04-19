@@ -91,12 +91,20 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
   const [loading, setLoading] = useState(false);
   const [context, setContext] = useState(null);
   const [contextLoaded, setContextLoaded] = useState(false);
+  const isDirector = profile?.role === 'direktor';
   const [model, setModel] = useState(() => {
+    // Direktör olmayan kullanıcılar Gemini'ye kilitli
+    if (profile?.role !== 'direktor') return 'gemini';
     try {
       const saved = localStorage.getItem(MODEL_STORAGE_KEY);
       return saved && MODELS[saved] ? saved : 'claude';
     } catch { return 'claude'; }
   });
+
+  // Rol değişirse modeli tekrar hesapla (non-director → Gemini kilit)
+  useEffect(() => {
+    if (!isDirector && model !== 'gemini') setModel('gemini');
+  }, [isDirector, model]);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const initialMessageSentRef = useRef(false);
@@ -258,17 +266,27 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
           </div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <select
-            className="btn btn-outline btn-sm"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            title={MODELS[model]?.desc || ''}
-            style={{paddingRight:28}}
-          >
-            {Object.values(MODELS).map((m) => (
-              <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
-            ))}
-          </select>
+          {isDirector ? (
+            <select
+              className="btn btn-outline btn-sm"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              title={MODELS[model]?.desc || ''}
+              style={{paddingRight:28}}
+            >
+              {Object.values(MODELS).map((m) => (
+                <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
+              ))}
+            </select>
+          ) : (
+            <span
+              className="btn btn-outline btn-sm"
+              style={{paddingRight:12,cursor:'default',opacity:0.75}}
+              title="Gemini 2.5 Flash"
+            >
+              {MODELS.gemini.icon} {MODELS.gemini.label}
+            </span>
+          )}
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate('dashboard')} title="Dashboard'a dön">
             ← Dashboard
           </button>
