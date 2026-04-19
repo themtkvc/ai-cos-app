@@ -4,6 +4,7 @@ import { format, differenceInCalendarDays } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { UNITS as UNIT_LIST, UNIT_CSS_MAP, UNIT_ICON_MAP, ROLE_LABELS, avatarColor, toLocalDateStr } from '../lib/constants';
 import EmptyState from '../components/EmptyState';
+import CollabWidget from '../components/CollabWidget';
 
 const UNITS = Object.fromEntries(UNIT_LIST.map(u => [u.name, { color: u.cssClass, icon: u.icon }]));
 
@@ -343,6 +344,11 @@ export default function Dashboard({ user, profile, onNavigate }) {
         <KPI label="Onay Bekleyen" value={pendingReview.length} sub="görev ↗" color="blue" onClick={() => onNavigate('agendas')} />
       </div>
 
+      {/* İŞBİRLİKLERİ ÖZETİ */}
+      <div style={{ marginBottom: 16 }}>
+        <CollabWidget onNavigate={onNavigate} />
+      </div>
+
       {/* BİRİM DURUM PANELİ */}
       <div className="card" style={{marginBottom:0}}>
         <div className="section-header">
@@ -508,6 +514,11 @@ export default function Dashboard({ user, profile, onNavigate }) {
         <KPI label="Tamamlanan" value={unitCompleted.length} sub="görev ↗" color="green" onClick={() => onNavigate('agendas')} />
         <KPI label="Onay Bekleyen" value={pendingReview.length} sub="görev ↗" color="navy" onClick={() => onNavigate('agendas')} />
         <KPI label="Bugün Kayıt" value={hasLogToday ? '✅' : '✗'} sub={hasLogToday ? 'girildi' : 'girilmedi'} color={hasLogToday ? 'green' : 'red'} onClick={() => onNavigate('dailylog')} />
+      </div>
+
+      {/* İŞBİRLİKLERİ ÖZETİ */}
+      <div style={{ marginBottom: 16 }}>
+        <CollabWidget onNavigate={onNavigate} />
       </div>
 
       <div className="grid-2">
