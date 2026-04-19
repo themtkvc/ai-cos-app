@@ -2555,6 +2555,29 @@ export const createMeeting = async (payload, attendees = []) => {
     await supabase.from('meeting_attendees').insert(rows);
   }
 
+  // 2b) Bildirim: user_id'si olan katılımcılara "yeni toplantı" bildirimi
+  try {
+    const notifyTo = attendees
+      .filter(a => a.user_id && a.user_id !== uid)
+      .map(a => a.user_id);
+    const uniq = Array.from(new Set(notifyTo));
+    if (uniq.length > 0) {
+      const timeStr = new Date(m.starts_at).toLocaleString('tr-TR', {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: m.timezone || 'Europe/Istanbul',
+      });
+      await createNotifications(uniq.map(userId => ({
+        userId,
+        type: 'meeting_invite',
+        title: `📅 Yeni toplantı: ${m.title || 'Başlıksız'}`,
+        body: `${timeStr} • ${m.duration_minutes || 30} dk${m.location ? ' • ' + m.location : ''}`,
+        linkType: 'meeting',
+        linkId: m.id,
+        createdBy: uid,
+        createdByName: row.organizer_name || null,
+      })));
+    }
+  } catch (e) { console.warn('[createMeeting] notify skipped:', e); }
+
   // 3) Calendar + Meet event — edge function
   const attendeeEmails = attendees.filter(a => a.email).map(a => a.email);
   try {
@@ -2600,6 +2623,10 @@ export const createMeeting = async (payload, attendees = []) => {
 
 /** Toplantı güncelle + (opsiyonel) Calendar event'i güncelle. */
 export const updateMeeting = async (id, patch, opts = { updateCalendar: true }) => {
+  // Önce eski halini oku (değişen alanları tespit etmek için)
+  const { data: before } = await supabase
+    .from('meetings').select('*').eq('id', id).single();
+
   const { data, error } = await supabase
     .from('meetings').update(patch).eq('id', id).select().single();
   if (error) return { data: null, error };
@@ -2628,13 +2655,80 @@ export const updateMeeting = async (id, patch, opts = { updateCalendar: true }) 
       });
     } catch (_) { /* sessiz fail — DB güncel */ }
   }
+
+  // Bildirim: status iptal'e döndüyse ya da saat önemli ölçüde değiştiyse
+  try {
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const uid = sessionRes?.session?.user?.id || null;
+    const startsChanged = before && before.starts_at !== data.starts_at;
+    const statusCancelled = (patch?.status === 'iptal') && (before?.status !== 'iptal');
+
+    if (statusCancelled || startsChanged) {
+      const { data: atts } = await supabase
+        .from('meeting_attendees')
+        .select('user_id')
+        .eq('meeting_id', id)
+        .not('user_id', 'is', null);
+      const notifyTo = Array.from(new Set(
+        (atts || []).map(a => a.user_id).filter(u => u && u !== uid)
+      ));
+      if (notifyTo.length > 0) {
+        const timeStr = new Date(data.starts_at).toLocaleString('tr-TR', {
+          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: data.timezone || 'Europe/Istanbul',
+        });
+        const title = statusCancelled
+          ? `❌ Toplantı iptal: ${data.title || 'Başlıksız'}`
+          : `🕒 Toplantı saati değişti: ${data.title || 'Başlıksız'}`;
+        const body = statusCancelled
+          ? `"${data.title || 'Başlıksız'}" toplantısı iptal edildi.`
+          : `Yeni zaman: ${timeStr} • ${data.duration_minutes || 30} dk`;
+        await createNotifications(notifyTo.map(userId => ({
+          userId,
+          type: statusCancelled ? 'meeting_cancelled' : 'meeting_rescheduled',
+          title,
+          body,
+          linkType: 'meeting',
+          linkId: id,
+          createdBy: uid,
+          createdByName: data.organizer_name || null,
+        })));
+      }
+    }
+  } catch (e) { console.warn('[updateMeeting] notify skipped:', e); }
+
   return { data, error: null };
 };
 
 /** Toplantı sil + Calendar event'i sil. */
 export const deleteMeeting = async (id) => {
   const { data: m } = await supabase
-    .from('meetings').select('calendar_event_id, calendar_organizer_email').eq('id', id).single();
+    .from('meetings').select('id, title, calendar_event_id, calendar_organizer_email, organizer_name').eq('id', id).single();
+
+  // Silmeden önce bildirim gönder (katılımcılara haber ver)
+  try {
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const uid = sessionRes?.session?.user?.id || null;
+    const { data: atts } = await supabase
+      .from('meeting_attendees')
+      .select('user_id')
+      .eq('meeting_id', id)
+      .not('user_id', 'is', null);
+    const notifyTo = Array.from(new Set(
+      (atts || []).map(a => a.user_id).filter(u => u && u !== uid)
+    ));
+    if (notifyTo.length > 0) {
+      await createNotifications(notifyTo.map(userId => ({
+        userId,
+        type: 'meeting_deleted',
+        title: `🗑 Toplantı silindi: ${m?.title || 'Başlıksız'}`,
+        body: `"${m?.title || 'Başlıksız'}" toplantısı iptal edilip silindi.`,
+        linkType: 'meeting',
+        linkId: id,
+        createdBy: uid,
+        createdByName: m?.organizer_name || null,
+      })));
+    }
+  } catch (e) { console.warn('[deleteMeeting] notify skipped:', e); }
 
   if (m?.calendar_event_id) {
     try {
@@ -2673,6 +2767,37 @@ export const addMeetingAttendee = async (meetingId, attendee) => {
     email:   attendee.email || null,
     is_optional: !!attendee.is_optional,
   });
+  if (error) return { error };
+
+  // Yeni eklenen (user_id'si olan) katılımcıya bildirim
+  try {
+    if (attendee.user_id) {
+      const { data: sessionRes } = await supabase.auth.getSession();
+      const uid = sessionRes?.session?.user?.id || null;
+      if (attendee.user_id !== uid) {
+        const { data: m } = await supabase
+          .from('meetings')
+          .select('title, starts_at, duration_minutes, location, timezone, organizer_name')
+          .eq('id', meetingId).single();
+        if (m) {
+          const timeStr = new Date(m.starts_at).toLocaleString('tr-TR', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: m.timezone || 'Europe/Istanbul',
+          });
+          await createNotification({
+            userId: attendee.user_id,
+            type: 'meeting_invite',
+            title: `📅 Toplantıya davet: ${m.title || 'Başlıksız'}`,
+            body: `${timeStr} • ${m.duration_minutes || 30} dk${m.location ? ' • ' + m.location : ''}`,
+            linkType: 'meeting',
+            linkId: meetingId,
+            createdBy: uid,
+            createdByName: m.organizer_name || null,
+          });
+        }
+      }
+    }
+  } catch (e) { console.warn('[addMeetingAttendee] notify skipped:', e); }
+
   return { error };
 };
 
