@@ -10,7 +10,8 @@ const ALL_NAV = [
   { id: 'agendas',          icon: '📋', label: 'Gündemler' },
   { id: 'direktor_agendas', icon: '🗂', label: 'Direktör Gündemleri' },
   { id: 'donors',    icon: '🤝', label: 'Donör CRM' },
-  { id: 'meetings',  icon: '📋', label: 'Toplantı Logu' },
+  { id: 'meetings',  icon: '📅', label: 'Toplantılar' },
+  { id: 'meetinglog', icon: '📋', label: 'Toplantı Logu' },
   { id: 'reports',   icon: '📊', label: 'Birim Raporları' },
   { id: 'dailylog',   icon: '🗓', label: 'Günlük İş Kayıtları' },
   { id: 'logsviewer', icon: '📂', label: 'İş Kayıtları - Dashboard' },
@@ -80,7 +81,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
 
   useEffect(() => {
     if (!user) return;
-    if (allowed.includes('meetings')) {
+    if (allowed.includes('meetinglog')) {
       getMeetingActions(user.id).then(({ data }) => {
         if (!data) return;
         setOpenActionsCount(data.filter(a => a.status !== '✅ Completed').length);
@@ -109,7 +110,7 @@ export default function Sidebar({ activePage, onNavigate, user, profile, mobileO
     };
   }, [user, role]);
 
-  const badges = { meetings: openActionsCount || null, notifications: unreadNotifCount || null };
+  const badges = { meetinglog: openActionsCount || null, notifications: unreadNotifCount || null };
   const displayName = profile?.full_name || user?.email?.split('@')[0] || '';
   const roleLabel = ROLE_LABELS[role] || role;
 

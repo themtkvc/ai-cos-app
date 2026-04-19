@@ -6,6 +6,7 @@ import Chat from './pages/Chat';
 import Agendas from './pages/Agendas';
 import Donors from './pages/Donors';
 import MeetingLog from './pages/MeetingLog';
+import Meetings from './pages/Meetings';
 import UnitReports from './pages/UnitReports';
 import DailyLog from './pages/DailyLog';
 import LogsDashboard from './pages/LogsDashboard';
@@ -49,11 +50,11 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
 export const ROLE_ACCESS = {
-  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','collaborations','policy','emails','feedback','admin','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','policy','profile'],
-  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
-  koordinator:          ['dashboard','notifications','agendas','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
-  personel:             ['dashboard','notifications','agendas','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','meetinglog','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','collaborations','policy','emails','feedback','admin','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','meetinglog','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','policy','profile'],
+  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','meetinglog','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  koordinator:          ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  personel:             ['dashboard','notifications','agendas','meetings','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
 };
 
 // Politika birimi üyeleri (rolden bağımsız) "policy" sayfasına erişebilir.
@@ -344,7 +345,8 @@ export default function App() {
     dashboard: Dashboard,
     agendas:   Agendas,
     donors:    Donors,
-    meetings:  MeetingLog,
+    meetings:  Meetings,
+    meetinglog: MeetingLog,
     reports:   UnitReports,
     dailylog:   DailyLog,
     logsviewer: LogsViewer,
@@ -379,7 +381,8 @@ export default function App() {
     chat:       '🤖 AI Asistan',
     agendas:    '📋 Gündemler',
     donors:     '🤝 Donör CRM',
-    meetings:   '📋 Toplantı Logu',
+    meetings:   '📅 Toplantılar',
+    meetinglog: '📋 Toplantı Logu',
     reports:    '📊 Birim Raporları',
     dailylog:   '🗓 İş Kayıtları',
     logsviewer: '📂 Kayıt Dashboard',
