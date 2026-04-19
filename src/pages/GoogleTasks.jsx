@@ -66,7 +66,7 @@ const isOverdue = (iso, status) => {
 };
 
 // ── Bağlantı kur ekranı ──────────────────────────────────────────────
-function ConnectScreen({ onConnect }) {
+function ConnectScreen({ onConnect, error }) {
   return (
     <div style={{ maxWidth: 560, margin: '56px auto', padding: 32, textAlign: 'center',
       background: 'var(--card-bg, #fff)', border: '1px solid var(--border, #e5e7eb)', borderRadius: 16 }}>
@@ -82,6 +82,21 @@ function ConnectScreen({ onConnect }) {
       <button onClick={onConnect} style={{ ...btnPrimary, padding: '12px 22px', fontSize: 14 }}>
         🔗 Google Tasks'a Bağlan
       </button>
+      {error && (
+        <div style={{
+          marginTop: 20, padding: '10px 14px', borderRadius: 10, textAlign: 'left',
+          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#b91c1c', fontSize: 12.5,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠️ Bağlanamadı: {error}</div>
+          {error === 'oauth_env_not_configured' && (
+            <div style={{ color: '#7f1d1d', lineHeight: 1.5 }}>
+              Vercel'de <code>GOOGLE_TASKS_CLIENT_ID</code>, <code>GOOGLE_TASKS_CLIENT_SECRET</code>,
+              ve <code>GOOGLE_TASKS_REDIRECT_URI</code> env var'ları eksik. Settings → Environment Variables'tan
+              ekleyip redeploy et.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -321,7 +336,13 @@ export default function GoogleTasks({ profile }) {
   }, [loadStatus, loadTasklists]);
 
   // ── Aksiyonlar ───────────────────────────────────────────────────
-  const handleConnect = () => { startGoogleTasksOAuth().catch(e => setError(e.message)); };
+  const handleConnect = () => {
+    setError(null);
+    startGoogleTasksOAuth().catch(e => {
+      console.error('OAuth start failed:', e);
+      setError(e.message || 'oauth_start_failed');
+    });
+  };
 
   const handleDisconnect = async () => {
     if (!window.confirm('Google Tasks bağlantısını kaldırmak istiyor musunuz? Google tarafındaki notlar silinmez, sadece IRDP erişimi kesilir.')) return;
@@ -402,7 +423,7 @@ export default function GoogleTasks({ profile }) {
     return (
       <div style={{ padding: 24 }}>
         <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 18 }}>✅ Google Tasks</div>
-        <ConnectScreen onConnect={handleConnect} />
+        <ConnectScreen onConnect={handleConnect} error={error} />
       </div>
     );
   }
