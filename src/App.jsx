@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { supabase, getUserProfile, upsertUserProfile } from './lib/supabase';
+import { startNoteReminderPoller } from './lib/noteReminders';
 import { ROLE_LABELS as _ROLE_LABELS } from './lib/constants';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
@@ -218,6 +219,13 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [profile]);
+
+  // ── Not hatırlatıcı poller (her 60 sn kontrol) ──
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const stop = startNoteReminderPoller(profile.user_id, 60 * 1000);
+    return stop;
+  }, [profile?.user_id]);
 
   // Load user + profile
   const loadProfile = async (authUser) => {

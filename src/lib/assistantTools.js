@@ -622,29 +622,139 @@ export const ASSISTANT_TOOLS = [
     },
   },
 
-  // ── NOTLAR ───────────────────────────────────────────────────────────────────
+  // ── NOTLAR (Google Keep tarzı) ──────────────────────────────────────────────
   {
     name: 'search_notes',
-    description: 'Kullanıcının notlarını arar.',
+    description: 'Kullanıcının notlarını arar. view ile aktif/arşiv/çöp filtrelenebilir, label_name ile etikete göre.',
     input_schema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Başlık veya içerikte aranacak terim' },
+        view: { type: 'string', description: 'notes (aktif, varsayılan), archive (arşiv), trash (çöp kutusu), reminders (hatırlatıcısı olanlar)' },
+        label_name: { type: 'string', description: 'Sadece bu etiketi içeren notları getir' },
+        limit: { type: 'number', description: 'Max sonuç (varsayılan 20)' },
       },
       required: [],
     },
   },
   {
     name: 'create_note',
-    description: 'Yeni not oluşturur.',
+    description: 'Yeni not oluşturur. Etiket, renk, hatırlatıcı ile birlikte oluşturabilir.',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Not başlığı' },
-        content: { type: 'string', description: 'Not içeriği (markdown destekler)' },
+        content: { type: 'string', description: 'Not içeriği (HTML/markdown destekler)' },
         is_pinned: { type: 'boolean', description: 'Sabitle?' },
+        color: { type: 'string', description: 'Arka plan rengi (hex, örn: #fff8b8 sarı, #aecbfa mavi)' },
+        label_names: { type: 'array', items: { type: 'string' }, description: 'Etiket adları (yoksa oluşturulur)' },
+        reminder_at: { type: 'string', description: 'Hatırlatıcı zamanı ISO-8601 (YYYY-MM-DDTHH:MM:SS)' },
       },
       required: ['title', 'content'],
+    },
+  },
+  {
+    name: 'update_note',
+    description: 'Mevcut bir notu günceller (başlık, içerik, renk, pin durumu).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Güncellenecek notun mevcut başlığı (kısmi eşleşme)' },
+        new_title: { type: 'string', description: 'Yeni başlık' },
+        content: { type: 'string', description: 'Yeni içerik' },
+        is_pinned: { type: 'boolean', description: 'Sabitle durumu' },
+        color: { type: 'string', description: 'Arka plan rengi (hex)' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'archive_note',
+    description: 'Bir notu arşivler (listeden kaldırır ama silinmez).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Not başlığı (kısmi eşleşme)' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'unarchive_note',
+    description: 'Arşivdeki bir notu geri aktif listeye alır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Arşivdeki not başlığı (kısmi eşleşme)' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'trash_note',
+    description: 'Bir notu çöp kutusuna taşır (30 gün sonra otomatik silinir).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Not başlığı (kısmi eşleşme)' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'restore_note',
+    description: 'Çöp kutusundaki bir notu geri yükler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Çöp kutusundaki not başlığı (kısmi eşleşme)' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'set_note_reminder',
+    description: 'Bir not için hatırlatıcı zamanı ayarlar veya kaldırır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Not başlığı (kısmi eşleşme)' },
+        reminder_at: { type: 'string', description: 'Hatırlatıcı zamanı ISO-8601 (YYYY-MM-DDTHH:MM:SS). Null/boş gönderirse hatırlatıcı kaldırılır.' },
+      },
+      required: ['note_title'],
+    },
+  },
+  {
+    name: 'add_note_label',
+    description: 'Bir nota etiket ekler (etiket yoksa oluşturulur).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Not başlığı (kısmi eşleşme)' },
+        label_name: { type: 'string', description: 'Etiket adı' },
+      },
+      required: ['note_title', 'label_name'],
+    },
+  },
+  {
+    name: 'remove_note_label',
+    description: 'Bir nottan etiket kaldırır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        note_title: { type: 'string', description: 'Not başlığı (kısmi eşleşme)' },
+        label_name: { type: 'string', description: 'Kaldırılacak etiket adı' },
+      },
+      required: ['note_title', 'label_name'],
+    },
+  },
+  {
+    name: 'list_note_labels',
+    description: 'Kullanıcının tüm not etiketlerini listeler.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
     },
   },
 ];
@@ -1075,21 +1185,228 @@ export async function executeTool(toolName, toolInput, context) {
       };
     }
 
-    // ── NOTLAR ─────────────────────────────────────────────────────────────────
+    // ── NOTLAR (Google Keep tarzı) ─────────────────────────────────────────────
     case 'search_notes': {
-      let query = supabase.from('notes').select('id, title, content, is_pinned, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
-      if (toolInput.query) query = query.or(`title.ilike.%${toolInput.query}%,content.ilike.%${toolInput.query}%`);
+      const view = (toolInput.view || 'notes').toLowerCase();
+      const lim = toolInput.limit || 20;
+      let query = supabase.from('notes')
+        .select('id, title, content, is_pinned, color, is_archived, archived_at, deleted_at, reminder_at, created_at, updated_at')
+        .eq('user_id', userId);
+
+      if (view === 'trash') {
+        query = query.not('deleted_at', 'is', null);
+      } else if (view === 'archive') {
+        query = query.is('deleted_at', null).eq('is_archived', true);
+      } else if (view === 'reminders') {
+        query = query.is('deleted_at', null).eq('is_archived', false).not('reminder_at', 'is', null);
+      } else {
+        // default: active notes
+        query = query.is('deleted_at', null).eq('is_archived', false);
+      }
+
+      if (toolInput.query) {
+        query = query.or(`title.ilike.%${toolInput.query}%,content.ilike.%${toolInput.query}%`);
+      }
+
+      // Label filter via note_label_links
+      let allowedNoteIds = null;
+      if (toolInput.label_name) {
+        const { data: lbl } = await supabase.from('note_labels').select('id').eq('user_id', userId).ilike('name', toolInput.label_name).limit(1);
+        if (!lbl || lbl.length === 0) return { notes: [], count: 0, note: 'Etiket bulunamadı' };
+        const { data: links } = await supabase.from('note_label_links').select('note_id').eq('user_id', userId).eq('label_id', lbl[0].id);
+        allowedNoteIds = (links || []).map(l => l.note_id);
+        if (allowedNoteIds.length === 0) return { notes: [], count: 0 };
+        query = query.in('id', allowedNoteIds);
+      }
+
+      query = query.order('is_pinned', { ascending: false }).order('updated_at', { ascending: false }).limit(lim);
       const { data, error } = await query;
       if (error) return { error: error.message };
-      return { notes: (data || []).map(n => ({ id: n.id, title: n.title, preview: n.content?.slice(0, 100), pinned: n.is_pinned, created_at: n.created_at })), count: data?.length || 0 };
+
+      // Fetch labels for returned notes
+      const noteIds = (data || []).map(n => n.id);
+      let labelsByNote = {};
+      if (noteIds.length) {
+        const { data: links } = await supabase.from('note_label_links')
+          .select('note_id, label_id, note_labels(id, name, color)')
+          .in('note_id', noteIds);
+        (links || []).forEach(l => {
+          if (!labelsByNote[l.note_id]) labelsByNote[l.note_id] = [];
+          if (l.note_labels) labelsByNote[l.note_id].push(l.note_labels.name);
+        });
+      }
+
+      return {
+        view,
+        notes: (data || []).map(n => ({
+          id: n.id,
+          title: n.title,
+          preview: (n.content || '').replace(/<[^>]+>/g, '').slice(0, 120),
+          pinned: n.is_pinned,
+          archived: n.is_archived,
+          trashed: !!n.deleted_at,
+          color: n.color,
+          reminder_at: n.reminder_at,
+          labels: labelsByNote[n.id] || [],
+          created_at: n.created_at,
+          updated_at: n.updated_at,
+        })),
+        count: data?.length || 0,
+      };
     }
 
     case 'create_note': {
-      const { data, error } = await supabase.from('notes').insert({
-        title: toolInput.title, content: toolInput.content, user_id: userId, is_pinned: toolInput.is_pinned || false,
-      }).select().single();
+      const insertPayload = {
+        title: toolInput.title,
+        content: toolInput.content,
+        user_id: userId,
+        is_pinned: toolInput.is_pinned || false,
+      };
+      if (toolInput.color) insertPayload.color = toolInput.color;
+      if (toolInput.reminder_at) insertPayload.reminder_at = toolInput.reminder_at;
+
+      const { data, error } = await supabase.from('notes').insert(insertPayload).select().single();
       if (error) return { error: error.message };
-      return { success: true, note: { id: data.id, title: data.title } };
+
+      // Labels — create missing, link all
+      const addedLabels = [];
+      if (Array.isArray(toolInput.label_names) && toolInput.label_names.length > 0) {
+        for (const rawName of toolInput.label_names) {
+          const name = (rawName || '').trim();
+          if (!name) continue;
+          let { data: existing } = await supabase.from('note_labels').select('id, name').eq('user_id', userId).ilike('name', name).limit(1);
+          let labelId = existing?.[0]?.id;
+          if (!labelId) {
+            const { data: created, error: crErr } = await supabase.from('note_labels').insert({ user_id: userId, name }).select('id').single();
+            if (crErr) continue;
+            labelId = created.id;
+          }
+          await supabase.from('note_label_links').insert({ note_id: data.id, label_id: labelId, user_id: userId });
+          addedLabels.push(name);
+        }
+      }
+
+      return { success: true, note: { id: data.id, title: data.title, color: data.color, reminder_at: data.reminder_at, labels: addedLabels } };
+    }
+
+    case 'update_note': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).is('deleted_at', null).limit(1);
+      if (!found || !found.length) return { error: 'Not bulunamadı' };
+      const updates = {};
+      if (toolInput.new_title !== undefined) updates.title = toolInput.new_title;
+      if (toolInput.content !== undefined) updates.content = toolInput.content;
+      if (toolInput.is_pinned !== undefined) updates.is_pinned = toolInput.is_pinned;
+      if (toolInput.color !== undefined) updates.color = toolInput.color;
+      if (Object.keys(updates).length === 0) return { error: 'Güncellenecek alan yok' };
+      updates.updated_at = new Date().toISOString();
+      const { error } = await supabase.from('notes').update(updates).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, note_id: found[0].id, updated: Object.keys(updates) };
+    }
+
+    case 'archive_note': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).is('deleted_at', null).eq('is_archived', false).limit(1);
+      if (!found || !found.length) return { error: 'Not bulunamadı (veya zaten arşivde)' };
+      const { error } = await supabase.from('notes').update({
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+        is_pinned: false,
+        updated_at: new Date().toISOString(),
+      }).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, archived: found[0].title };
+    }
+
+    case 'unarchive_note': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).eq('is_archived', true).limit(1);
+      if (!found || !found.length) return { error: 'Arşivde bu notu bulamadım' };
+      const { error } = await supabase.from('notes').update({
+        is_archived: false,
+        archived_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, unarchived: found[0].title };
+    }
+
+    case 'trash_note': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).is('deleted_at', null).limit(1);
+      if (!found || !found.length) return { error: 'Not bulunamadı' };
+      const { error } = await supabase.from('notes').update({
+        deleted_at: new Date().toISOString(),
+        is_pinned: false,
+        updated_at: new Date().toISOString(),
+      }).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, trashed: found[0].title, note: '30 gün sonra otomatik silinecek' };
+    }
+
+    case 'restore_note': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).not('deleted_at', 'is', null).limit(1);
+      if (!found || !found.length) return { error: 'Çöp kutusunda bu notu bulamadım' };
+      const { error } = await supabase.from('notes').update({
+        deleted_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, restored: found[0].title };
+    }
+
+    case 'set_note_reminder': {
+      const { data: found } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).is('deleted_at', null).limit(1);
+      if (!found || !found.length) return { error: 'Not bulunamadı' };
+      const reminderVal = toolInput.reminder_at || null;
+      const { error } = await supabase.from('notes').update({
+        reminder_at: reminderVal,
+        reminder_notified_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', found[0].id);
+      if (error) return { error: error.message };
+      return { success: true, note: found[0].title, reminder_at: reminderVal };
+    }
+
+    case 'add_note_label': {
+      const { data: noteFound } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).is('deleted_at', null).limit(1);
+      if (!noteFound || !noteFound.length) return { error: 'Not bulunamadı' };
+      const name = (toolInput.label_name || '').trim();
+      if (!name) return { error: 'Etiket adı boş' };
+
+      let { data: existing } = await supabase.from('note_labels').select('id, name').eq('user_id', userId).ilike('name', name).limit(1);
+      let labelId = existing?.[0]?.id;
+      if (!labelId) {
+        const { data: created, error: crErr } = await supabase.from('note_labels').insert({ user_id: userId, name }).select('id').single();
+        if (crErr) return { error: crErr.message };
+        labelId = created.id;
+      }
+      // Upsert link (ignore duplicate)
+      await supabase.from('note_label_links').upsert({ note_id: noteFound[0].id, label_id: labelId, user_id: userId }, { onConflict: 'note_id,label_id' });
+      return { success: true, note: noteFound[0].title, label: name };
+    }
+
+    case 'remove_note_label': {
+      const { data: noteFound } = await supabase.from('notes').select('id, title').eq('user_id', userId).ilike('title', `%${toolInput.note_title}%`).limit(1);
+      if (!noteFound || !noteFound.length) return { error: 'Not bulunamadı' };
+      const { data: lbl } = await supabase.from('note_labels').select('id').eq('user_id', userId).ilike('name', toolInput.label_name).limit(1);
+      if (!lbl || !lbl.length) return { error: 'Etiket bulunamadı' };
+      const { error } = await supabase.from('note_label_links').delete().eq('note_id', noteFound[0].id).eq('label_id', lbl[0].id);
+      if (error) return { error: error.message };
+      return { success: true, note: noteFound[0].title, removed_label: toolInput.label_name };
+    }
+
+    case 'list_note_labels': {
+      const { data, error } = await supabase.from('note_labels').select('id, name, color, created_at').eq('user_id', userId).order('name');
+      if (error) return { error: error.message };
+      // Count notes per label
+      const ids = (data || []).map(l => l.id);
+      let countsByLabel = {};
+      if (ids.length) {
+        const { data: links } = await supabase.from('note_label_links').select('label_id').in('label_id', ids);
+        (links || []).forEach(l => { countsByLabel[l.label_id] = (countsByLabel[l.label_id] || 0) + 1; });
+      }
+      return {
+        labels: (data || []).map(l => ({ id: l.id, name: l.name, color: l.color, note_count: countsByLabel[l.id] || 0 })),
+        count: data?.length || 0,
+      };
     }
 
     // ── GÖRSEL YÜKLEME ──────────────────────────────────────────────────────────
@@ -1459,8 +1776,17 @@ Sistemdeki TÜM modüllere erişimin var ve her türlü görevi yapabilirsin. Ku
 ### 💰 Fon Fırsatları
 - Fon fırsatı arama/oluşturma
 
-### 📝 Notlar
-- Not oluşturma ve arama
+### 📝 Notlar (Google Keep tarzı)
+- **Arama:** search_notes (view: notes/archive/trash/reminders, label_name ile etiket filtrele)
+- **Oluştur:** create_note (title, content, color hex, label_names array, reminder_at ISO-8601)
+- **Güncelle:** update_note (new_title, content, color, is_pinned)
+- **Arşiv:** archive_note / unarchive_note
+- **Çöp kutusu:** trash_note / restore_note (30 gün retention, sonra otomatik silinir)
+- **Hatırlatıcı:** set_note_reminder (reminder_at ISO-8601; null göndererek kaldır)
+- **Etiket:** add_note_label / remove_note_label / list_note_labels (yoksa otomatik oluşur)
+- Renk örnekleri: #fff8b8 (sarı), #aecbfa (mavi), #ccff90 (yeşil), #fdcfe8 (pembe), #e6c9a8 (kahverengi)
+- "Not arşivle", "X notunu sil" → trash_note (geri alınabilir)
+- "Kalıcı sil" derse: kullanıcıya çöp kutusu 30 gün sonra otomatik boşaltılır de; kod-tarafı kalıcı silme yok
 
 ### ✅ Google Tasks (Kişisel OAuth)
 - Her kullanıcının KENDİ Google hesabındaki Tasks listeleri ve taskları
