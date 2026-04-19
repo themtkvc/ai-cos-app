@@ -133,3 +133,31 @@ BEGIN
     (p_user_id, 'Good Neighbors', 'INGO Partner', '🟢 Strong', 'Yasir', CURRENT_DATE - 7, CURRENT_DATE + 14, CURRENT_DATE + 21, 'Grant Narrative, Financial Report', '🟠 High');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ── USER INTEGRATIONS (Google Tasks / kişisel OAuth) ──────────────────────
+-- Her kullanıcı için provider bazlı OAuth token'ları saklar.
+-- refresh_token + access_token plain-text (RLS + service role korur).
+-- Production-grade encryption için pg_sodium veya vault önerilir.
+CREATE TABLE IF NOT EXISTS user_integrations (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,                   -- 'google_tasks' (ileride 'google_keep_readonly' vb.)
+  access_token TEXT,
+  refresh_token TEXT,
+  access_token_expires_at TIMESTAMPTZ,
+  scopes TEXT[],
+  google_email TEXT,                        -- bağlanan Google hesabı (UX için)
+  connected_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, provider)
+);
+ALTER TABLE user_integrations ENABLE ROW LEVEL SECURITY;
+-- Kullanıcı sadece kendi satırlarını görebilir / yönetebilir
+DROP POLICY IF EXISTS "own_integrations_select" ON user_integrations;
+CREATE POLICY "own_integrations_select" ON user_integrations FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "own_integrations_insert" ON user_integrations;
+CREATE POLICY "own_integrations_insert" ON user_integrations FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "own_integrations_update" ON user_integrations;
+CREATE POLICY "own_integrations_update" ON user_integrations FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "own_integrations_delete" ON user_integrations;
+CREATE POLICY "own_integrations_delete" ON user_integrations FOR DELETE USING (auth.uid() = user_id);
+-- (api/google-tasks*.js proxy'leri SUPABASE_SERVICE_ROLE_KEY ile okur/yazar → RLS bypass.)

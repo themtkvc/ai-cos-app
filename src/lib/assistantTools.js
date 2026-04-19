@@ -1,5 +1,14 @@
 // ── AI ASISTAN: Tool tanımları ve executor ──────────────────────────────────
 import { supabase } from './supabase';
+import {
+  listTasklists as gtListTasklists,
+  listTasks as gtListTasks,
+  createTask as gtCreateTask,
+  updateTask as gtUpdateTask,
+  completeTask as gtCompleteTask,
+  deleteTask as gtDeleteTask,
+  createTasklist as gtCreateTasklist,
+} from './googleTasks';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL TANIMLARI — Claude API'ye gönderilir
@@ -526,6 +535,90 @@ export const ASSISTANT_TOOLS = [
         agenda_title: { type: 'string', description: 'Silinecek gündemin başlığı (kısmi eşleşme)' },
       },
       required: ['agenda_title'],
+    },
+  },
+
+  // ── GOOGLE TASKS (kişisel OAuth) ────────────────────────────────────────────
+  {
+    name: 'list_google_tasklists',
+    description: "Kullanıcının Google Tasks hesabındaki tüm listeleri getirir. Task eklemeden önce liste ID'sini bulmak için kullan.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'list_google_tasks',
+    description: 'Belirli bir Google Tasks listesindeki taskları getirir. list_name verilirse tam eşleşme aranır, yoksa ilk liste kullanılır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        list_name: { type: 'string', description: 'Liste adı (örn: "My Tasks"). Boş bırakılırsa ilk liste kullanılır.' },
+        include_completed: { type: 'boolean', description: 'Tamamlananları da getir (default true)' },
+        max_results: { type: 'number', description: 'Max sonuç (default 50)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_google_task',
+    description: 'Google Tasks\'a yeni bir task ekler. Kullanıcı "yarına X eklе", "bugün Y\'yi yap" gibi konuştuğunda kullanılır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Task başlığı (zorunlu)' },
+        notes: { type: 'string', description: 'Detay notları (opsiyonel)' },
+        due_date: { type: 'string', description: 'Son tarih YYYY-MM-DD (opsiyonel)' },
+        list_name: { type: 'string', description: 'Hedef liste adı (boş = ilk liste)' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'complete_google_task',
+    description: 'Bir Google Task\'ı tamamlanmış olarak işaretler. task_title kısmi eşleşme ile aranır.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_title: { type: 'string', description: 'Task başlığı (kısmi eşleşme)' },
+        list_name: { type: 'string', description: 'Arama yapılacak liste (boş = tüm listeler)' },
+      },
+      required: ['task_title'],
+    },
+  },
+  {
+    name: 'update_google_task',
+    description: 'Bir Google Task\'ın başlık, notlar veya son tarihini günceller.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_title: { type: 'string', description: 'Mevcut task başlığı (kısmi eşleşme)' },
+        new_title: { type: 'string', description: 'Yeni başlık' },
+        notes:     { type: 'string', description: 'Yeni notlar' },
+        due_date:  { type: 'string', description: 'Yeni son tarih (YYYY-MM-DD) veya "none" temizle' },
+        list_name: { type: 'string', description: 'Arama yapılacak liste (boş = tüm listeler)' },
+      },
+      required: ['task_title'],
+    },
+  },
+  {
+    name: 'delete_google_task',
+    description: 'Bir Google Task\'ı kalıcı olarak siler.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_title: { type: 'string', description: 'Task başlığı (kısmi eşleşme)' },
+        list_name: { type: 'string', description: 'Arama yapılacak liste (boş = tüm listeler)' },
+      },
+      required: ['task_title'],
+    },
+  },
+  {
+    name: 'create_google_tasklist',
+    description: 'Google Tasks\'ta yeni bir liste oluşturur.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Liste adı' },
+      },
+      required: ['title'],
     },
   },
 
@@ -1163,6 +1256,152 @@ export async function executeTool(toolName, toolInput, context) {
       return { success: true, deleted: matches[0].title };
     }
 
+    // ── GOOGLE TASKS ────────────────────────────────────────────────────────
+    case 'list_google_tasklists': {
+      try {
+        const lists = await gtListTasklists();
+        return { count: lists.length, lists: lists.map(l => ({ id: l.id, title: l.title, updated: l.updated })) };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil. Kullanıcının /#google_tasks sayfasından "Bağlan" butonuna basması gerekir.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'list_google_tasks': {
+      try {
+        const lists = await gtListTasklists();
+        if (!lists.length) return { error: 'Hiç Google Tasks listesi yok.' };
+        const target = toolInput.list_name
+          ? lists.find(l => l.title?.toLowerCase().includes(toolInput.list_name.toLowerCase()))
+          : lists[0];
+        if (!target) return { error: `"${toolInput.list_name}" adlı liste bulunamadı. Mevcut: ${lists.map(l => l.title).join(', ')}` };
+        const items = await gtListTasks(target.id, {
+          show_completed: toolInput.include_completed !== false,
+          max_results: Math.min(toolInput.max_results || 50, 100),
+        });
+        return {
+          list: target.title,
+          count: items.length,
+          tasks: items.map(t => ({
+            id: t.id,
+            title: t.title,
+            notes: t.notes,
+            status: t.status,
+            due: t.due,
+            completed: t.completed,
+          })),
+        };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'create_google_task': {
+      if (!toolInput.title?.trim()) return { error: 'Task başlığı zorunludur.' };
+      try {
+        const lists = await gtListTasklists();
+        if (!lists.length) return { error: 'Önce bir Google Tasks listesi oluşturmanız gerekir.' };
+        const target = toolInput.list_name
+          ? lists.find(l => l.title?.toLowerCase().includes(toolInput.list_name.toLowerCase()))
+          : lists[0];
+        if (!target) return { error: `"${toolInput.list_name}" adlı liste bulunamadı.` };
+        const payload = { title: toolInput.title.trim() };
+        if (toolInput.notes) payload.notes = toolInput.notes;
+        if (toolInput.due_date) payload.due = new Date(toolInput.due_date + 'T00:00:00.000Z').toISOString();
+        const created = await gtCreateTask(target.id, payload);
+        return { success: true, task_id: created.id, title: created.title, list: target.title };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'complete_google_task': {
+      if (!toolInput.task_title?.trim()) return { error: 'Task başlığı zorunludur.' };
+      try {
+        const lists = await gtListTasklists();
+        const candidates = toolInput.list_name
+          ? lists.filter(l => l.title?.toLowerCase().includes(toolInput.list_name.toLowerCase()))
+          : lists;
+        for (const list of candidates) {
+          const items = await gtListTasks(list.id, { show_completed: false });
+          const match = items.find(t => t.title?.toLowerCase().includes(toolInput.task_title.toLowerCase()));
+          if (match) {
+            await gtCompleteTask(list.id, match.id);
+            return { success: true, completed: match.title, list: list.title };
+          }
+        }
+        return { error: `"${toolInput.task_title}" başlıklı bir task bulunamadı.` };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'update_google_task': {
+      if (!toolInput.task_title?.trim()) return { error: 'Task başlığı zorunludur.' };
+      try {
+        const lists = await gtListTasklists();
+        const candidates = toolInput.list_name
+          ? lists.filter(l => l.title?.toLowerCase().includes(toolInput.list_name.toLowerCase()))
+          : lists;
+        for (const list of candidates) {
+          const items = await gtListTasks(list.id, { show_completed: true });
+          const match = items.find(t => t.title?.toLowerCase().includes(toolInput.task_title.toLowerCase()));
+          if (match) {
+            const patch = {};
+            if (toolInput.new_title) patch.title = toolInput.new_title;
+            if (toolInput.notes !== undefined) patch.notes = toolInput.notes || null;
+            if (toolInput.due_date) {
+              if (toolInput.due_date === 'none') patch.due = null;
+              else patch.due = new Date(toolInput.due_date + 'T00:00:00.000Z').toISOString();
+            }
+            if (Object.keys(patch).length === 0) return { error: 'Güncellenecek alan verilmedi.' };
+            const updated = await gtUpdateTask(list.id, match.id, patch);
+            return { success: true, updated: updated.title, list: list.title, changes: patch };
+          }
+        }
+        return { error: `"${toolInput.task_title}" başlıklı bir task bulunamadı.` };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'delete_google_task': {
+      if (!toolInput.task_title?.trim()) return { error: 'Task başlığı zorunludur.' };
+      try {
+        const lists = await gtListTasklists();
+        const candidates = toolInput.list_name
+          ? lists.filter(l => l.title?.toLowerCase().includes(toolInput.list_name.toLowerCase()))
+          : lists;
+        for (const list of candidates) {
+          const items = await gtListTasks(list.id, { show_completed: true });
+          const match = items.find(t => t.title?.toLowerCase().includes(toolInput.task_title.toLowerCase()));
+          if (match) {
+            await gtDeleteTask(list.id, match.id);
+            return { success: true, deleted: match.title, list: list.title };
+          }
+        }
+        return { error: `"${toolInput.task_title}" başlıklı bir task bulunamadı.` };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
+    case 'create_google_tasklist': {
+      if (!toolInput.title?.trim()) return { error: 'Liste adı zorunludur.' };
+      try {
+        const created = await gtCreateTasklist(toolInput.title.trim());
+        return { success: true, list_id: created.id, title: created.title };
+      } catch (e) {
+        if (e.status === 409) return { error: 'Google Tasks bağlı değil.' };
+        return { error: e.message };
+      }
+    }
+
     default:
       return { error: `Bilinmeyen araç: ${toolName}` };
   }
@@ -1222,6 +1461,15 @@ Sistemdeki TÜM modüllere erişimin var ve her türlü görevi yapabilirsin. Ku
 
 ### 📝 Notlar
 - Not oluşturma ve arama
+
+### ✅ Google Tasks (Kişisel OAuth)
+- Her kullanıcının KENDİ Google hesabındaki Tasks listeleri ve taskları
+- IRDP sunucusunda not saklanmaz — sadece Google'a proxy
+- list_google_tasklists, list_google_tasks, create_google_task, complete_google_task, update_google_task, delete_google_task, create_google_tasklist
+- "yarına X ekle", "bugün Y yap" → create_google_task (due_date: YYYY-MM-DD)
+- "Z görevini tamamlandı yap" → complete_google_task
+- Kullanıcı "Google Tasks bağlı değil" hatası alırsa /#google_tasks sayfasından Bağlan butonuna basmasını söyle
+- Hangi liste varsayılan — list_name vermezsen ilk liste kullanılır
 
 ### 🖼️ Görsel Yönetimi
 - Kullanıcının yüklediği görseli etkinlik, kişi veya kuruma ekleyebilirsin

@@ -21,6 +21,7 @@ const ALL_NAV = [
   { id: 'network',          icon: '🕸️', label: 'Network Yönetimi' },
   { id: 'networkanalytics', icon: '🔬', label: 'Network Analiz' },
   { id: 'notes',            icon: '📝', label: 'Notlarım' },
+  { id: 'google_tasks',     icon: '✅', label: 'Google Tasks' },
   { id: 'documents',        icon: '📄', label: 'Dokümanlar' },
   { id: 'funds',            icon: '💰', label: 'Fon Fırsatları' },
   { id: 'forms',            icon: '📋', label: 'Formlar' },

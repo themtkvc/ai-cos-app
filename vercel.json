@@ -3,6 +3,14 @@
     "api/claude.js": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/google-tasks.js": {
+      "maxDuration": 20,
+      "memory": 512
+    },
+    "api/google-tasks-auth.js": {
+      "maxDuration": 20,
+      "memory": 512
     }
   }
 }
