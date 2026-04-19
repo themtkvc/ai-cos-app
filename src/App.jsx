@@ -49,12 +49,13 @@ export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {
 export const useTheme = () => useContext(ThemeContext);
 
 // Role-based page access
+// 'chat' (AI Asistan) tüm rollere açıktır — her rol listesinde yer alır.
 export const ROLE_ACCESS = {
   direktor:             ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','meetinglog','reports','dailylog','logsviewer','analytics','donations','orgchart','network','networkanalytics','notes','documents','funds','forms','gamification','events','capacity','activities','goals','collaborations','policy','emails','feedback','admin','profile'],
-  direktor_yardimcisi:  ['dashboard','notifications','agendas','meetings','meetinglog','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','policy','profile'],
-  asistan:              ['dashboard','notifications','agendas','direktor_agendas','donors','meetings','meetinglog','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
-  koordinator:          ['dashboard','notifications','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
-  personel:             ['dashboard','notifications','agendas','meetings','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  direktor_yardimcisi:  ['dashboard','notifications','chat','agendas','meetings','meetinglog','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','policy','profile'],
+  asistan:              ['dashboard','notifications','chat','agendas','direktor_agendas','donors','meetings','meetinglog','reports','dailylog','logsviewer','analytics','donations','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  koordinator:          ['dashboard','notifications','chat','agendas','meetings','reports','dailylog','logsviewer','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
+  personel:             ['dashboard','notifications','chat','agendas','meetings','dailylog','analytics','orgchart','network','funds','forms','notes','events','capacity','activities','goals','collaborations','profile'],
 };
 
 // Politika birimi üyeleri (rolden bağımsız) "policy" sayfasına erişebilir.

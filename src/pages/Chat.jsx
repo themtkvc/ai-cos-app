@@ -1,7 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { sendMessage, buildContext } from '../lib/claude';
+import { sendMessage as sendClaude, buildContext } from '../lib/claude';
+import { sendMessage as sendGemini } from '../lib/gemini';
 import { getChatHistory, saveChatMessage, clearChatHistory, getDeadlines, getDonors, getMeetingActions, getUnitReports } from '../lib/supabase';
+
+// ── Model seçenekleri ──
+const MODELS = {
+  claude: {
+    id: 'claude',
+    label: 'Claude Sonnet 4',
+    short: 'Claude',
+    icon: '🧠',
+    desc: 'Araç çağırma destekli — kayıt oluşturur, bildirim gönderir',
+    send: sendClaude,
+  },
+  gemini: {
+    id: 'gemini',
+    label: 'Gemini 2.5 Flash',
+    short: 'Gemini',
+    icon: '✨',
+    desc: 'Hızlı ve ücretsiz — sadece metin yanıt (araç çağırma yok)',
+    send: sendGemini,
+  },
+};
+const MODEL_STORAGE_KEY = 'irdp_ai_model';
 
 const QUICK_ACTIONS_DIREKTOR = [
   '⚡ Bu hafta ne yapmalıyım?',
@@ -69,10 +91,21 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
   const [loading, setLoading] = useState(false);
   const [context, setContext] = useState(null);
   const [contextLoaded, setContextLoaded] = useState(false);
+  const [model, setModel] = useState(() => {
+    try {
+      const saved = localStorage.getItem(MODEL_STORAGE_KEY);
+      return saved && MODELS[saved] ? saved : 'claude';
+    } catch { return 'claude'; }
+  });
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const initialMessageSentRef = useRef(false);
   const messagesLoadedRef = useRef(false);
+
+  // Persist model seçimi
+  useEffect(() => {
+    try { localStorage.setItem(MODEL_STORAGE_KEY, model); } catch {}
+  }, [model]);
 
   // Load chat history and context
   useEffect(() => {
@@ -161,13 +194,20 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
       .map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const reply = await sendMessage(history, context, {
+      const modelConfig = MODELS[model] || MODELS.claude;
+      const reply = await modelConfig.send(history, context, {
         role: profile?.role,
         name: profile?.full_name,
         unit: profile?.unit,
         userId: user.id,
       });
-      const assistantMsg = { id: Date.now() + 1, role: 'assistant', content: reply, created_at: new Date().toISOString() };
+      const assistantMsg = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: reply,
+        model: modelConfig.id,
+        created_at: new Date().toISOString(),
+      };
       setMessages(prev => [...prev, assistantMsg]);
       try { await saveChatMessage(user.id, 'assistant', reply); }
       catch (e) { console.error('Asistan mesajı kaydedilemedi:', e); }
@@ -175,6 +215,7 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
       const errMsg = {
         id: Date.now() + 1, role: 'assistant',
         content: `⚠️ Hata: ${err.message || 'Bir sorun oluştu. Lütfen tekrar deneyin.'}`,
+        model,
         created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, errMsg]);
@@ -217,6 +258,17 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
           </div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <select
+            className="btn btn-outline btn-sm"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            title={MODELS[model]?.desc || ''}
+            style={{paddingRight:28}}
+          >
+            {Object.values(MODELS).map((m) => (
+              <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
+            ))}
+          </select>
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate('dashboard')} title="Dashboard'a dön">
             ← Dashboard
           </button>
@@ -238,7 +290,14 @@ export default function Chat({ user, profile, onNavigate, initialMessage, onClea
                 className={`message-bubble ${msg.role}`}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
               />
-              <div className="message-time">{formatTime(msg.created_at)}</div>
+              <div className="message-time">
+                {formatTime(msg.created_at)}
+                {msg.role === 'assistant' && msg.model && MODELS[msg.model] && (
+                  <span style={{marginLeft:8,opacity:0.65}}>
+                    · {MODELS[msg.model].icon} {MODELS[msg.model].short}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
