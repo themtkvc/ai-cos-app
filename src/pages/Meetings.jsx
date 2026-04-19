@@ -334,7 +334,7 @@ function MeetingCard({ meeting, profile, onOpen, onEdit }) {
 }
 
 // ── Create / Edit Modal ──────────────────────────────────────────────────
-function MeetingModal({ mode, meeting, user, profile, people, collabs, onClose, onSaved }) {
+export function MeetingModal({ mode, meeting, user, profile, people, collabs, onClose, onSaved, defaults = {} }) {
   const isEdit = mode === 'edit' && meeting;
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -354,14 +354,14 @@ function MeetingModal({ mode, meeting, user, profile, people, collabs, onClose, 
     notes: meeting.notes || '',
     status: meeting.status || 'planlandi',
   }) : ({
-    title: '',
-    description: '',
+    title: defaults.title || '',
+    description: defaults.description || '',
     starts_at: toLocalInput(nowPlus1h.toISOString()),
     duration_minutes: 30,
     timezone: 'Europe/Istanbul',
-    location: '',
-    unit: profile?.unit || '',
-    related_collaboration_id: '',
+    location: defaults.location || '',
+    unit: defaults.unit || profile?.unit || '',
+    related_collaboration_id: defaults.related_collaboration_id || '',
     visibility: 'team',
     notes: '',
     status: 'planlandi',

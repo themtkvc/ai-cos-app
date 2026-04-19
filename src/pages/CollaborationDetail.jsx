@@ -15,6 +15,7 @@ import {
   updateCollaborationReport,
   deleteCollaborationReport,
   logActivity,
+  getMeetings,
   COLLAB_TYPES,
   COLLAB_STATUSES,
   COLLAB_PARTNER_ROLES,
@@ -22,6 +23,7 @@ import {
   COLLAB_REPORT_TYPES,
   COLLAB_REPORT_STATUSES,
 } from '../lib/supabase';
+import { MeetingModal } from './Meetings';
 
 const UNITS = [
   { id: 'fonlar',       label: 'Fonlar' },
@@ -83,6 +85,12 @@ export default function CollaborationDetail({ id, user, profile, onNavigate }) {
   const [composerBusy,   setComposerBusy]   = useState(false);
   const [reportDraft,    setReportDraft]    = useState(null); // null or {report_type, title, due_date, notes, responsible_user_id, status}
 
+  // Toplantılar
+  const [meetings,      setMeetings]      = useState([]);
+  const [meetingModal,  setMeetingModal]  = useState(null); // null | { mode, meeting? }
+  const [meetingPeople, setMeetingPeople] = useState([]);
+  const [allCollabs,    setAllCollabs]    = useState([]); // modal'da dropdown için
+
   const canEdit = !!profile && (
     profile.user_id === row?.owner_id
     || profile.role === 'direktor'
@@ -103,16 +111,40 @@ export default function CollaborationDetail({ id, user, profile, onNavigate }) {
     setLoading(false);
 
     // parallel load
-    const [lk, cm, hs, rp] = await Promise.all([
+    const [lk, cm, hs, rp, mt] = await Promise.all([
       getCollabLookups(),
       getCollaborationComments(id),
       getCollaborationHistory(id),
       getCollaborationReports(id),
+      getMeetings({ collaborationId: id, limit: 50 }),
     ]);
     setLookups(lk);
     setComments(cm.data || []);
     setHistory(hs.data || []);
     setReports(rp.data || []);
+    setMeetings(mt.data || []);
+  };
+
+  const reloadMeetings = async () => {
+    if (!id) return;
+    const { data } = await getMeetings({ collaborationId: id, limit: 50 });
+    setMeetings(data || []);
+  };
+
+  // Modal için kişi + collab lookup'ları (lazy — modal açıldığında)
+  const ensureMeetingLookups = async () => {
+    if (meetingPeople.length === 0) {
+      const { data: ppl } = await supabase
+        .from('user_profiles')
+        .select('user_id, full_name, email, unit, role, avatar_url')
+        .not('email','is',null)
+        .order('full_name');
+      setMeetingPeople(ppl || []);
+    }
+    if (allCollabs.length === 0) {
+      const { data: cs } = await supabase.from('collaborations').select('id, title').limit(500);
+      setAllCollabs(cs || []);
+    }
   };
 
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [id]);
@@ -297,6 +329,22 @@ export default function CollaborationDetail({ id, user, profile, onNavigate }) {
             <AttachmentList attachments={row.attachments || []} />
           </Section>
 
+          <Section
+            title={`İlgili Toplantılar (${meetings.length})`}
+            action={canEdit ? (
+              <button
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                onClick={async () => { await ensureMeetingLookups(); setMeetingModal({ mode: 'create' }); }}
+              >+ Yeni Toplantı</button>
+            ) : null}
+          >
+            <MeetingsMiniList
+              meetings={meetings}
+              canEdit={canEdit}
+              onEdit={async (m) => { await ensureMeetingLookups(); setMeetingModal({ mode: 'edit', meeting: m }); }}
+            />
+          </Section>
+
           <Section title={`Raporlama Takvimi (${reports.length})`}>
             <ReportList
               reports={reports}
@@ -439,18 +487,92 @@ export default function CollaborationDetail({ id, user, profile, onNavigate }) {
           )}
         </aside>
       </div>
+
+      {/* Meeting create/edit modal */}
+      {meetingModal && (
+        <MeetingModal
+          mode={meetingModal.mode}
+          meeting={meetingModal.meeting}
+          user={user}
+          profile={profile}
+          people={meetingPeople}
+          collabs={allCollabs.length ? allCollabs : [{ id: row.id, title: row.title }]}
+          defaults={{
+            related_collaboration_id: row.id,
+            unit: row.unit || profile?.unit || '',
+            title: meetingModal.mode === 'create' ? `${row.title} — Toplantı` : '',
+          }}
+          onClose={() => setMeetingModal(null)}
+          onSaved={() => { setMeetingModal(null); reloadMeetings(); }}
+        />
+      )}
     </div>
   );
 }
 
 // ── SECTION WRAPPER ────────────────────────────────────────────────────
-function Section({ title, children }) {
+function Section({ title, children, action }) {
   return (
     <section style={{ marginBottom: 32 }}>
-      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px 0' }}>{title}</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 12px 0' }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>{title}</h2>
+        {action}
+      </div>
       <div>{children}</div>
     </section>
   );
+}
+
+// ── MEETINGS MINI-LIST ─────────────────────────────────────────────────
+function MeetingsMiniList({ meetings, canEdit, onEdit }) {
+  if (!meetings || meetings.length === 0) {
+    return <div style={{ color: 'var(--muted, #94a3b8)', fontStyle: 'italic', padding: 8 }}>
+      Bu işbirliği için henüz toplantı yok. Üstteki "+ Yeni Toplantı" ile başla — Meet linki otomatik oluşur.
+    </div>;
+  }
+  const now = Date.now();
+  const upcoming = meetings.filter(m => new Date(m.starts_at).getTime() >= now).sort((a,b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const past     = meetings.filter(m => new Date(m.starts_at).getTime() < now).sort((a,b) => new Date(b.starts_at) - new Date(a.starts_at));
+
+  const fmt = (iso) => new Date(iso).toLocaleString('tr-TR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+
+  const renderGroup = (label, list) => list.length > 0 && (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted,#64748b)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label} ({list.length})</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {list.map(m => (
+          <div key={m.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: 10, border: '1px solid var(--border, #e2e8f0)', borderRadius: 8, background: '#fff',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title || 'Başlıksız toplantı'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted, #64748b)' }}>
+                🕒 {fmt(m.starts_at)} · {m.duration_minutes || 30} dk · 👥 {m.attendees?.length || 0} kişi
+                {m.organizer_name ? ` · 👤 ${m.organizer_name}` : ''}
+              </div>
+            </div>
+            {m.meet_url && (
+              <a href={m.meet_url} target="_blank" rel="noreferrer"
+                 style={{ padding: '5px 11px', background: '#0f172a', color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                🎥 Katıl
+              </a>
+            )}
+            {canEdit && (
+              <button onClick={() => onEdit(m)}
+                style={{ padding: '4px 8px', background: 'transparent', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
+                title="Düzenle">✏️</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (<div>
+    {renderGroup('Yaklaşan', upcoming)}
+    {renderGroup('Geçmiş',   past)}
+  </div>);
 }
 
 // ── MILESTONES ─────────────────────────────────────────────────────────

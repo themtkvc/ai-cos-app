@@ -5,6 +5,7 @@ import { tr } from 'date-fns/locale';
 import { UNITS as UNIT_LIST, UNIT_CSS_MAP, UNIT_ICON_MAP, ROLE_LABELS, avatarColor, toLocalDateStr } from '../lib/constants';
 import EmptyState from '../components/EmptyState';
 import CollabWidget from '../components/CollabWidget';
+import MeetingsWidget from '../components/MeetingsWidget';
 
 const UNITS = Object.fromEntries(UNIT_LIST.map(u => [u.name, { color: u.cssClass, icon: u.icon }]));
 
@@ -339,13 +340,14 @@ export default function Dashboard({ user, profile, onNavigate }) {
       <div className="kpi-grid">
         <KPI label="Gecikmiş" value={overdue.length} sub="deadline ↗" color="red" onClick={() => onNavigate('deadlines')} />
         <KPI label="Bu Hafta" value={urgent.length} sub="süresi doluyor ↗" color="orange" onClick={() => onNavigate('deadlines')} />
-        <KPI label="Açık Aksiyonlar" value={openActions.length} sub="toplantıdan ↗" color="navy" onClick={() => onNavigate('meetings')} />
+        <KPI label="Açık Aksiyonlar" value={openActions.length} sub="toplantıdan ↗" color="navy" onClick={() => onNavigate('meetinglog')} />
         <KPI label="Donörler" value={donors.length} sub="aktif ilişki ↗" color="green" onClick={() => onNavigate('donors')} />
         <KPI label="Onay Bekleyen" value={pendingReview.length} sub="görev ↗" color="blue" onClick={() => onNavigate('agendas')} />
       </div>
 
-      {/* İŞBİRLİKLERİ ÖZETİ */}
-      <div style={{ marginBottom: 16 }}>
+      {/* TOPLANTILAR + İŞBİRLİKLERİ */}
+      <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+        <MeetingsWidget user={user} profile={profile} onNavigate={onNavigate} />
         <CollabWidget onNavigate={onNavigate} />
       </div>
 
@@ -516,8 +518,9 @@ export default function Dashboard({ user, profile, onNavigate }) {
         <KPI label="Bugün Kayıt" value={hasLogToday ? '✅' : '✗'} sub={hasLogToday ? 'girildi' : 'girilmedi'} color={hasLogToday ? 'green' : 'red'} onClick={() => onNavigate('dailylog')} />
       </div>
 
-      {/* İŞBİRLİKLERİ ÖZETİ */}
-      <div style={{ marginBottom: 16 }}>
+      {/* TOPLANTILAR + İŞBİRLİKLERİ */}
+      <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+        <MeetingsWidget user={user} profile={profile} onNavigate={onNavigate} />
         <CollabWidget onNavigate={onNavigate} />
       </div>
 
