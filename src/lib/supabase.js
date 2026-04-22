@@ -2362,6 +2362,66 @@ export const deleteCollaborationReport = async (id) => {
   return await supabase.from('collaboration_reports').delete().eq('id', id);
 };
 
+// ── İşbirliği Tamamlanma Raporu (Completion Report) ───────────────────────
+// Not: Burada "completion report", bir işbirliği "tamamlandi" statüsüne
+// geçtiğinde personelin doldurduğu yapılandırılmış sonuç formudur.
+// Yukarıdaki collaboration_reports (zamanlanmış donör raporları) tablosundan
+// farklıdır; ayrı tablo (collaboration_completion_reports) kullanır.
+
+export const getCollabCompletionReport = async (collaborationId) => {
+  if (!collaborationId) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('collaboration_completion_reports')
+    .select('*')
+    .eq('collaboration_id', collaborationId)
+    .maybeSingle();
+  return { data, error };
+};
+
+export const upsertCollabCompletionReport = async (payload) => {
+  // payload.collaboration_id zorunlu. Varsa update, yoksa insert.
+  const { data: existing } = await supabase
+    .from('collaboration_completion_reports')
+    .select('id')
+    .eq('collaboration_id', payload.collaboration_id)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('collaboration_completion_reports')
+      .update({
+        ...payload,
+        // id ve collaboration_id değişmemeli; submitted_by/_at sadece ilk eklemede
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    return { data, error };
+  }
+
+  const { data, error } = await supabase
+    .from('collaboration_completion_reports')
+    .insert([payload])
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const reviewCollabCompletionReport = async (reportId, { reviewed_by, reviewed_by_name, coordinator_note }) => {
+  const { data, error } = await supabase
+    .from('collaboration_completion_reports')
+    .update({
+      reviewed_by,
+      reviewed_by_name,
+      reviewed_at: new Date().toISOString(),
+      coordinator_note: coordinator_note || null,
+    })
+    .eq('id', reportId)
+    .select()
+    .single();
+  return { data, error };
+};
+
 // ── İşbirliği için lookup listeleri (modal picker'ları doldurmak için) ────
 export const getCollabLookups = async () => {
   const [orgs, users, funds, events] = await Promise.all([

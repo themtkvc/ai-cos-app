@@ -7,10 +7,12 @@ import {
   getCollabLookups,
   bulkUpdateCollaborations, bulkDeleteCollaborations,
   createNetworkOrg,
+  getCollabCompletionReport,
   COLLAB_TYPES, COLLAB_STATUSES, COLLAB_PARTNER_ROLES, COLLAB_MOU_STATUSES,
   DEFAULT_COLLAB_PAGE_LIMIT,
 } from '../lib/supabase';
 import { UNITS, resolveUnitName, fmtDisplayDate } from '../lib/constants';
+import CompletionReportModal from '../components/CompletionReportModal';
 
 // ── Drive dosya yardımcıları ────────────────────────────────────────────────
 const ATTACH_FILE_ICONS = {
@@ -75,6 +77,9 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
   const [viewId, setViewId]   = useState(null);
   const [toast, setToast]     = useState('');
   const [lookups, setLookups] = useState({ organizations: [], users: [], fundOpportunities: [], events: [] });
+
+  // Tamamlandı olarak işaretlenen işbirlikleri için sonuç raporu modal'ı
+  const [completionCtx, setCompletionCtx] = useState(null); // { collab, existingReport }
 
   // Bulk action mode
   const [bulkMode, setBulkMode] = useState(false);
@@ -176,6 +181,10 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
   const viewing = rows.find(r => r.id === viewId);
 
   const handleSaved = (next, { isNew } = {}) => {
+    const prev = rows.find(x => x.id === next.id);
+    const becameCompleted =
+      next.status === 'tamamlandi' && (isNew || prev?.status !== 'tamamlandi');
+
     setRows(xs => {
       const idx = xs.findIndex(x => x.id === next.id);
       if (idx >= 0) { const n = xs.slice(); n[idx] = next; return n; }
@@ -197,6 +206,21 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
 
     setToast(isNew ? '✅ İşbirliği oluşturuldu' : '✅ Değişiklik kaydedildi');
     setTimeout(() => setToast(''), 2800);
+
+    // Tamamlandı'ya geçildiyse sonuç raporu modal'ını aç
+    // (mevcut rapor varsa edit modunda, yoksa yeni giriş için)
+    if (becameCompleted) {
+      (async () => {
+        const { data: report } = await getCollabCompletionReport(next.id);
+        setCompletionCtx({ collab: next, existingReport: report || null });
+      })();
+    }
+  };
+
+  const openCompletionReport = async (collab) => {
+    if (!collab?.id) return;
+    const { data: report } = await getCollabCompletionReport(collab.id);
+    setCompletionCtx({ collab, existingReport: report || null });
   };
 
   return (
@@ -429,6 +453,7 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
           lookups={lookups}
           onClose={() => setViewId(null)}
           onEdit={() => { setViewId(null); setEditing(viewing); }}
+          onOpenCompletion={() => openCompletionReport(viewing)}
           onOpenFullPage={onNavigate ? () => {
             const id = viewing.id;
             setViewId(null);
@@ -438,6 +463,23 @@ export default function Collaborations({ user, profile, onNavigate, editCollabId
             setRows(xs => xs.filter(x => x.id !== viewing.id));
             setViewId(null);
           }}
+        />
+      )}
+
+      {completionCtx && completionCtx.collab && (
+        <CompletionReportModal
+          collaboration={completionCtx.collab}
+          existingReport={completionCtx.existingReport}
+          submittedBy={{
+            user_id: user?.id || profile?.user_id,
+            full_name: profile?.full_name || user?.email || '',
+          }}
+          onSaved={(saved) => {
+            setCompletionCtx(null);
+            setToast(saved?.id ? '✅ Sonuç raporu kaydedildi' : '✅ Kaydedildi');
+            setTimeout(() => setToast(''), 2800);
+          }}
+          onClose={() => setCompletionCtx(null)}
         />
       )}
     </div>
@@ -1018,12 +1060,32 @@ function CollabCard({ row, onOpen, compact = false, bulkMode = false, selected =
 }
 
 // ── Detay Modal ──────────────────────────────────────────────────────────────
-function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDeleted, onOpenFullPage }) {
+function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDeleted, onOpenFullPage, onOpenCompletion }) {
   const t = typeObj(row.type);
   const s = statusObj(row.status);
   const u = unitObj(row.unit);
   const editable = canEdit(row, profile);
   const [deleting, setDeleting] = useState(false);
+  const [completionReport, setCompletionReport] = useState(null);
+  const [completionLoaded, setCompletionLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (row?.status !== 'tamamlandi' || !row?.id) {
+      setCompletionReport(null);
+      setCompletionLoaded(true);
+      return () => { cancelled = true; };
+    }
+    setCompletionLoaded(false);
+    (async () => {
+      const { data } = await getCollabCompletionReport(row.id);
+      if (!cancelled) {
+        setCompletionReport(data || null);
+        setCompletionLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [row?.id, row?.status]);
 
   // Bağlantılı kayıtları lookup listelerinden çöz
   const linkedOrg   = row.partner_org_id
@@ -1268,6 +1330,55 @@ function CollabDetailModal({ row, profile, lookups = {}, onClose, onEdit, onDele
               />
             )}
           </div>
+        </Section>
+      )}
+
+      {row.status === 'tamamlandi' && completionLoaded && (
+        <Section title="📝 Sonuç Raporu">
+          {completionReport ? (
+            <div style={{
+              padding: '10px 12px', borderRadius: 8,
+              background: 'rgba(34,197,94,0.08)',
+              border: '1px solid rgba(34,197,94,0.25)',
+              display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+            }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#15803d', marginBottom: 2 }}>
+                  ✓ Rapor doldurulmuş
+                </div>
+                <div style={{ fontSize: 11.5, opacity: 0.75 }}>
+                  {completionReport.submitted_by_name || 'Kullanıcı'} ·{' '}
+                  {completionReport.submitted_at ? fmtDisplayDate(completionReport.submitted_at) : ''}
+                  {completionReport.achievement_level && (
+                    <> · Başarı: <b>{completionReport.achievement_level}</b></>
+                  )}
+                </div>
+              </div>
+              {onOpenCompletion && (
+                <button onClick={onOpenCompletion} style={{
+                  padding: '7px 12px', borderRadius: 7, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  border: '1.5px solid #16a34a', background: '#16a34a', color: '#fff',
+                }}>Görüntüle / Düzenle</button>
+              )}
+            </div>
+          ) : (
+            <div style={{
+              padding: '10px 12px', borderRadius: 8,
+              background: 'rgba(234,179,8,0.10)',
+              border: '1px solid rgba(234,179,8,0.30)',
+              display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+            }}>
+              <div style={{ flex: 1, minWidth: 220, fontSize: 12.5 }}>
+                Bu işbirliği tamamlandı ama henüz sonuç raporu doldurulmadı.
+              </div>
+              {onOpenCompletion && (
+                <button onClick={onOpenCompletion} style={{
+                  padding: '7px 12px', borderRadius: 7, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  border: '1.5px solid #ca8a04', background: '#ca8a04', color: '#fff',
+                }}>＋ Rapor Doldur</button>
+              )}
+            </div>
+          )}
         </Section>
       )}
 
