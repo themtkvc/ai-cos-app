@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase, logActivity, uploadDocumentToDrive, deleteDocumentFromDrive, validateUploadFile, MAX_DOCUMENT_BYTES } from '../lib/supabase';
 import { useProfile } from '../App';
 
@@ -779,6 +779,103 @@ function DocCardList({ doc, onOpen, onEdit, onDelete }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// KATEGORİ FİLTRE DROPDOWN — native <select> yerine özel (her zaman aşağı açılır)
+// ══════════════════════════════════════════════════════════════════════════════
+function CategoryFilterDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  const current = value ? DOC_CATEGORIES.find(c => c.id === value) : null;
+  const label = current ? `${current.icon} ${current.label}` : 'Tüm kategoriler';
+
+  const selectAnd = (v) => { onChange(v); setOpen(false); };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          padding: '8px 30px 8px 12px', borderRadius: 10,
+          border: '1.5px solid var(--border)', fontSize: 12.5,
+          background: 'var(--bg-hover)', color: 'var(--text-secondary)',
+          cursor: 'pointer', outline: 'none', fontWeight: 500,
+          position: 'relative', textAlign: 'left', minWidth: 170,
+        }}
+      >
+        {label}
+        <span style={{
+          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 10, opacity: 0.6,
+        }}>▼</span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+            minWidth: 200, maxHeight: 360, overflowY: 'auto',
+            background: 'var(--bg)', border: '1.5px solid var(--border)',
+            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            zIndex: 50, padding: 4,
+          }}
+          role="listbox"
+        >
+          <DropdownItem
+            active={!value}
+            onClick={() => selectAnd('')}
+            label="Tüm kategoriler"
+          />
+          {DOC_CATEGORIES.map(c => (
+            <DropdownItem
+              key={c.id}
+              active={value === c.id}
+              onClick={() => selectAnd(c.id)}
+              label={`${c.icon} ${c.label}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropdownItem({ active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        padding: '8px 12px', border: 'none', borderRadius: 7,
+        background: active ? 'var(--navy)' : 'transparent',
+        color: active ? '#fff' : 'var(--text)',
+        fontSize: 13, fontWeight: active ? 600 : 500, cursor: 'pointer',
+        textAlign: 'left',
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span style={{ width: 14, opacity: active ? 1 : 0 }}>{active ? '✓' : ''}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ANA BİLEŞEN
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Documents({ user }) {
@@ -974,20 +1071,7 @@ export default function Documents({ user }) {
           />
         </div>
 
-        <select
-          value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value)}
-          style={{
-            padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--border)',
-            fontSize: 12.5, background: 'var(--bg-hover)', color: 'var(--text-secondary)',
-            cursor: 'pointer', outline: 'none', fontWeight: 500,
-          }}
-        >
-          <option value="">Tüm kategoriler</option>
-          {DOC_CATEGORIES.map(c => (
-            <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-          ))}
-        </select>
+        <CategoryFilterDropdown value={categoryFilter} onChange={setCategoryFilter} />
 
         <button
           onClick={() => setShowArchived(!showArchived)}
