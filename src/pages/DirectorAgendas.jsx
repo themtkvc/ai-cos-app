@@ -8,12 +8,12 @@ import {
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
 const SECTIONS = [
-  { id: 'direktor_takip',   label: 'Direktörün Takibindeki Gündemler',     icon: '📌', color: '#1a3a5c' },
-  { id: 'koordinator_takip',label: 'Koordinatörlerin Takibindeki İşler',   icon: '👥', color: '#0e7490' },
-  { id: 'asistan_takip',    label: 'Asistan\'ın Takibindeki İşler',        icon: '✅', color: '#2e6da4' },
-  { id: 'genel_sekreter',   label: 'Genel Sekreter ile Görüşülecekler',    icon: '💬', color: '#6b3fa0' },
-  { id: 'yonetim_kurulu',   label: 'Yönetim Kurulu Gündemleri',            icon: '🏛',  color: '#c47a1e' },
-  { id: 'mutevelli',        label: 'Mütevelli Gündemleri',                 icon: '🤝', color: '#1e7a4a' },
+  { id: 'direktor_takip',   label: 'Direktörün Takibindeki Gündemler',     icon: '📌', color: '#1a3a5c', pastel: '#e3ebf5', pastelBorder: '#c5d4e8' },
+  { id: 'koordinator_takip',label: 'Koordinatörlerin Takibindeki İşler',   icon: '👥', color: '#0e7490', pastel: '#d6eef5', pastelBorder: '#a5dae6' },
+  { id: 'asistan_takip',    label: 'Asistan\'ın Takibindeki İşler',        icon: '✅', color: '#2e6da4', pastel: '#dce7f5', pastelBorder: '#b8cfe8' },
+  { id: 'genel_sekreter',   label: 'Genel Sekreter ile Görüşülecekler',    icon: '💬', color: '#6b3fa0', pastel: '#ece0f5', pastelBorder: '#d2b8e6' },
+  { id: 'yonetim_kurulu',   label: 'Yönetim Kurulu Gündemleri',            icon: '🏛',  color: '#c47a1e', pastel: '#f5e8d1', pastelBorder: '#e8cfa3' },
+  { id: 'mutevelli',        label: 'Mütevelli Gündemleri',                 icon: '🤝', color: '#1e7a4a', pastel: '#d9ecde', pastelBorder: '#b0d7bc' },
 ];
 
 const PRIORITY = {
@@ -218,7 +218,6 @@ function AttachmentsBlock({ attachments, uploading, progress, error, onPick, onR
 }
 
 function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClose, onOpenFullPage }) {
-  const isCoordSection = sectionId === 'koordinator_takip';
   // Başlangıç: all_day varsayılan true; mevcut kayıtta starts_at yoksa due_date'ten al
   const initAllDay = item ? (item.all_day !== false) : true;
   const initStart = item?.starts_at
@@ -227,6 +226,8 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
   const initEnd = item?.ends_at
     ? (initAllDay ? isoToInputDate(item.ends_at) : isoToInputDateTime(item.ends_at))
     : '';
+  // section: mevcut item'ın section'ı > modal'ın açıldığı sectionId > default 'direktor_takip'
+  const initSection = item?.section || sectionId || 'direktor_takip';
   const [draft, setDraft] = useState({
     title:            item?.title    || '',
     notes:            item?.notes    || '',
@@ -235,9 +236,11 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
     all_day:          initAllDay,
     start_input:      initStart,
     end_input:        initEnd,
+    section:          initSection,
     coordinator_id:   item?.coordinator_id   || '',
     coordinator_name: item?.coordinator_name || '',
   });
+  const isCoordSection = draft.section === 'koordinator_takip';
   const [attachments, setAttachments] = useState(
     Array.isArray(item?.attachments) ? item.attachments : []
   );
@@ -334,6 +337,7 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
     const base = {
       title: draft.title, notes: draft.notes,
       status: draft.status, priority: draft.priority,
+      section: draft.section,
       all_day: draft.all_day,
       starts_at,
       ends_at,
@@ -399,6 +403,35 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
             color: 'var(--text)', marginBottom: 12,
           }}
         />
+
+        {/* Kategori (bölüm) seçici */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{
+            fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+            textTransform: 'uppercase', letterSpacing: 0.3, display: 'block', marginBottom: 4,
+          }}>Kategori</label>
+          <select
+            value={draft.section}
+            onChange={e => {
+              const next = e.target.value;
+              setDraft(d => ({
+                ...d,
+                section: next,
+                // Koordinatör bölümünden çıkıldığında koordinatör alanlarını temizle
+                ...(next !== 'koordinator_takip' ? { coordinator_id: '', coordinator_name: '' } : {}),
+              }));
+            }}
+            style={{
+              width: '100%', padding: '8px 12px', borderRadius: 8,
+              border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'inherit',
+              background: 'var(--bg-card)', color: 'var(--text)', outline: 'none', cursor: 'pointer',
+            }}
+          >
+            {SECTIONS.map(s => (
+              <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Notlar */}
         <textarea
@@ -545,41 +578,58 @@ const selStyle = {
 };
 
 // ── TEK GÜNDEM KARTI ─────────────────────────────────────────────────────────
-function AgendaCard({ item, onToggle, onClick, accentColor }) {
+function AgendaCard({ item, onToggle, onClick, section, accentColor, showSectionBadge = false }) {
   const done = item.status === 'tamamlandi';
   const overdue = !done && isOverdue(item);
   const dateText = fmtDateRange(item);
   const prio = PRIORITY[item.priority] || PRIORITY.normal;
   const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS.aktif;
+  const pastelBg = section?.pastel || 'var(--bg-card)';
+  const pastelBorder = section?.pastelBorder || 'var(--border)';
+  const accent = section?.color || accentColor || '#1f2937';
 
   return (
     <div
       onClick={() => onClick(item)}
       style={{
         position: 'relative',
-        display: 'flex', flexDirection: 'column',
+        display: 'inline-block', width: '100%',
         padding: '14px 14px 12px',
         borderRadius: 12,
-        background: 'var(--bg-card)',
-        border: `1px solid ${done ? 'var(--border)' : 'var(--border)'}`,
-        borderLeft: `4px solid ${done ? '#a7f3d0' : (overdue ? '#dc2626' : (prio.color || accentColor))}`,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        background: done ? '#f5f5f5' : pastelBg,
+        border: `1px solid ${done ? 'var(--border)' : pastelBorder}`,
+        borderLeft: `4px solid ${done ? '#a7f3d0' : (overdue ? '#dc2626' : (prio.color || accent))}`,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
         cursor: 'pointer',
         transition: 'all 0.15s',
-        opacity: done ? 0.6 : 1,
-        minHeight: 118,
+        opacity: done ? 0.55 : 1,
+        marginBottom: 12,
+        breakInside: 'avoid',
+        WebkitColumnBreakInside: 'avoid',
+        pageBreakInside: 'avoid',
       }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.07)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)'; e.currentTarget.style.transform = 'translateY(0)'; }}
     >
+      {/* Section badge (filterSection == '' iken kartın hangi kategoriye ait olduğunu belli et) */}
+      {showSectionBadge && section && (
+        <div style={{
+          position: 'absolute', top: 10, right: 12,
+          fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
+          color: accent, opacity: 0.85,
+        }}>
+          {section.icon} {section.label.split(' ')[0]}
+        </div>
+      )}
+
       {/* Üst satır: checkbox + başlık */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: item.notes ? 8 : 6, paddingRight: showSectionBadge ? 70 : 0 }}>
         <button
           onClick={e => { e.stopPropagation(); onToggle(item); }}
           title={done ? 'Aktifleştir' : 'Tamamlandı olarak işaretle'}
           style={{
             width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 2,
-            border: `2px solid ${done ? '#16a34a' : '#d1d5db'}`,
+            border: `2px solid ${done ? '#16a34a' : '#cbd5e1'}`,
             background: done ? '#16a34a' : 'white',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'white', fontSize: 12, fontWeight: 800, padding: 0, lineHeight: 1,
@@ -596,22 +646,22 @@ function AgendaCard({ item, onToggle, onClick, accentColor }) {
         </div>
       </div>
 
-      {/* Notlar önizleme */}
+      {/* Notlar önizleme — masonry'de tam metin gözüksün diye satır sınırlaması kaldırıldı */}
       {item.notes && (
         <div style={{
-          fontSize: 12, color: 'var(--text-light)', lineHeight: 1.45,
+          fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5,
           marginBottom: 10, paddingLeft: 30,
-          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          opacity: 0.78,
         }}>
           {item.notes}
         </div>
       )}
 
       {/* Badge'ler */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 30, marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 30, marginBottom: 6 }}>
         {item.coordinator_name && (
-          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#ecfeff', color: '#0e7490', border: '1px solid #a5f3fc' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.7)', color: '#0e7490', border: '1px solid #a5f3fc' }}>
             👤 {item.coordinator_name}
           </span>
         )}
@@ -635,13 +685,18 @@ function AgendaCard({ item, onToggle, onClick, accentColor }) {
             ✓ Tamamlandı
           </span>
         )}
+        {Array.isArray(item.attachments) && item.attachments.length > 0 && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.7)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            📎 {item.attachments.length}
+          </span>
+        )}
       </div>
 
       {/* Alt satır: tarih + yaratıcı */}
       {(dateText || item.created_by_name) && (
         <div style={{
           display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
-          paddingLeft: 30, marginTop: 'auto',
+          paddingLeft: 30, marginTop: 4,
           fontSize: 11, color: 'var(--text-light)',
         }}>
           {dateText && (
@@ -1433,7 +1488,9 @@ export default function DirectorAgendas({ user, profile }) {
       const { data } = await updateDirectorAgenda(modal.item.id, draft);
       if (data) setItems(prev => prev.map(i => i.id === data.id ? data : i));
     } else {
-      const { data } = await createDirectorAgenda({ section: modal.sectionId, ...draft });
+      // section: draft.section > modal.sectionId > default 'direktor_takip'
+      const section = draft.section || modal.sectionId || 'direktor_takip';
+      const { data } = await createDirectorAgenda({ ...draft, section });
       if (data) setItems(prev => [...prev, data]);
     }
     setModal(null);
@@ -1507,6 +1564,20 @@ export default function DirectorAgendas({ user, profile }) {
   return (
     <div style={{ padding: '28px 32px', background: 'var(--bg-hover)', minHeight: '100vh' }}>
 
+      {/* Masonry CSS — CSS columns ile yumuşak yığın görünümü */}
+      <style>{`
+        .dirag-masonry {
+          column-count: 3;
+          column-gap: 14px;
+        }
+        @media (max-width: 1280px) {
+          .dirag-masonry { column-count: 2; }
+        }
+        @media (max-width: 720px) {
+          .dirag-masonry { column-count: 1; }
+        }
+      `}</style>
+
       {/* Başlık */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 }}>
         <div>
@@ -1542,6 +1613,16 @@ export default function DirectorAgendas({ user, profile }) {
               {allActive} açık gündem
             </span>
           )}
+          {/* Yeni Gündem butonu — her zaman görünür (kart görünümünde merkez rol) */}
+          <button
+            onClick={() => setModal({ item: null, sectionId: filterSection || null })}
+            title="Yeni gündem ekle"
+            style={{
+              padding: '6px 16px', borderRadius: 20, border: 'none',
+              background: '#111827', color: 'white',
+              fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>＋ Yeni Gündem</button>
           {(viewMode === 'cards' || viewMode === 'list') && allDone > 0 && (
             <button
               onClick={() => setShowDone(s => !s)}
@@ -1634,23 +1715,96 @@ export default function DirectorAgendas({ user, profile }) {
         />
       )}
 
-      {/* Kart görünümü — bölümler */}
-      {!loading && viewMode === 'cards' && visibleSections.map(section => (
-        <SectionPanel
-          key={section.id}
-          section={section}
-          items={items.filter(i => i.section === section.id)}
-          showDone={showDone}
-          onAdd={handleQuickAdd}
-          onToggle={handleToggle}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          coordinators={coordinators}
-          coordFilter={coordFilter}
-          onCoordFilterChange={setCoordFilter}
-          groupByCoordinator={section.id === 'koordinator_takip'}
-        />
-      ))}
+      {/* Kart görünümü — masonry (tüm gündemler tek akışta) */}
+      {!loading && viewMode === 'cards' && (() => {
+        const sectionById = Object.fromEntries(SECTIONS.map(s => [s.id, s]));
+        // Filtre + tamamlandı
+        let filtered = items.filter(it => !filterSection || it.section === filterSection);
+        if (!showDone) filtered = filtered.filter(i => i.status !== 'tamamlandi');
+        // Koordinatör alt-filtresi (yalnızca koordinator_takip + filtre seçili iken)
+        if (filterSection === 'koordinator_takip' && coordFilter) {
+          filtered = filtered.filter(i => i.coordinator_id === coordFilter);
+        }
+        // Sıralama: tamamlandıları sona at + tarihe göre (yakın önde) + yaratılış sırası
+        filtered.sort((a, b) => {
+          const ad = a.status === 'tamamlandi' ? 1 : 0;
+          const bd = b.status === 'tamamlandi' ? 1 : 0;
+          if (ad !== bd) return ad - bd;
+          const at = a.starts_at || (a.due_date ? a.due_date + 'T12:00:00' : null);
+          const bt = b.starts_at || (b.due_date ? b.due_date + 'T12:00:00' : null);
+          const an = at ? new Date(at).getTime() : Number.POSITIVE_INFINITY;
+          const bn = bt ? new Date(bt).getTime() : Number.POSITIVE_INFINITY;
+          if (an !== bn) return an - bn;
+          return (a.created_at || '').localeCompare(b.created_at || '');
+        });
+
+        return (
+          <>
+            {/* Koordinatör alt-filtresi (yalnızca "Koordinatörlerin İşleri" seçili iken) */}
+            {filterSection === 'koordinator_takip' && coordinators.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+                <button
+                  onClick={() => setCoordFilter('')}
+                  style={{
+                    padding: '4px 12px', borderRadius: 20, border: '1.5px solid',
+                    borderColor: !coordFilter ? '#0e7490' : 'var(--border)',
+                    background: !coordFilter ? '#ecfeff' : 'var(--bg-card)',
+                    color: !coordFilter ? '#0e7490' : 'var(--text-muted)',
+                    fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>Tüm koordinatörler</button>
+                {coordinators.map(c => {
+                  const count = items.filter(i => i.coordinator_id === c.user_id && i.status !== 'tamamlandi').length;
+                  return (
+                    <button key={c.user_id}
+                      onClick={() => setCoordFilter(c.user_id)}
+                      style={{
+                        padding: '4px 12px', borderRadius: 20, border: '1.5px solid',
+                        borderColor: coordFilter === c.user_id ? '#0e7490' : 'var(--border)',
+                        background: coordFilter === c.user_id ? '#ecfeff' : 'var(--bg-card)',
+                        color: coordFilter === c.user_id ? '#0e7490' : 'var(--text-muted)',
+                        fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                      👤 {(c.full_name || '').split(' ')[0]} {count > 0 && `(${count})`}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {filtered.length === 0 ? (
+              <div style={{
+                background: 'var(--bg-card)', borderRadius: 12,
+                border: '1.5px dashed var(--border)', padding: 48, textAlign: 'center',
+                color: 'var(--text-light)',
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 4 }}>
+                  {filterSection ? 'Bu kategoride gündem yok' : 'Henüz gündem yok'}
+                </div>
+                <div style={{ fontSize: 12, marginBottom: 14 }}>
+                  Üstteki <strong>＋ Yeni Gündem</strong> butonu ile ekleyebilirsiniz
+                </div>
+              </div>
+            ) : (
+              <div className="dirag-masonry">
+                {filtered.map(item => {
+                  const sec = sectionById[item.section] || SECTIONS[0];
+                  return (
+                    <AgendaCard
+                      key={item.id}
+                      item={item}
+                      section={sec}
+                      showSectionBadge={!filterSection}
+                      onToggle={handleToggle}
+                      onClick={(it) => openEdit(it)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Modal */}
       {modal && (
