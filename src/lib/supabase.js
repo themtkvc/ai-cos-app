@@ -1570,6 +1570,99 @@ export const deleteDirectorAgenda = async (id) => {
   return { error };
 };
 
+// ── DIRECTOR DRIVE: özel Shared Drive entegrasyonu ─────────────────────────────
+// IRDP-Direktör-Özel adlı ayrı Shared Drive'a talha@irdp.app impersonation'ı ile
+// dosya yükler. İlk çağrıda drive-setup fonksiyonu Drive'ı kurar; sonraki
+// çağrılarda mevcut drive_id kullanılır. Sadece direktör + asistan erişebilir.
+
+export const getDirectorDriveConfig = async () => {
+  const { data, error } = await supabase
+    .from('director_drive_config')
+    .select('drive_id, drive_name, admin_emails, updated_at')
+    .eq('id', 1).maybeSingle();
+  return { data: data || null, error };
+};
+
+// İlk kullanımda Drive'ı oluşturur (direktör tarafından çağrılmalı).
+// İkinci çağrıda ek maliyet yok — edge function idempotent.
+export const ensureDirectorDrive = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('not_authenticated');
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error('missing_supabase_config');
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/director-drive-setup`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  const text = await resp.text();
+  if (!resp.ok) {
+    let detail = text;
+    try { detail = JSON.parse(text)?.error || detail; } catch {}
+    throw new Error(`director_drive_setup_${resp.status}: ${detail}`);
+  }
+  try { return JSON.parse(text); } catch { return { ok: true }; }
+};
+
+// Direktör Gündemleri için dosya yükle (IRDP-Direktör-Özel Shared Drive'a).
+// Döner: { fileId, name, mimeType, size, webViewLink, iconLink, uploadedBy, uploadedAt, driveId }
+export const uploadDirectorAgendaFile = (file, { displayName = null, onProgress = null } = {}) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { reject(new Error('not_authenticated')); return; }
+      if (!supabaseUrl || !supabaseAnonKey) { reject(new Error('missing_supabase_config')); return; }
+
+      const url = `${supabaseUrl}/functions/v1/director-drive-upload`;
+      const form = new FormData();
+      form.append('file', file);
+      if (displayName) form.append('name', displayName);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('apikey', supabaseAnonKey);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && typeof onProgress === 'function') {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('invalid_response')); }
+        } else {
+          let detail = xhr.responseText;
+          try { detail = JSON.parse(xhr.responseText)?.error || detail; } catch {}
+          reject(new Error(`director_drive_upload_${xhr.status}: ${detail}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('network_error'));
+      xhr.send(form);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+// Gündem'in attachments dizisini güncelle (yalnızca DB kaydı — dosya Drive'da
+// kalır, audit trail açısından güvenli). Direktör tarafında gerçek Drive
+// silme işlemi ayrıca Drive UI'dan yapılmalı.
+export const updateDirectorAgendaAttachments = async (id, attachments) => {
+  const safe = Array.isArray(attachments) ? attachments : [];
+  const { data, error } = await supabase
+    .from('director_agendas')
+    .update({ attachments: safe, updated_at: new Date().toISOString() })
+    .eq('id', id).select().single();
+  return { data, error };
+};
+
 // ── HEDEFLER (GOALS) MODULE ──
 
 // Birim Goals — tek veri kaynağı

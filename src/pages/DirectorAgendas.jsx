@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getDirectorAgendas, createDirectorAgenda, updateDirectorAgenda, deleteDirectorAgenda,
   getAllProfiles,
+  uploadDirectorAgendaFile, ensureDirectorDrive, getDirectorDriveConfig,
+  updateDirectorAgendaAttachments,
 } from '../lib/supabase';
 
 // ── SABİTLER ──────────────────────────────────────────────────────────────────
@@ -100,7 +102,122 @@ function isoToInputDateTime(iso) {
 }
 
 // ── SATIR DETAY / DÜZENLEME MODALİ ───────────────────────────────────────────
-function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClose }) {
+// Dosya boyutunu okunabilir formatta göster
+function fmtBytes(n) {
+  const num = Number(n);
+  if (!num || num < 0) return '—';
+  if (num < 1024) return `${num} B`;
+  if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)} KB`;
+  if (num < 1024 * 1024 * 1024) return `${(num / 1024 / 1024).toFixed(1)} MB`;
+  return `${(num / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+// MIME → emoji
+function mimeIcon(mime, name) {
+  const m = (mime || '').toLowerCase();
+  const ext = (name || '').toLowerCase().split('.').pop();
+  if (m.startsWith('image/')) return '🖼️';
+  if (m.startsWith('video/')) return '🎬';
+  if (m.startsWith('audio/')) return '🎵';
+  if (m.includes('pdf') || ext === 'pdf') return '📕';
+  if (m.includes('word') || ext === 'doc' || ext === 'docx') return '📘';
+  if (m.includes('sheet') || ext === 'xls' || ext === 'xlsx' || ext === 'csv') return '📗';
+  if (m.includes('presentation') || ext === 'ppt' || ext === 'pptx') return '📙';
+  if (m.includes('zip') || ext === 'zip' || ext === 'rar' || ext === '7z') return '🗜️';
+  return '📄';
+}
+
+function AttachmentsBlock({ attachments, uploading, progress, error, onPick, onRemove, fileInputRef, readOnly = false }) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 10,
+      border: '1.5px solid var(--border)',
+      background: 'var(--bg-hover)',
+      marginBottom: 18,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+          📎 Dosyalar ({attachments.length})
+        </span>
+        {!readOnly && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={onPick}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{ padding: '6px 12px', borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: '#0e7490', fontSize: 12, fontWeight: 700, cursor: uploading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: uploading ? 0.6 : 1 }}>
+              {uploading ? `⏳ %${progress}` : '＋ Dosya ekle'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {error && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, background: '#fee2e2', color: '#991b1b', fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {attachments.length === 0 ? (
+        <div style={{ padding: '8px 2px', fontSize: 12, color: 'var(--text-light)', fontStyle: 'italic' }}>
+          Henüz dosya yok. Yüklediğiniz dosyalar IRDP-Direktör-Özel adlı özel Shared Drive'a gider; sadece direktör ve asistan erişebilir.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {attachments.map((a) => (
+            <div key={a.fileId} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 7,
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+            }}>
+              <span style={{ fontSize: 16 }}>{mimeIcon(a.mimeType, a.name)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <a
+                  href={a.webViewLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={a.name}
+                >
+                  {a.name}
+                </a>
+                <div style={{ fontSize: 10.5, color: 'var(--text-light)' }}>
+                  {fmtBytes(a.size)}
+                  {a.uploadedBy ? ` · ${a.uploadedBy}` : ''}
+                  {a.uploadedAt ? ` · ${new Date(a.uploadedAt).toLocaleDateString('tr-TR')}` : ''}
+                </div>
+              </div>
+              <a
+                href={a.webViewLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Drive'da aç"
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', color: '#0e7490', fontSize: 11, fontWeight: 700, textDecoration: 'none', background: 'var(--bg-card)' }}>
+                ↗ Aç
+              </a>
+              {!readOnly && (
+                <button
+                  onClick={() => onRemove(a.fileId)}
+                  title="Gündemden çıkar (Drive'dan silinmez)"
+                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: 'white', color: '#dc2626', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClose, onOpenFullPage }) {
   const isCoordSection = sectionId === 'koordinator_takip';
   // Başlangıç: all_day varsayılan true; mevcut kayıtta starts_at yoksa due_date'ten al
   const initAllDay = item ? (item.all_day !== false) : true;
@@ -121,7 +238,14 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
     coordinator_id:   item?.coordinator_id   || '',
     coordinator_name: item?.coordinator_name || '',
   });
+  const [attachments, setAttachments] = useState(
+    Array.isArray(item?.attachments) ? item.attachments : []
+  );
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   const set = (k, v) => setDraft(d => ({ ...d, [k]: v }));
 
@@ -155,6 +279,42 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
     }));
   };
 
+  const handleFilePick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const rec = await uploadDirectorAgendaFile(file, { onProgress: setUploadProgress });
+      // Drive'a dosya yüklendi. Attachment metadata listeye ekle.
+      setAttachments(prev => [...prev, rec]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Eğer Drive kurulu değilse kullanıcıya Drive kurma önerisi göster
+      if (/drive_not_configured/.test(msg)) {
+        setUploadError('Özel Drive henüz kurulmamış. Sayfa başındaki "Drive\'ı Kur" butonunu kullanın.');
+      } else if (/forbidden_role/.test(msg)) {
+        setUploadError('Bu dosyayı yükleme yetkiniz yok. (Sadece direktör ve asistan)');
+      } else if (/file_too_large/.test(msg)) {
+        setUploadError('Dosya 100 MB sınırını aşıyor.');
+      } else if (/file_type_blocked/.test(msg)) {
+        setUploadError('Bu dosya türü güvenlik nedeniyle engellendi.');
+      } else {
+        setUploadError('Yüklenemedi: ' + msg);
+      }
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = (fileId) => {
+    if (!window.confirm('Bu dosya gündemden çıkarılacak. Drive\'daki orijinal dosya silinmez. Devam?')) return;
+    setAttachments(prev => prev.filter(a => a.fileId !== fileId));
+  };
+
   const handleSave = async () => {
     if (!draft.title.trim()) return;
     if (isCoordSection && !draft.coordinator_id) return;
@@ -178,6 +338,7 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
       starts_at,
       ends_at,
       due_date,
+      attachments,
     };
     const payload = isCoordSection
       ? { ...base, coordinator_id: draft.coordinator_id, coordinator_name: draft.coordinator_name }
@@ -187,17 +348,40 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
     setSaving(false);
   };
 
+  const handleOpenFullPage = () => {
+    if (!item?.id || !onOpenFullPage) return;
+    // Değişiklikleri kaydetmeden mi ilerlemek istiyor? Uyar.
+    const dirty = (
+      draft.title !== (item.title || '') ||
+      draft.notes !== (item.notes || '') ||
+      draft.status !== (item.status || 'aktif') ||
+      draft.priority !== (item.priority || 'normal') ||
+      JSON.stringify(attachments) !== JSON.stringify(item.attachments || [])
+    );
+    if (dirty && !window.confirm('Kaydedilmemiş değişiklikler var. Yine de tam sayfaya geç?')) return;
+    onOpenFullPage(item.id);
+  };
+
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1200 }} />
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
         background: 'var(--bg-card)', borderRadius: 14, padding: '24px 28px',
-        width: 'min(480px, 94vw)', zIndex: 1201,
+        width: 'min(760px, 94vw)', maxHeight: '90vh', overflowY: 'auto', zIndex: 1201,
         boxShadow: '0 20px 60px rgba(0,0,0,0.18)', border: '1px solid var(--border)',
       }}>
-        <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)', marginBottom: 18 }}>
-          {item ? '✏️ Gündem Düzenle' : '➕ Yeni Gündem'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>
+            {item ? '✏️ Gündem Düzenle' : '➕ Yeni Gündem'}
+          </div>
+          {item?.id && onOpenFullPage && (
+            <button onClick={handleOpenFullPage}
+              title="Tam sayfa görünüme geç"
+              style={{ padding: '6px 12px', borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ⤢ Tam sayfa
+            </button>
+          )}
         </div>
 
         {/* Başlık */}
@@ -318,6 +502,17 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
             )}
           </div>
         </div>
+
+        {/* Dosyalar (Direktör Özel Drive) */}
+        <AttachmentsBlock
+          attachments={attachments}
+          uploading={uploading}
+          progress={uploadProgress}
+          error={uploadError}
+          onPick={handleFilePick}
+          onRemove={handleRemoveAttachment}
+          fileInputRef={fileInputRef}
+        />
 
         {/* Butonlar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1125,6 +1320,13 @@ const navBtn = {
 };
 
 // ── ANA SAYFA ─────────────────────────────────────────────────────────────────
+// Hash'ten detay id'sini oku (#director_agendas/:id pattern)
+function readFullPageIdFromHash() {
+  const h = (typeof window !== 'undefined' ? window.location.hash : '').replace('#', '').trim();
+  const m = h.match(/^director_agendas\/([a-f0-9-]{8,})$/i);
+  return m ? m[1] : null;
+}
+
 export default function DirectorAgendas({ user, profile }) {
   const [items, setItems]         = useState([]);
   const [coordinators, setCoordinators] = useState([]);
@@ -1133,16 +1335,24 @@ export default function DirectorAgendas({ user, profile }) {
   const [showDone, setShowDone]   = useState(false);
   const [filterSection, setFilterSection] = useState('');
   const [coordFilter, setCoordFilter] = useState(''); // koordinatöre göre alt-filtre (koordinator_takip bölümü)
-  const [viewMode, setViewMode]   = useState('cards'); // 'cards' | 'calendar'
+  const [viewMode, setViewMode]   = useState('cards'); // 'cards' | 'list' | 'calendar'
+  const [fullPageId, setFullPageId] = useState(() => readFullPageIdFromHash());
+
+  // Drive kurulum durumu
+  const [driveCfg, setDriveCfg] = useState(null); // { drive_id, drive_name, admin_emails } | null
+  const [driveSetupRunning, setDriveSetupRunning] = useState(false);
+  const [driveSetupMsg, setDriveSetupMsg] = useState('');
 
   // Erişim kontrolü
   const allowed = ['direktor', 'asistan'].includes(profile?.role);
+  const isDirector = profile?.role === 'direktor';
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [agendasRes, profilesRes] = await Promise.all([
+    const [agendasRes, profilesRes, cfgRes] = await Promise.all([
       getDirectorAgendas(),
       getAllProfiles(),
+      getDirectorDriveConfig(),
     ]);
     setItems(agendasRes.data || []);
     // Koordinatör rolündeki profilleri topla (adına göre sırala)
@@ -1150,10 +1360,66 @@ export default function DirectorAgendas({ user, profile }) {
       .filter(p => p.role === 'koordinator')
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'tr'));
     setCoordinators(coords);
+    setDriveCfg(cfgRes.data || null);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Hash değişimlerini dinle (browser back/forward + doğrudan link)
+  useEffect(() => {
+    const onHash = () => setFullPageId(readFullPageIdFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const handleDriveSetup = async () => {
+    if (!isDirector) {
+      alert('Sadece direktör Drive kurulumunu başlatabilir.');
+      return;
+    }
+    setDriveSetupRunning(true);
+    setDriveSetupMsg('Kuruluyor…');
+    try {
+      const res = await ensureDirectorDrive();
+      if (res && res.drive_id) {
+        setDriveCfg({
+          drive_id: res.drive_id,
+          drive_name: res.drive_name,
+          admin_emails: res.admin_emails || [],
+        });
+        setDriveSetupMsg('✓ Drive kuruldu');
+      } else if (res && res.already_configured) {
+        setDriveSetupMsg('ℹ Drive zaten kurulu');
+      } else {
+        setDriveSetupMsg('ℹ Tamamlandı');
+      }
+      setTimeout(() => setDriveSetupMsg(''), 3500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setDriveSetupMsg('⚠ Hata: ' + msg);
+    } finally {
+      setDriveSetupRunning(false);
+    }
+  };
+
+  const openFullPage = (id) => {
+    setFullPageId(id);
+    // Hash'i güncelle (yenileme korunur)
+    if (typeof window !== 'undefined') {
+      const newHash = `director_agendas/${id}`;
+      if (window.location.hash.replace('#', '') !== newHash) {
+        window.location.hash = newHash;
+      }
+    }
+  };
+
+  const closeFullPage = () => {
+    setFullPageId(null);
+    if (typeof window !== 'undefined' && /director_agendas\//.test(window.location.hash)) {
+      window.location.hash = 'director_agendas';
+    }
+  };
 
   // Hızlı ekle (Enter ile başlık)
   const handleQuickAdd = async (sectionId, title) => {
@@ -1186,6 +1452,14 @@ export default function DirectorAgendas({ user, profile }) {
     await deleteDirectorAgenda(id);
     setItems(prev => prev.filter(i => i.id !== id));
     setModal(null);
+    if (fullPageId === id) closeFullPage();
+  };
+
+  // Sadece attachments güncelle (tam sayfa detayı için anlık upsert)
+  const handleAttachmentsChange = async (id, nextAttachments) => {
+    const { data } = await updateDirectorAgendaAttachments(id, nextAttachments);
+    if (data) setItems(prev => prev.map(i => i.id === data.id ? data : i));
+    return data;
   };
 
   // Düzenleme aç
@@ -1200,6 +1474,26 @@ export default function DirectorAgendas({ user, profile }) {
         <h2 style={{ color: 'var(--text)' }}>Erişim Reddedildi</h2>
         <p style={{ color: 'var(--text-light)', marginTop: 8 }}>Bu sayfa yalnızca direktör ve asistan tarafından görüntülenebilir.</p>
       </div>
+    );
+  }
+
+  // Tam sayfa detay görünümü (#director_agendas/:id)
+  const fullPageItem = fullPageId ? items.find(i => i.id === fullPageId) : null;
+  if (fullPageItem) {
+    return (
+      <FullPageDetail
+        item={fullPageItem}
+        sections={SECTIONS}
+        coordinators={coordinators}
+        onBack={closeFullPage}
+        onSave={async (draft) => {
+          const { data } = await updateDirectorAgenda(fullPageItem.id, draft);
+          if (data) setItems(prev => prev.map(i => i.id === data.id ? data : i));
+        }}
+        onAttachmentsChange={handleAttachmentsChange}
+        onToggle={handleToggle}
+        onDelete={handleDelete}
+      />
     );
   }
 
@@ -1254,6 +1548,30 @@ export default function DirectorAgendas({ user, profile }) {
               style={{ fontSize: 12.5, fontWeight: 600, color: showDone ? '#15803d' : 'var(--text-muted)', padding: '4px 12px', borderRadius: 20, background: showDone ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showDone ? '#bbf7d0' : 'var(--border)'}`, cursor: 'pointer', fontFamily: 'inherit' }}>
               {showDone ? '✓ Tamamlananları gizle' : `${allDone} tamamlananı göster`}
             </button>
+          )}
+          {/* Drive durumu / kurulum (sadece direktör tetikleyebilir) */}
+          {isDirector && !driveCfg?.drive_id && (
+            <button
+              onClick={handleDriveSetup}
+              disabled={driveSetupRunning}
+              title="IRDP-Direktör-Özel adında ayrı bir Shared Drive oluşturur"
+              style={{ fontSize: 12.5, fontWeight: 700, color: '#0e7490', padding: '4px 12px', borderRadius: 20, background: '#ecfeff', border: '1px solid #a5f3fc', cursor: driveSetupRunning ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: driveSetupRunning ? 0.7 : 1 }}>
+              {driveSetupRunning ? '⏳ Drive kuruluyor…' : '☁️ Drive\'ı Kur'}
+            </button>
+          )}
+          {driveCfg?.drive_id && (
+            <a
+              href={`https://drive.google.com/drive/folders/${driveCfg.drive_id}`}
+              target="_blank" rel="noopener noreferrer"
+              title={driveCfg.drive_name || 'IRDP-Direktör-Özel'}
+              style={{ fontSize: 12, fontWeight: 600, color: '#0e7490', padding: '4px 12px', borderRadius: 20, background: '#f0fdfa', border: '1px solid #99f6e4', textDecoration: 'none' }}>
+              ☁️ Özel Drive ↗
+            </a>
+          )}
+          {driveSetupMsg && (
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 600 }}>
+              {driveSetupMsg}
+            </span>
           )}
         </div>
       </div>
@@ -1343,8 +1661,313 @@ export default function DirectorAgendas({ user, profile }) {
           onSave={handleModalSave}
           onDelete={handleDelete}
           onClose={() => setModal(null)}
+          onOpenFullPage={(id) => { setModal(null); openFullPage(id); }}
         />
       )}
     </div>
   );
 }
+
+// ── TAM SAYFA DETAY ──────────────────────────────────────────────────────────
+// ItemModal'ın "tam sayfa" versiyonu. Modal'dan ⤢ butonu veya
+// doğrudan hash rotası (#director_agendas/:id) ile açılır.
+function FullPageDetail({ item, sections, coordinators, onBack, onSave, onAttachmentsChange, onToggle, onDelete }) {
+  const isCoord = item.section === 'koordinator_takip';
+  const section = sections.find(s => s.id === item.section) || sections[0];
+
+  const initAllDay = item.all_day !== false;
+  const [draft, setDraft] = useState({
+    title: item.title || '',
+    notes: item.notes || '',
+    status: item.status || 'aktif',
+    priority: item.priority || 'normal',
+    all_day: initAllDay,
+    start_input: item.starts_at
+      ? (initAllDay ? isoToInputDate(item.starts_at) : isoToInputDateTime(item.starts_at))
+      : (item.due_date || ''),
+    end_input: item.ends_at
+      ? (initAllDay ? isoToInputDate(item.ends_at) : isoToInputDateTime(item.ends_at))
+      : '',
+    coordinator_id: item.coordinator_id || '',
+    coordinator_name: item.coordinator_name || '',
+  });
+  const [attachments, setAttachments] = useState(Array.isArray(item.attachments) ? item.attachments : []);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+
+  // Item dışarıdan değişirse (örn. başka tab kaydetti) draft/attachments'ı senkronla
+  useEffect(() => {
+    setAttachments(Array.isArray(item.attachments) ? item.attachments : []);
+  }, [item.id, item.updated_at]);
+
+  const set = (k, v) => setDraft(d => ({ ...d, [k]: v }));
+
+  const toggleAllDay = (nextAllDay) => {
+    setDraft(d => {
+      const convert = (val) => {
+        if (!val) return '';
+        if (nextAllDay) return val.slice(0, 10);
+        return val.length === 10 ? `${val}T09:00` : val;
+      };
+      return { ...d, all_day: nextAllDay, start_input: convert(d.start_input), end_input: convert(d.end_input) };
+    });
+  };
+
+  const handleFilePick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const rec = await uploadDirectorAgendaFile(file, { onProgress: setUploadProgress });
+      const next = [...attachments, rec];
+      setAttachments(next);
+      // Tam sayfa görünümünde anlık kalıcılık: DB'ye hemen yaz
+      await onAttachmentsChange(item.id, next);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/drive_not_configured/.test(msg)) {
+        setUploadError('Özel Drive kurulu değil. Ana sayfadan "Drive\'ı Kur" butonunu kullanın.');
+      } else if (/forbidden_role/.test(msg)) {
+        setUploadError('Dosya yükleme yetkiniz yok.');
+      } else if (/file_too_large/.test(msg)) {
+        setUploadError('Dosya 100 MB sınırını aşıyor.');
+      } else if (/file_type_blocked/.test(msg)) {
+        setUploadError('Bu dosya türü güvenlik nedeniyle engellendi.');
+      } else {
+        setUploadError('Yüklenemedi: ' + msg);
+      }
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = async (fileId) => {
+    if (!window.confirm('Bu dosya gündemden çıkarılacak. Drive\'daki orijinal dosya silinmez. Devam?')) return;
+    const next = attachments.filter(a => a.fileId !== fileId);
+    setAttachments(next);
+    await onAttachmentsChange(item.id, next);
+  };
+
+  const handleCoordChange = (id) => {
+    const found = coordinators.find(c => c.user_id === id);
+    setDraft(d => ({ ...d, coordinator_id: id || '', coordinator_name: found?.full_name || '' }));
+  };
+
+  const handleSave = async () => {
+    if (!draft.title.trim()) return;
+    if (isCoord && !draft.coordinator_id) return;
+    const starts_at = inputToIso(draft.start_input, draft.all_day);
+    const ends_at = inputToIso(draft.end_input, draft.all_day);
+    if (starts_at && ends_at && new Date(ends_at) < new Date(starts_at)) {
+      alert('Bitiş tarihi başlangıçtan önce olamaz.');
+      return;
+    }
+    setSaving(true);
+    const due_date = starts_at ? starts_at.slice(0, 10) : null;
+    const base = {
+      title: draft.title, notes: draft.notes,
+      status: draft.status, priority: draft.priority,
+      all_day: draft.all_day, starts_at, ends_at, due_date,
+    };
+    const payload = isCoord
+      ? { ...base, coordinator_id: draft.coordinator_id, coordinator_name: draft.coordinator_name }
+      : { ...base, coordinator_id: null, coordinator_name: null };
+    await onSave(payload);
+    setSaving(false);
+  };
+
+  const done = draft.status === 'tamamlandi';
+  const overdueItem = isOverdue({ ...item, ...draft, starts_at: inputToIso(draft.start_input, draft.all_day), ends_at: inputToIso(draft.end_input, draft.all_day) });
+
+  return (
+    <div style={{ padding: '28px 32px', background: 'var(--bg-hover)', minHeight: '100vh' }}>
+
+      {/* Üst bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
+        <button onClick={onBack}
+          style={{ padding: '7px 14px', borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          ← Geri
+        </button>
+        <span style={{
+          padding: '4px 12px', borderRadius: 20,
+          background: section.color + '18', color: section.color,
+          fontSize: 12, fontWeight: 700, border: `1px solid ${section.color}40`,
+        }}>
+          {section.icon} {section.label}
+        </span>
+        {overdueItem && !done && (
+          <span style={{ padding: '4px 10px', borderRadius: 20, background: '#fee2e2', color: '#991b1b', fontSize: 11.5, fontWeight: 700, border: '1px solid #fca5a5' }}>
+            ⚠ Gecikmiş
+          </span>
+        )}
+      </div>
+
+      <div style={{ maxWidth: 980, margin: '0 auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '28px 32px', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
+
+        {/* Başlık satırı (checkbox + title) */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
+          <input
+            type="checkbox"
+            checked={done}
+            onChange={() => onToggle(item)}
+            style={{ marginTop: 8, width: 20, height: 20, cursor: 'pointer', accentColor: section.color }}
+          />
+          <textarea
+            value={draft.title}
+            onChange={e => set('title', e.target.value)}
+            placeholder="Gündem başlığı…"
+            rows={1}
+            style={{
+              flex: 1, resize: 'none', overflow: 'hidden',
+              padding: '6px 10px', borderRadius: 8,
+              border: '1.5px solid transparent', outline: 'none',
+              fontSize: 22, fontWeight: 800, fontFamily: 'inherit',
+              background: 'transparent', color: 'var(--text)',
+              textDecoration: done ? 'line-through' : 'none',
+              opacity: done ? 0.55 : 1,
+              lineHeight: 1.3,
+            }}
+            onFocus={e => e.target.style.borderColor = 'var(--border)'}
+            onBlur={e => e.target.style.borderColor = 'transparent'}
+          />
+        </div>
+
+        {/* Koordinatör (varsa) */}
+        {isCoord && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3, display: 'block', marginBottom: 6 }}>
+              Koordinatör
+            </label>
+            <select value={draft.coordinator_id} onChange={e => handleCoordChange(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, fontFamily: 'inherit', background: 'var(--bg-card)', color: 'var(--text)', outline: 'none' }}>
+              <option value="">— Koordinatör seçin —</option>
+              {coordinators.map(c => (
+                <option key={c.user_id} value={c.user_id}>
+                  {c.full_name} {c.unit ? `· ${c.unit}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Status + Priority + Tarih tek satırda */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
+          <div>
+            <label style={lblStyle}>Durum</label>
+            <select value={draft.status} onChange={e => set('status', e.target.value)} style={bigSelStyle}>
+              <option value="aktif">Aktif</option>
+              <option value="bekliyor">Bekliyor</option>
+              <option value="tamamlandi">Tamamlandı</option>
+            </select>
+          </div>
+          <div>
+            <label style={lblStyle}>Öncelik</label>
+            <select value={draft.priority} onChange={e => set('priority', e.target.value)} style={bigSelStyle}>
+              <option value="yuksek">🔴 Yüksek</option>
+              <option value="normal">⚪ Normal</option>
+              <option value="dusuk">🟢 Düşük</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Tarih bloğu (genişletilmiş) */}
+        <div style={{ padding: '14px 16px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg-hover)', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              📅 Tarih & Saat
+            </span>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+              <input type="checkbox" checked={draft.all_day} onChange={e => toggleAllDay(e.target.checked)} />
+              Tüm gün
+            </label>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, alignItems: 'end' }}>
+            <div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-light)', marginBottom: 3 }}>Başlangıç</div>
+              <input type={draft.all_day ? 'date' : 'datetime-local'} value={draft.start_input}
+                onChange={e => set('start_input', e.target.value)} style={bigSelStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-light)', marginBottom: 3 }}>Bitiş (ops.)</div>
+              <input type={draft.all_day ? 'date' : 'datetime-local'} value={draft.end_input}
+                onChange={e => set('end_input', e.target.value)} min={draft.start_input || undefined}
+                style={bigSelStyle} />
+            </div>
+            {(draft.start_input || draft.end_input) && (
+              <button onClick={() => { set('start_input', ''); set('end_input', ''); }}
+                style={{ padding: '8px 12px', borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', height: 38 }}>
+                ✕ Temizle
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Notlar (büyük) */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={lblStyle}>Notlar</label>
+          <textarea
+            value={draft.notes}
+            onChange={e => set('notes', e.target.value)}
+            rows={10}
+            placeholder="Detaylı notlar, görüşmeler, bağlamlar…"
+            style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '12px 14px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, fontFamily: 'inherit', outline: 'none', background: 'var(--bg-card)', color: 'var(--text)', lineHeight: 1.55 }}
+          />
+        </div>
+
+        {/* Dosyalar */}
+        <AttachmentsBlock
+          attachments={attachments}
+          uploading={uploading}
+          progress={uploadProgress}
+          error={uploadError}
+          onPick={handleFilePick}
+          onRemove={handleRemoveAttachment}
+          fileInputRef={fileInputRef}
+        />
+
+        {/* Meta bilgi */}
+        <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--bg-hover)', fontSize: 11.5, color: 'var(--text-light)', marginBottom: 18 }}>
+          Oluşturan: <strong style={{ color: 'var(--text-muted)' }}>{item.created_by_name || '—'}</strong>
+          {item.created_at && <> · {new Date(item.created_at).toLocaleString('tr-TR')}</>}
+          {item.updated_at && item.updated_at !== item.created_at && <> · Son güncelleme: {new Date(item.updated_at).toLocaleString('tr-TR')}</>}
+        </div>
+
+        {/* Butonlar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button onClick={() => onDelete(item.id)}
+            style={{ padding: '9px 18px', borderRadius: 8, border: '1.5px solid #fca5a5', background: 'white', color: '#dc2626', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🗑 Sil
+          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onBack}
+              style={{ padding: '9px 18px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Kapat
+            </button>
+            <button onClick={handleSave} disabled={saving || !draft.title.trim() || (isCoord && !draft.coordinator_id)}
+              style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: '#111827', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (saving || (isCoord && !draft.coordinator_id)) ? 0.6 : 1 }}>
+              {saving ? '⏳ Kaydediliyor…' : '✓ Kaydet'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const lblStyle = {
+  fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+  textTransform: 'uppercase', letterSpacing: 0.3, display: 'block', marginBottom: 6,
+};
+const bigSelStyle = {
+  width: '100%', boxSizing: 'border-box',
+  padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--border)',
+  fontSize: 14, fontFamily: 'inherit', background: 'var(--bg-card)',
+  color: 'var(--text)', cursor: 'pointer', outline: 'none',
+};
