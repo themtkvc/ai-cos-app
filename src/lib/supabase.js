@@ -1603,7 +1603,10 @@ export const ensureDirectorDrive = async () => {
   const text = await resp.text();
   if (!resp.ok) {
     let detail = text;
-    try { detail = JSON.parse(text)?.error || detail; } catch {}
+    try {
+      const j = JSON.parse(text);
+      detail = [j.error, j.message, j.detail].filter(Boolean).join(' — ');
+    } catch {}
     throw new Error(`director_drive_setup_${resp.status}: ${detail}`);
   }
   try { return JSON.parse(text); } catch { return { ok: true }; }
@@ -1639,7 +1642,10 @@ export const uploadDirectorAgendaFile = (file, { displayName = null, onProgress 
           catch { reject(new Error('invalid_response')); }
         } else {
           let detail = xhr.responseText;
-          try { detail = JSON.parse(xhr.responseText)?.error || detail; } catch {}
+          try {
+            const j = JSON.parse(xhr.responseText);
+            detail = [j.error, j.message, j.detail].filter(Boolean).join(' — ') || detail;
+          } catch {}
           reject(new Error(`director_drive_upload_${xhr.status}: ${detail}`));
         }
       };
