@@ -47,6 +47,7 @@ const DOC_CATEGORIES = [
   { id: 'proposal',  icon: '💡', label: 'Proje Teklifi' },
   { id: 'form',      icon: '📄', label: 'Form' },
   { id: 'guide',     icon: '📚', label: 'Kılavuz' },
+  { id: 'reference', icon: '✉️', label: 'Referans Mektubu' },
   { id: 'document',  icon: '📎', label: 'Diğer' },
 ];
 const DEFAULT_CATEGORY = DOC_CATEGORIES[DOC_CATEGORIES.length - 1];
