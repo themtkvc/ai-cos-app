@@ -733,6 +733,196 @@ function SectionPanel({
   );
 }
 
+// ── LİSTE GÖRÜNÜMÜ ───────────────────────────────────────────────────────────
+function ListView({ items, sections, coordinators, onToggle, onEdit, filterSection, showDone }) {
+  const [sortKey, setSortKey] = useState('date'); // 'date' | 'title' | 'section' | 'priority' | 'status'
+  const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
+
+  const sectionById = Object.fromEntries(sections.map(s => [s.id, s]));
+
+  const filtered = items
+    .filter(it => !filterSection || it.section === filterSection)
+    .filter(it => showDone || it.status !== 'tamamlandi');
+
+  const getSortTs = (it) => {
+    const s = it.starts_at || (it.due_date ? it.due_date + 'T12:00:00' : null);
+    return s ? new Date(s).getTime() : Number.POSITIVE_INFINITY; // tarihi yoksa en sona
+  };
+
+  const PRIO_ORDER = { yuksek: 0, normal: 1, dusuk: 2 };
+  const STATUS_ORDER = { aktif: 0, bekliyor: 1, tamamlandi: 2 };
+
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === 'date')     cmp = getSortTs(a) - getSortTs(b);
+    else if (sortKey === 'title')    cmp = (a.title || '').localeCompare(b.title || '', 'tr');
+    else if (sortKey === 'section')  cmp = (a.section || '').localeCompare(b.section || '');
+    else if (sortKey === 'priority') cmp = (PRIO_ORDER[a.priority] ?? 1) - (PRIO_ORDER[b.priority] ?? 1);
+    else if (sortKey === 'status')   cmp = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const SortHdr = ({ label, k, width, align = 'left' }) => (
+    <th
+      onClick={() => toggleSort(k)}
+      style={{
+        padding: '10px 12px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+        textAlign: align, letterSpacing: 0.3, textTransform: 'uppercase',
+        borderBottom: '2px solid var(--border)', cursor: 'pointer', userSelect: 'none',
+        whiteSpace: 'nowrap', width,
+      }}
+    >
+      {label} {sortKey === k && (sortDir === 'asc' ? '▲' : '▼')}
+    </th>
+  );
+
+  if (sorted.length === 0) {
+    return (
+      <div style={{
+        background: 'var(--bg-card)', borderRadius: 12,
+        border: '1px solid var(--border)', padding: 48, textAlign: 'center',
+        color: 'var(--text-light)',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Filtreye uyan gündem yok</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: 'var(--bg-card)', borderRadius: 12,
+      border: '1px solid var(--border)', overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+    }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'inherit' }}>
+          <thead style={{ background: 'var(--bg-hover)' }}>
+            <tr>
+              <th style={{ width: 40, padding: '10px 8px 10px 14px', borderBottom: '2px solid var(--border)' }} />
+              <SortHdr label="Başlık" k="title" />
+              <SortHdr label="Bölüm" k="section" width={180} />
+              <SortHdr label="Tarih" k="date" width={180} />
+              <SortHdr label="Öncelik" k="priority" width={110} align="center" />
+              <SortHdr label="Durum" k="status" width={120} align="center" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((it, i) => {
+              const sec = sectionById[it.section] || { color: '#6b7280', label: it.section, icon: '•' };
+              const done = it.status === 'tamamlandi';
+              const overdue = !done && isOverdue(it);
+              const prio = PRIORITY[it.priority] || PRIORITY.normal;
+              const statusStyle = STATUS_COLORS[it.status] || STATUS_COLORS.aktif;
+              const dateText = fmtDateRange(it);
+
+              return (
+                <tr key={it.id}
+                  onClick={() => onEdit(it)}
+                  style={{
+                    background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-hover)',
+                    cursor: 'pointer', opacity: done ? 0.55 : 1,
+                    transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = sec.color + '10'}
+                  onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-hover)'}
+                >
+                  {/* checkbox */}
+                  <td style={{ padding: '10px 8px 10px 14px', borderLeft: `3px solid ${done ? '#a7f3d0' : (overdue ? '#dc2626' : prio.color)}` }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); onToggle(it); }}
+                      title={done ? 'Aktifleştir' : 'Tamamlandı olarak işaretle'}
+                      style={{
+                        width: 18, height: 18, borderRadius: 5, padding: 0,
+                        border: `2px solid ${done ? '#16a34a' : '#d1d5db'}`,
+                        background: done ? '#16a34a' : 'white',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: 11, fontWeight: 800, lineHeight: 1,
+                      }}
+                    >{done ? '✓' : ''}</button>
+                  </td>
+
+                  {/* Başlık + koordinatör */}
+                  <td style={{ padding: '10px 12px', minWidth: 220 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', lineHeight: 1.35, textDecoration: done ? 'line-through' : 'none' }}>
+                      {it.title}
+                    </div>
+                    {(it.coordinator_name || it.notes) && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-light)', marginTop: 3, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {it.coordinator_name && (
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: '#ecfeff', color: '#0e7490', border: '1px solid #a5f3fc' }}>
+                            👤 {it.coordinator_name}
+                          </span>
+                        )}
+                        {it.notes && (
+                          <span style={{
+                            flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            fontStyle: 'italic',
+                          }}>
+                            {it.notes}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Bölüm */}
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                      background: sec.color + '18', color: sec.color,
+                      border: `1px solid ${sec.color}33`, whiteSpace: 'nowrap',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      {sec.icon} {sec.label?.split(' ')[0] || ''}
+                    </span>
+                  </td>
+
+                  {/* Tarih */}
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: overdue && !done ? '#dc2626' : 'var(--text-light)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {dateText ? `${overdue && !done ? '⚠️ ' : '📅 '}${dateText}` : <span style={{ opacity: 0.4 }}>—</span>}
+                  </td>
+
+                  {/* Öncelik */}
+                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <span title={prio.label} style={{ fontSize: 11, fontWeight: 700, color: prio.color }}>
+                      {prio.dot} {prio.label}
+                    </span>
+                  </td>
+
+                  {/* Durum */}
+                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <span style={{
+                      fontSize: 10.5, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
+                      background: statusStyle.bg, color: statusStyle.text,
+                      border: `1px solid ${statusStyle.border}`, whiteSpace: 'nowrap',
+                    }}>
+                      {it.status === 'aktif' && '● Aktif'}
+                      {it.status === 'bekliyor' && '⏸ Bekliyor'}
+                      {it.status === 'tamamlandi' && '✓ Tamamlandı'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{
+        padding: '10px 14px', borderTop: '1px solid var(--border)',
+        fontSize: 11.5, color: 'var(--text-light)', background: 'var(--bg-hover)',
+      }}>
+        {sorted.length} gündem · sütun başlığına tıklayarak sırala
+      </div>
+    </div>
+  );
+}
+
 // ── TAKVİM GÖRÜNÜMÜ ──────────────────────────────────────────────────────────
 const WEEKDAYS_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 const MONTHS_TR = [
@@ -1038,29 +1228,27 @@ export default function DirectorAgendas({ user, profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {/* Görünüm toggle */}
           <div style={{ display: 'inline-flex', borderRadius: 20, border: '1.5px solid var(--border)', background: 'var(--bg-card)', padding: 2 }}>
-            <button
-              onClick={() => setViewMode('cards')}
-              style={{
-                padding: '4px 14px', borderRadius: 18, border: 'none',
-                background: viewMode === 'cards' ? '#111827' : 'transparent',
-                color: viewMode === 'cards' ? 'white' : 'var(--text-muted)',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}>🗂 Kart</button>
-            <button
-              onClick={() => setViewMode('calendar')}
-              style={{
-                padding: '4px 14px', borderRadius: 18, border: 'none',
-                background: viewMode === 'calendar' ? '#111827' : 'transparent',
-                color: viewMode === 'calendar' ? 'white' : 'var(--text-muted)',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}>📅 Takvim</button>
+            {[
+              { id: 'cards',    label: '🗂 Kart' },
+              { id: 'list',     label: '📋 Liste' },
+              { id: 'calendar', label: '📅 Takvim' },
+            ].map(v => (
+              <button key={v.id}
+                onClick={() => setViewMode(v.id)}
+                style={{
+                  padding: '4px 14px', borderRadius: 18, border: 'none',
+                  background: viewMode === v.id ? '#111827' : 'transparent',
+                  color: viewMode === v.id ? 'white' : 'var(--text-muted)',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                }}>{v.label}</button>
+            ))}
           </div>
           {allActive > 0 && (
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1d4ed8', padding: '4px 12px', borderRadius: 20, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
               {allActive} açık gündem
             </span>
           )}
-          {viewMode === 'cards' && allDone > 0 && (
+          {(viewMode === 'cards' || viewMode === 'list') && allDone > 0 && (
             <button
               onClick={() => setShowDone(s => !s)}
               style={{ fontSize: 12.5, fontWeight: 600, color: showDone ? '#15803d' : 'var(--text-muted)', padding: '4px 12px', borderRadius: 20, background: showDone ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showDone ? '#bbf7d0' : 'var(--border)'}`, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1070,8 +1258,8 @@ export default function DirectorAgendas({ user, profile }) {
         </div>
       </div>
 
-      {/* Bölüm filtresi (sadece kart görünümünde) */}
-      {viewMode === 'cards' && (
+      {/* Bölüm filtresi (kart & liste görünümünde) */}
+      {(viewMode === 'cards' || viewMode === 'list') && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
           <button
             onClick={() => setFilterSection('')}
@@ -1112,6 +1300,19 @@ export default function DirectorAgendas({ user, profile }) {
           items={items}
           sections={SECTIONS}
           onEventClick={(it) => openEdit(it)}
+        />
+      )}
+
+      {/* Liste görünümü */}
+      {!loading && viewMode === 'list' && (
+        <ListView
+          items={items}
+          sections={SECTIONS}
+          coordinators={coordinators}
+          filterSection={filterSection}
+          showDone={showDone}
+          onToggle={handleToggle}
+          onEdit={(it) => openEdit(it)}
         />
       )}
 
