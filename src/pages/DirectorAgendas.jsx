@@ -28,30 +28,123 @@ const STATUS_COLORS = {
 
 function fmtDate(d) {
   if (!d) return '';
-  const dt = new Date(d + 'T12:00:00');
+  // Hem "2026-04-22" hem de ISO timestamptz kabul et
+  const dt = typeof d === 'string' && d.length === 10 ? new Date(d + 'T12:00:00') : new Date(d);
+  if (isNaN(dt.getTime())) return '';
   return dt.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function isOverdue(d) {
-  if (!d) return false;
-  return new Date(d + 'T23:59:59') < new Date();
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDateRange(item) {
+  // Yeni kayıtlar: starts_at / ends_at / all_day
+  // Eski kayıtlar: due_date (date)
+  const s = item.starts_at || null;
+  const e = item.ends_at || null;
+  const allDay = item.all_day !== false; // varsayılan: all_day true
+  if (s) {
+    const sDate = fmtDate(s);
+    if (!e || e === s) {
+      return allDay ? sDate : `${sDate} · ${fmtTime(s)}`;
+    }
+    const eDate = fmtDate(e);
+    if (allDay) {
+      return sDate === eDate ? sDate : `${sDate} → ${eDate}`;
+    }
+    return sDate === eDate
+      ? `${sDate} · ${fmtTime(s)}–${fmtTime(e)}`
+      : `${sDate} ${fmtTime(s)} → ${eDate} ${fmtTime(e)}`;
+  }
+  if (item.due_date) return fmtDate(item.due_date);
+  return '';
+}
+
+function isOverdue(item) {
+  if (!item) return false;
+  // starts_at veya due_date bazında — end varsa onu al
+  const e = item.ends_at || item.starts_at;
+  if (e) return new Date(e) < new Date();
+  if (item.due_date) return new Date(item.due_date + 'T23:59:59') < new Date();
+  return false;
+}
+
+// ── TARİH INPUT YARDIMCILARI ─────────────────────────────────────────────────
+function inputToIso(input, allDay) {
+  if (!input) return null;
+  if (allDay) {
+    // input: yyyy-mm-dd → UTC gün başı olarak sakla
+    return `${input}T00:00:00Z`;
+  }
+  // input: yyyy-mm-ddThh:mm → lokal tz, ISO'ya çevir
+  const d = new Date(input);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function isoToInputDate(iso) {
+  if (!iso) return '';
+  // "yyyy-mm-dd" kısmını al (all_day için UTC ile sakladığımız için güvenli)
+  return iso.slice(0, 10);
+}
+
+function isoToInputDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── SATIR DETAY / DÜZENLEME MODALİ ───────────────────────────────────────────
 function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClose }) {
   const isCoordSection = sectionId === 'koordinator_takip';
+  // Başlangıç: all_day varsayılan true; mevcut kayıtta starts_at yoksa due_date'ten al
+  const initAllDay = item ? (item.all_day !== false) : true;
+  const initStart = item?.starts_at
+    ? (initAllDay ? isoToInputDate(item.starts_at) : isoToInputDateTime(item.starts_at))
+    : (item?.due_date || '');
+  const initEnd = item?.ends_at
+    ? (initAllDay ? isoToInputDate(item.ends_at) : isoToInputDateTime(item.ends_at))
+    : '';
   const [draft, setDraft] = useState({
     title:            item?.title    || '',
     notes:            item?.notes    || '',
     status:           item?.status   || 'aktif',
     priority:         item?.priority || 'normal',
-    due_date:         item?.due_date || '',
+    all_day:          initAllDay,
+    start_input:      initStart,
+    end_input:        initEnd,
     coordinator_id:   item?.coordinator_id   || '',
     coordinator_name: item?.coordinator_name || '',
   });
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => setDraft(d => ({ ...d, [k]: v }));
+
+  const toggleAllDay = (nextAllDay) => {
+    // Input formatı değiştiği için mevcut değerleri uygun forma dönüştür
+    setDraft(d => {
+      const convert = (val) => {
+        if (!val) return '';
+        if (nextAllDay) {
+          // datetime-local → date
+          return val.slice(0, 10);
+        }
+        // date → datetime-local (saat 09:00 default)
+        return val.length === 10 ? `${val}T09:00` : val;
+      };
+      return {
+        ...d,
+        all_day: nextAllDay,
+        start_input: convert(d.start_input),
+        end_input: convert(d.end_input),
+      };
+    });
+  };
 
   const handleCoordChange = (id) => {
     const found = coordinators.find(c => c.user_id === id);
@@ -64,14 +157,32 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
 
   const handleSave = async () => {
     if (!draft.title.trim()) return;
-    if (isCoordSection && !draft.coordinator_id) return; // koordinatör zorunlu bu bölümde
+    if (isCoordSection && !draft.coordinator_id) return;
+
+    const starts_at = inputToIso(draft.start_input, draft.all_day);
+    const ends_at = inputToIso(draft.end_input, draft.all_day);
+    // Tarih aralığı tutarlılığı (basit guard — DB CHECK zaten var)
+    if (starts_at && ends_at && new Date(ends_at) < new Date(starts_at)) {
+      alert('Bitiş tarihi başlangıçtan önce olamaz.');
+      return;
+    }
+
     setSaving(true);
-    // Koordinatör bölümünde değilsek ilgili alanları hiç gönderme (null kalsın)
-    const payload = isCoordSection ? draft : {
+    // due_date ile backward-compat: all_day ise başlangıç tarihini date olarak da yaz
+    const due_date = starts_at ? starts_at.slice(0, 10) : null;
+
+    const base = {
       title: draft.title, notes: draft.notes,
-      status: draft.status, priority: draft.priority, due_date: draft.due_date,
-      coordinator_id: null, coordinator_name: null,
+      status: draft.status, priority: draft.priority,
+      all_day: draft.all_day,
+      starts_at,
+      ends_at,
+      due_date,
     };
+    const payload = isCoordSection
+      ? { ...base, coordinator_id: draft.coordinator_id, coordinator_name: draft.coordinator_name }
+      : { ...base, coordinator_id: null, coordinator_name: null };
+
     await onSave(payload);
     setSaving(false);
   };
@@ -146,8 +257,8 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
           </div>
         )}
 
-        {/* Durum + Öncelik + Tarih */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+        {/* Durum + Öncelik */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <select value={draft.status} onChange={e => set('status', e.target.value)}
             style={selStyle}>
             <option value="aktif">Aktif</option>
@@ -160,9 +271,52 @@ function ItemModal({ item, sectionId, coordinators = [], onSave, onDelete, onClo
             <option value="normal">⚪ Normal öncelik</option>
             <option value="dusuk">🟢 Düşük öncelik</option>
           </select>
-          <input type="date" value={draft.due_date}
-            onChange={e => set('due_date', e.target.value)}
-            style={{ ...selStyle, cursor: 'pointer' }} />
+        </div>
+
+        {/* Tarih bloğu */}
+        <div style={{
+          padding: '10px 12px', borderRadius: 10,
+          border: '1.5px solid var(--border)',
+          background: 'var(--bg-hover)',
+          marginBottom: 18,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              📅 Tarih & Saat
+            </span>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+              <input type="checkbox" checked={draft.all_day} onChange={e => toggleAllDay(e.target.checked)} />
+              Tüm gün
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontSize: 10.5, color: 'var(--text-light)', marginBottom: 2 }}>Başlangıç</div>
+              <input
+                type={draft.all_day ? 'date' : 'datetime-local'}
+                value={draft.start_input}
+                onChange={e => set('start_input', e.target.value)}
+                style={{ ...selStyle, cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontSize: 10.5, color: 'var(--text-light)', marginBottom: 2 }}>Bitiş (ops.)</div>
+              <input
+                type={draft.all_day ? 'date' : 'datetime-local'}
+                value={draft.end_input}
+                onChange={e => set('end_input', e.target.value)}
+                min={draft.start_input || undefined}
+                style={{ ...selStyle, cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            {(draft.start_input || draft.end_input) && (
+              <button
+                onClick={() => { set('start_input', ''); set('end_input', ''); }}
+                title="Tarihleri temizle"
+                style={{ padding: '6px 10px', borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-end' }}
+              >✕ Temizle</button>
+            )}
+          </div>
         </div>
 
         {/* Butonlar */}
@@ -198,7 +352,8 @@ const selStyle = {
 // ── TEK GÜNDEM KARTI ─────────────────────────────────────────────────────────
 function AgendaCard({ item, onToggle, onClick, accentColor }) {
   const done = item.status === 'tamamlandi';
-  const overdue = !done && isOverdue(item.due_date);
+  const overdue = !done && isOverdue(item);
+  const dateText = fmtDateRange(item);
   const prio = PRIORITY[item.priority] || PRIORITY.normal;
   const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS.aktif;
 
@@ -288,15 +443,15 @@ function AgendaCard({ item, onToggle, onClick, accentColor }) {
       </div>
 
       {/* Alt satır: tarih + yaratıcı */}
-      {(item.due_date || item.created_by_name) && (
+      {(dateText || item.created_by_name) && (
         <div style={{
           display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
           paddingLeft: 30, marginTop: 'auto',
           fontSize: 11, color: 'var(--text-light)',
         }}>
-          {item.due_date && (
+          {dateText && (
             <span style={{ fontWeight: 600, color: overdue && !done ? '#dc2626' : 'var(--text-light)', whiteSpace: 'nowrap' }}>
-              {overdue && !done ? '⚠️ ' : '📅 '}{fmtDate(item.due_date)}
+              {overdue && !done ? '⚠️ ' : '📅 '}{dateText}
             </span>
           )}
           {item.created_by_name && (
@@ -578,6 +733,207 @@ function SectionPanel({
   );
 }
 
+// ── TAKVİM GÖRÜNÜMÜ ──────────────────────────────────────────────────────────
+const WEEKDAYS_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const MONTHS_TR = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+];
+
+function CalendarView({ items, sections, onEventClick }) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [active, setActive] = useState(() => sections.map(s => s.id));
+
+  const toggleSection = (id) => {
+    setActive(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const year  = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  // Pazartesi başlangıç: Pazartesi=1, Pazar=0 → düzelt
+  const firstDow = (firstOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - firstDow);
+
+  const days = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    days.push(d);
+  }
+
+  const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+  const dayEnd   = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+
+  const visibleItems = items.filter(it => active.includes(it.section));
+
+  const eventsOnDay = (day) => {
+    const ds = dayStart(day), de = dayEnd(day);
+    return visibleItems.filter(it => {
+      const sRaw = it.starts_at || (it.due_date ? it.due_date + 'T12:00:00' : null);
+      if (!sRaw) return false;
+      const s = new Date(sRaw);
+      const e = it.ends_at ? new Date(it.ends_at) : s;
+      return e >= ds && s <= de;
+    }).sort((a, b) => {
+      const ta = a.starts_at ? new Date(a.starts_at).getTime() : 0;
+      const tb = b.starts_at ? new Date(b.starts_at).getTime() : 0;
+      return ta - tb;
+    });
+  };
+
+  const sectionById = Object.fromEntries(sections.map(s => [s.id, s]));
+  const today = new Date();
+  const isToday = (d) =>
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const isCurMonth = (d) => d.getMonth() === month;
+
+  const untagged = items.filter(it => {
+    const sRaw = it.starts_at || it.due_date;
+    return !sRaw;
+  }).length;
+
+  const goto = (delta) => setCursor(new Date(year, month + delta, 1));
+  const gotoToday = () => {
+    const d = new Date();
+    setCursor(new Date(d.getFullYear(), d.getMonth(), 1));
+  };
+
+  return (
+    <div style={{
+      background: 'var(--bg-card)', borderRadius: 12,
+      border: '1px solid var(--border)',
+      padding: 16,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+    }}>
+      {/* Üst bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => goto(-1)} title="Önceki ay"
+            style={navBtn}>‹</button>
+          <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text)', minWidth: 170, textAlign: 'center' }}>
+            {MONTHS_TR[month]} {year}
+          </div>
+          <button onClick={() => goto(1)} title="Sonraki ay"
+            style={navBtn}>›</button>
+          <button onClick={gotoToday}
+            style={{ ...navBtn, padding: '5px 12px', fontSize: 12, fontWeight: 600 }}>Bugün</button>
+        </div>
+        {untagged > 0 && (
+          <span style={{ fontSize: 11.5, color: 'var(--text-light)', fontStyle: 'italic' }}>
+            {untagged} gündemin tarihi yok (takvimde görünmez)
+          </span>
+        )}
+      </div>
+
+      {/* Section filtre chip'leri */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {sections.map(s => {
+          const on = active.includes(s.id);
+          return (
+            <button key={s.id} onClick={() => toggleSection(s.id)}
+              style={{
+                padding: '4px 12px', borderRadius: 20, border: '1.5px solid',
+                borderColor: on ? s.color : 'var(--border)',
+                background: on ? s.color + '18' : 'var(--bg-card)',
+                color: on ? s.color : 'var(--text-light)',
+                fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                opacity: on ? 1 : 0.55,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, display: 'inline-block' }} />
+              {s.icon} {s.label.split(' ')[0]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Gün başlıkları */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+        {WEEKDAYS_TR.map((w, i) => (
+          <div key={w} style={{
+            fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+            textAlign: 'center', padding: '6px 0',
+            textTransform: 'uppercase', letterSpacing: 0.5,
+            borderBottom: '1.5px solid var(--border)',
+            background: i >= 5 ? 'var(--bg-hover)' : 'transparent',
+          }}>{w}</div>
+        ))}
+      </div>
+
+      {/* Gün grid'i — 6 satır */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {days.map((d, i) => {
+          const evs = eventsOnDay(d);
+          const inMonth = isCurMonth(d);
+          const today_ = isToday(d);
+          return (
+            <div key={i} style={{
+              minHeight: 96,
+              background: today_ ? '#fef9c3' : (inMonth ? 'var(--bg-card)' : 'var(--bg-hover)'),
+              border: `1px solid ${today_ ? '#facc15' : 'var(--border)'}`,
+              borderRadius: 8, padding: '4px 6px',
+              opacity: inMonth ? 1 : 0.55,
+              display: 'flex', flexDirection: 'column', gap: 2,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                fontSize: 11.5, fontWeight: today_ ? 800 : 600,
+                color: today_ ? '#854d0e' : (inMonth ? 'var(--text)' : 'var(--text-light)'),
+                marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span>{d.getDate()}</span>
+                {evs.length > 3 && (
+                  <span style={{ fontSize: 9.5, color: 'var(--text-light)', fontWeight: 600 }}>
+                    +{evs.length - 3}
+                  </span>
+                )}
+              </div>
+              {evs.slice(0, 3).map(ev => {
+                const sec = sectionById[ev.section] || { color: '#6b7280' };
+                const done = ev.status === 'tamamlandi';
+                const timeStr = (!ev.all_day && ev.starts_at) ? fmtTime(ev.starts_at) + ' ' : '';
+                return (
+                  <button
+                    key={ev.id}
+                    onClick={() => onEventClick && onEventClick(ev)}
+                    title={ev.title}
+                    style={{
+                      textAlign: 'left', display: 'block', width: '100%',
+                      fontSize: 10.5, padding: '3px 6px', borderRadius: 5,
+                      background: done ? '#f3f4f6' : sec.color + '18',
+                      color: done ? '#9ca3af' : sec.color,
+                      border: `1px solid ${done ? '#e5e7eb' : sec.color + '40'}`,
+                      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      textDecoration: done ? 'line-through' : 'none',
+                    }}
+                  >
+                    {timeStr}{ev.title}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const navBtn = {
+  padding: '5px 10px', borderRadius: 7,
+  border: '1.5px solid var(--border)',
+  background: 'var(--bg-card)', color: 'var(--text)',
+  fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  lineHeight: 1,
+};
+
 // ── ANA SAYFA ─────────────────────────────────────────────────────────────────
 export default function DirectorAgendas({ user, profile }) {
   const [items, setItems]         = useState([]);
@@ -587,6 +943,7 @@ export default function DirectorAgendas({ user, profile }) {
   const [showDone, setShowDone]   = useState(false);
   const [filterSection, setFilterSection] = useState('');
   const [coordFilter, setCoordFilter] = useState(''); // koordinatöre göre alt-filtre (koordinator_takip bölümü)
+  const [viewMode, setViewMode]   = useState('cards'); // 'cards' | 'calendar'
 
   // Erişim kontrolü
   const allowed = ['direktor', 'asistan'].includes(profile?.role);
@@ -678,13 +1035,32 @@ export default function DirectorAgendas({ user, profile }) {
         </div>
 
         {/* Özet + kontroller */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {/* Görünüm toggle */}
+          <div style={{ display: 'inline-flex', borderRadius: 20, border: '1.5px solid var(--border)', background: 'var(--bg-card)', padding: 2 }}>
+            <button
+              onClick={() => setViewMode('cards')}
+              style={{
+                padding: '4px 14px', borderRadius: 18, border: 'none',
+                background: viewMode === 'cards' ? '#111827' : 'transparent',
+                color: viewMode === 'cards' ? 'white' : 'var(--text-muted)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>🗂 Kart</button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              style={{
+                padding: '4px 14px', borderRadius: 18, border: 'none',
+                background: viewMode === 'calendar' ? '#111827' : 'transparent',
+                color: viewMode === 'calendar' ? 'white' : 'var(--text-muted)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}>📅 Takvim</button>
+          </div>
           {allActive > 0 && (
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1d4ed8', padding: '4px 12px', borderRadius: 20, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
               {allActive} açık gündem
             </span>
           )}
-          {allDone > 0 && (
+          {viewMode === 'cards' && allDone > 0 && (
             <button
               onClick={() => setShowDone(s => !s)}
               style={{ fontSize: 12.5, fontWeight: 600, color: showDone ? '#15803d' : 'var(--text-muted)', padding: '4px 12px', borderRadius: 20, background: showDone ? '#f0fdf4' : 'var(--bg-card)', border: `1px solid ${showDone ? '#bbf7d0' : 'var(--border)'}`, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -694,31 +1070,33 @@ export default function DirectorAgendas({ user, profile }) {
         </div>
       </div>
 
-      {/* Bölüm filtresi */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setFilterSection('')}
-          style={{
-            padding: '5px 14px', borderRadius: 20, border: '1.5px solid',
-            borderColor: !filterSection ? '#111827' : 'var(--border)',
-            background: !filterSection ? '#111827' : 'var(--bg-card)',
-            color: !filterSection ? 'white' : 'var(--text-muted)',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-          }}>Tümü</button>
-        {SECTIONS.map(s => (
-          <button key={s.id}
-            onClick={() => setFilterSection(s.id)}
+      {/* Bölüm filtresi (sadece kart görünümünde) */}
+      {viewMode === 'cards' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setFilterSection('')}
             style={{
               padding: '5px 14px', borderRadius: 20, border: '1.5px solid',
-              borderColor: filterSection === s.id ? s.color : 'var(--border)',
-              background: filterSection === s.id ? s.color + '18' : 'var(--bg-card)',
-              color: filterSection === s.id ? s.color : 'var(--text-muted)',
+              borderColor: !filterSection ? '#111827' : 'var(--border)',
+              background: !filterSection ? '#111827' : 'var(--bg-card)',
+              color: !filterSection ? 'white' : 'var(--text-muted)',
               fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-            {s.icon} {s.label.split(' ')[0]}
-          </button>
-        ))}
-      </div>
+            }}>Tümü</button>
+          {SECTIONS.map(s => (
+            <button key={s.id}
+              onClick={() => setFilterSection(s.id)}
+              style={{
+                padding: '5px 14px', borderRadius: 20, border: '1.5px solid',
+                borderColor: filterSection === s.id ? s.color : 'var(--border)',
+                background: filterSection === s.id ? s.color + '18' : 'var(--bg-card)',
+                color: filterSection === s.id ? s.color : 'var(--text-muted)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              {s.icon} {s.label.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Yükleniyor */}
       {loading && (
@@ -728,8 +1106,17 @@ export default function DirectorAgendas({ user, profile }) {
         </div>
       )}
 
-      {/* Bölümler */}
-      {!loading && visibleSections.map(section => (
+      {/* Takvim görünümü */}
+      {!loading && viewMode === 'calendar' && (
+        <CalendarView
+          items={items}
+          sections={SECTIONS}
+          onEventClick={(it) => openEdit(it)}
+        />
+      )}
+
+      {/* Kart görünümü — bölümler */}
+      {!loading && viewMode === 'cards' && visibleSections.map(section => (
         <SectionPanel
           key={section.id}
           section={section}
